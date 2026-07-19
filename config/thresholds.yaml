@@ -1,0 +1,16 @@
+# config/thresholds.yaml — 驗證層閾值（C_i 段落）
+# 載入：CardinalityConfig.from_yaml("config/thresholds.yaml", key="cardinality")
+cardinality:
+  n_known: 35          # 硬邊界，來自 ues.txt（場域已知裝置母體）
+  eps_low: 0.15        # 下界容忍（允許約 15% UE 該窗閒置）
+  eps_high: 0.0        # 上界容忍（灌水無良性成因，零容忍）
+  kappa: 0.10          # 高斯衰減陡度（越小越敏感）
+  include_lte: true    # 場域聯集含 LTE 錨點 cell（實測定案：必須 true）
+  lte_cell_id: 1
+  # n_min_override:    # （選用）以絕對值直接覆寫下界
+  # n_max_override:    # （選用）以絕對值直接覆寫上界
+
+# 分級門檻（對齊論文 3.4）
+grades:
+  theta_high: 0.90     # C_i >= θ_high → trusted，正常採信
+  theta_low: 0.50      # θ_low <= C_i < θ_high → low_trust；< θ_low → rejected
