@@ -13,6 +13,12 @@ lstm_baseline_anchor.py — 單節點時序 LSTM 基準(重現 Alimohammadi 風�
         CV≈0.65–0.70,是唯一夠密夠連續的單節點序列。這也符合 Alimohammadi
         單節點時序偵測的原始設定。
 
+本版新增(回應 review):step attack 拆兩口徑,避免『0.07 被誤解為連階梯都抓不到』——
+    - step_full : 整段攻擊窗偵測率(原數字);因階梯偏移進入輸入視窗後被吸收為新基準而偏低
+    - step_onset(k): 注入後前 k 窗內是否『至少觸發一次』;若 onset≫full,證明起始點其實被抓到
+    LSTM 為離線一次訓練、測試時凍結(no online update);其對緩慢漂移失效源於滑動輸入視窗
+    吸收漂移,而非線上 re-baseline。
+
 輸入:data/si_lstm_seeds/ues1_t300_seed42*.txt(你已收集的 4 個 300s seed)
 輸出:
     data/results/lstm_baseline_results.json
@@ -41,6 +47,7 @@ WINDOW = 10          # LSTM 看前 10 個窗預測下一窗
 EPOCHS = 60
 HIDDEN = 32
 SEED = 0
+ONSET_K = [1, 2, 3, 5]   # onset 判定:注入後前 k 個可預測窗內是否『至少觸發一次』
 
 np.random.seed(SEED)
 
@@ -167,6 +174,20 @@ def anomaly_flags(model, norm, thr, series):
     return resid > thr    # 布林陣列,長度 = len(series)-WINDOW
 
 
+def onset_and_full(flags, t0):
+    """把偵測拆成兩個口徑,回應 review『0.07 被誤解』:
+       - full : 整段攻擊窗的偵測率 (= flags[atk_region].mean(),原本報的數字)
+       - onset: 注入後前 k 個可預測窗內『至少觸發一次』(命中=1/未命中=0)
+       座標對齊:flags 的 index i 對應原序列第 (i+WINDOW) 窗,
+                 故注入起點 t0 在 flags 中的位置為 fi = t0 - WINDOW。
+    """
+    fi = max(0, t0 - WINDOW)
+    atk = flags[fi:]
+    full = float(atk.mean()) if len(atk) else float("nan")
+    onset = {k: (1.0 if flags[fi:fi + k].any() else 0.0) for k in ONSET_K}
+    return full, onset
+
+
 # ----------------------------------------------------------------------
 # 4. 主實驗:漂移速率掃描,量 LSTM 何時失效
 # ----------------------------------------------------------------------
@@ -195,7 +216,8 @@ def main():
                "drift_rates": drift_rates, "per_fold": [], "summary": {}}
 
     det_by_rate = {r: [] for r in drift_rates}
-    det_step = []
+    det_step = []          # 階梯:整段攻擊窗偵測率(原口徑)
+    onset_step = {k: [] for k in ONSET_K}   # 階梯:onset 命中(前 k 窗)
     fpr_list = []
 
     for test_seed in seeds:
@@ -210,30 +232,36 @@ def main():
 
         t0 = int(len(test) * t0_frac)
 
-        # (b) 突發階梯:應該抓得到
+        # (b) 突發階梯:拆 onset(起始點抓到否) 與 full(整段偵測率)
         step_series = inject_step(test, t0, step_frac)
         sf = anomaly_flags(model, norm, thr, step_series)
-        # 只看攻擊發生後的窗
-        atk_region = slice(max(0, t0 - WINDOW), len(sf))
-        det_step.append(float(sf[atk_region].mean()))
+        step_full, step_onset = onset_and_full(sf, t0)
+        det_step.append(step_full)
+        for k in ONSET_K:
+            onset_step[k].append(step_onset[k])
 
         # (c) 漂移掃描:速率越小,偵測率應該越低(LSTM 學成正常)
-        fold = {"test_seed": test_seed, "fpr": fpr, "step_det": det_step[-1], "drift_det": {}}
+        fold = {"test_seed": test_seed, "fpr": fpr,
+                "step_det_full": step_full,
+                "step_det_onset": step_onset, "drift_det": {}}
         for r in drift_rates:
             dseries = inject_drift(test, t0, r)
             df = anomaly_flags(model, norm, thr, dseries)
-            det = float(df[atk_region].mean())
+            det = float(df[max(0, t0 - WINDOW):].mean())
             det_by_rate[r].append(det)
             fold["drift_det"][str(r)] = det
         results["per_fold"].append(fold)
         drift_str = ", ".join(f"{r}:{fold['drift_det'][str(r)]:.2f}" for r in drift_rates)
-        print(f"  [test={test_seed}] FPR={fpr:.2f}  step_det={det_step[-1]:.2f}  "
+        onset_str = ", ".join(f"k{k}:{step_onset[k]:.0f}" for k in ONSET_K)
+        print(f"  [test={test_seed}] FPR={fpr:.2f}  "
+              f"step_full={step_full:.2f} step_onset({onset_str})  "
               f"drift_det={{{drift_str}}}")
 
     # 匯總
     results["summary"] = {
         "mean_fpr": float(np.mean(fpr_list)),
-        "mean_step_detection": float(np.mean(det_step)),
+        "mean_step_detection_full": float(np.mean(det_step)),
+        "mean_step_detection_onset": {str(k): float(np.mean(onset_step[k])) for k in ONSET_K},
         "mean_drift_detection_by_rate": {str(r): float(np.mean(det_by_rate[r])) for r in drift_rates},
     }
     out_json = os.path.join(OUT_DIR, "lstm_baseline_results.json")
@@ -241,8 +269,11 @@ def main():
         json.dump(results, fh, indent=2, ensure_ascii=False)
     print(f"\n結果寫入 {out_json}")
     print("關鍵數字(跨 seed 平均):")
-    print(f"  乾淨序列誤報率 FPR = {results['summary']['mean_fpr']:.2f}")
-    print(f"  突發階梯偵測率      = {results['summary']['mean_step_detection']:.2f}")
+    print(f"  乾淨序列誤報率 FPR        = {results['summary']['mean_fpr']:.2f}")
+    print(f"  突發階梯 full-window 偵測率 = {results['summary']['mean_step_detection_full']:.2f}  (整段攻擊窗)")
+    for k in ONSET_K:
+        print(f"  突發階梯 onset 命中率(k={k})  = {results['summary']['mean_step_detection_onset'][str(k)]:.2f}  (注入後前 {k} 窗內至少觸發一次)")
+    print("  → onset 遠高於 full 即證明:LSTM 抓得到『起始點』,但階梯偏移進入輸入視窗後被吸收為新基準,故整段偵測率被拉低")
     for r in drift_rates:
         print(f"  漂移速率 {r:<5} 偵測率 = {results['summary']['mean_drift_detection_by_rate'][str(r)]:.2f}")
 
@@ -254,8 +285,12 @@ def main():
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.plot([r * 100 for r in rates], dets, "o-", color="#c92a2a",
                 label="LSTM detection rate (slow drift)")
-        ax.axhline(results["summary"]["mean_step_detection"], ls="--", color="#495057",
-                   label=f"step attack (det={results['summary']['mean_step_detection']:.2f})")
+        _sf = results["summary"]["mean_step_detection_full"]
+        _so = results["summary"]["mean_step_detection_onset"][str(ONSET_K[0])]
+        ax.axhline(_sf, ls="--", color="#495057",
+                   label=f"step attack full-window (det={_sf:.2f})")
+        ax.axhline(_so, ls=":", color="#495057",
+                   label=f"step attack onset k={ONSET_K[0]} (hit={_so:.2f})")
         ax.set_xlabel("drift rate per window (% of mean throughput)")
         ax.set_ylabel("detection rate")
         ax.set_title("Single-node LSTM misses slow drift (baseline weakness)")
