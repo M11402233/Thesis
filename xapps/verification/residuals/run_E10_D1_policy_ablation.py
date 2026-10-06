@@ -129,6 +129,10 @@ def run_policy(windows, anchor, binding, L_H, track=None, legacy_none=False):
             mm = sorted(c for c in cs if c != X.LTE_CELL)
             if mm:
                 last_serving[i] = mm[0]
+        # 缺報中斷連續計數（與 zt_kpm_xapp.py 相同；E11 規格 v2）
+        for i in list(dwell):
+            if i not in cur:
+                dwell[i] = 0
 
         # 逐 UE 之 D1 證據強度（與 verify_hi_d1 同一公式）
         levels = {}

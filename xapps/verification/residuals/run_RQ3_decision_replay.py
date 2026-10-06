@@ -319,12 +319,13 @@ def draw(res, path):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     atks = [a for a, *_ in ATTACKS]
-    fig, axes = plt.subplots(1, 2, figsize=(13, 4.8))
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5.2), sharey=True)
     for ax, ann_name in zip(axes, [p[0] for p in ANN_POLICIES]):
         xs = np.arange(len(atks)); w = 0.2
         for i, (consumer, col) in enumerate(zip(
                 CONSUMERS, ["#adb5bd", "#2b8a3e", "#e8590c", "#1971c2"])):
-            reg = [res[f"{ann_name}|{a}|{consumer}"]["regret_mean_ms"] or 0 for a in atks]
+            # 相對 regret（真值最佳延遲之百分比），與 4.12.4 表格同一口徑
+            reg = [100 * (res[f"{ann_name}|{a}|{consumer}"]["regret_rel_mean"] or 0) for a in atks]
             ax.bar(xs + (i - 1.5) * w, reg, w, color=col, label=consumer, zorder=3)
         ax2 = ax.twinx()
         av = [res[f"{ann_name}|{a}|C_strict"]["availability"] or 0 for a in atks]
@@ -332,16 +333,16 @@ def draw(res, path):
                  label="availability (C_strict)", zorder=4)
         ax2.set_ylim(0, 1.05); ax2.set_ylabel("decision availability", color="#c92a2a")
         ax.set_xticks(xs); ax.set_xticklabels(atks, rotation=15, fontsize=8.5)
-        ax.set_ylabel("mean regret on true delay (ms)")
+        ax.set_ylabel("relative regret on true delay (%)")
         ax.set_title(f"annotation policy: {ann_name}", fontsize=10.5)
         ax.grid(alpha=0.3, axis="y", zorder=0)
         if ann_name == ANN_POLICIES[0][0]:
             h1, l1 = ax.get_legend_handles_labels(); h2, l2 = ax2.get_legend_handles_labels()
-            ax.legend(h1 + h2, l1 + l2, fontsize=8.5, loc="upper left")
+            fig.legend(h1 + h2, l1 + l2, fontsize=8.5, loc="lower center", ncol=5, frameon=False)
     fig.suptitle("RQ3: what remains usable after excluding untrusted measurements\n"
                  "(bars = decision cost evaluated on true delays; line = fraction of "
                  "windows where a decision can still be made)", fontsize=11)
-    fig.tight_layout(rect=[0, 0, 1, 0.9])
+    fig.tight_layout(rect=[0, 0.07, 1, 0.9])
     fig.savefig(path, dpi=180)
     print(f"圖已存: {path}")
 

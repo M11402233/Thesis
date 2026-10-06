@@ -9,7 +9,9 @@ make_fig_Hi_D1_grading.py — 重繪 H_i-D1 分級圖(修正圖文矛盾)
     low-trust  2 <= z < 3
     trusted    z < 2
 但 4.8.5 已定案:D1 單獨違反**不**直接 hard reject,z >= tau_reject 僅為
-strong statistical evidence,須交叉佐證或多窗持續才升級 rejected。
+strong statistical evidence;依 4.4.0,唯一升級為 rejected 之途徑為同窗 S_i 違反且指向
+同一節點(R2_SI_D1_BOUND),不存在多窗持續之升級路徑。
+(2026-10-06 修訂:右半對應表改為 4.4.0／4.8.5 之六列規則與規則代碼。)
 
 其根因不只在繪圖:run_Hi_experiments.py 的 grade(z) 直接回傳
 'rejected'/'low-trust'/'trusted',把「證據強度」與「信任狀態」混為一談。
@@ -19,11 +21,12 @@ strong statistical evidence,須交叉佐證或多窗持續才升級 rejected。
     fuse_d1(...)    -> 'rejected' / 'low-trust' / 'trusted' (融合層才能產生的東西)
 
 【對應 4.8.5 的五列規則】
-    D2 violated                        -> rejected           (hard veto)
-    D1 z >= tau_reject  且有佐證        -> rejected
-    D1 z >= tau_reject  單獨            -> low-trust / investigation
-    tau_warn <= D1 z < tau_reject       -> low-trust
-    D1 z < tau_warn                     -> trusted
+    D2 violated                                   -> rejected   (R1_D2_VETO)
+    D1 strong + S_i violated, same node           -> rejected   (R2_SI_D1_BOUND)
+    D1 strong + S_i violated, different node      -> low-trust  (R2_SI_D1_UNBOUND)
+    D1 strong alone                               -> low-trust  (R2_D1_STRONG)
+    D1 warning                                    -> low-trust  (R2_D1_WEAK)
+    D1 none                                       -> 由其他殘差決定
 
 【輸出】
     fig_Hi_D1_grading.png   左:z_d 分布與三個證據等級  右:證據 -> 信任狀態對應
@@ -150,7 +153,7 @@ def d1_evidence(z):
 def fuse_d1(evidence, d2_violated=False, corroborated=False):
     """信任狀態只能由融合層產生(4.8.5 五列規則)。
 
-    corroborated: 同窗有 C_i/S_i 示警,或該證據已多窗持續。
+    corroborated: 同窗 S_i 違反且指向同一節點(R2_SI_D1_BOUND);無多窗持續升級路徑。
     """
     if d2_violated:
         return "rejected"                    # hard veto,架構斷言
@@ -239,11 +242,12 @@ def draw(clean_z, inj_z, out_path, lang="en"):
             maph="證據  →  信任狀態", note="D1 單獨違反不構成 hard veto",
         )
         rows = [
-            ("H_i-D2 violated（瞬移）", "rejected", C_STRONG, "hard veto"),
-            ("D1 strong  +  交叉佐證／多窗持續", "rejected", C_STRONG, ""),
-            ("D1 strong  單獨", "low-trust / investigation", C_WARN, "← 舊圖誤標為 rejected"),
-            ("D1 warning", "low-trust", C_WARN, ""),
-            ("D1 none", "trusted", C_TRUST, ""),
+            ("H_i-D2 violated（瞬移）", "rejected", C_STRONG, "R1_D2_VETO（L1）"),
+            ("D1 strong + S_i 違反，同一節點", "rejected", C_STRONG, "R2_SI_D1_BOUND"),
+            ("D1 strong + S_i 違反，不同節點", "low-trust", C_WARN, "R2_SI_D1_UNBOUND"),
+            ("D1 strong 單獨", "low-trust", C_WARN, "R2_D1_STRONG"),
+            ("D1 warning", "low-trust", C_WARN, "R2_D1_WEAK"),
+            ("D1 none", "由其他殘差決定", C_TRUST, "不觸發"),
         ]
     else:
         T = dict(
@@ -259,12 +263,12 @@ def draw(clean_z, inj_z, out_path, lang="en"):
             note="D1 alone is never a hard veto",
         )
         rows = [
-            ("H_i-D2 violated (teleport)", "rejected", C_STRONG, "hard veto"),
-            ("D1 strong  +  corroboration / persistence", "rejected", C_STRONG, ""),
-            ("D1 strong  alone", "low-trust / investigation", C_WARN,
-             "← previously mislabelled"),
-            ("D1 warning", "low-trust", C_WARN, ""),
-            ("D1 none", "trusted", C_TRUST, ""),
+            ("H_i-D2 violated (teleport)", "rejected", C_STRONG, "R1_D2_VETO (L1)"),
+            ("D1 strong + S_i violated, same node", "rejected", C_STRONG, "R2_SI_D1_BOUND"),
+            ("D1 strong + S_i violated, other node", "low-trust", C_WARN, "R2_SI_D1_UNBOUND"),
+            ("D1 strong alone", "low-trust", C_WARN, "R2_D1_STRONG"),
+            ("D1 warning", "low-trust", C_WARN, "R2_D1_WEAK"),
+            ("D1 none", "decided by other residuals", C_TRUST, "no rule fired"),
         ]
 
     fig, (ax, bx) = plt.subplots(
@@ -336,11 +340,9 @@ def draw(clean_z, inj_z, out_path, lang="en"):
         bx.text(0.635, y, state, fontsize=10.5, va="center", ha="left",
                 color=colour, weight="bold")
         if tag:
-            bx.text(0.635, y - 0.052, tag, fontsize=8.5, va="center",
+            bx.text(0.635, y - 0.045, tag, fontsize=8.5, va="center",
                     ha="left", color=C_GRAY, style="italic")
-            y -= 0.155
-        else:
-            y -= 0.13
+        y -= 0.12
 
     bx.axhline(0.075, xmin=0.02, xmax=0.98, color="#CCCCCC", lw=1)
     bx.text(0.5, 0.035, T["note"], ha="center", fontsize=10, style="italic",

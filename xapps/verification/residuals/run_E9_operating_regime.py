@@ -189,7 +189,7 @@ def main():
                     onset[r][af].append(
                         (ts, float((z[t0:t0 + ONSET_K] > TAU_S).any())))
 
-    # ---------------- 彙整：macro 平均 + per-seed 範圍 ----------------
+    # ---------------- 彙整：seed×cell 樣本等權平均 + per-seed 範圍 ----------------
     def agg(pairs):
         vals = [v for _, v in pairs]
         by_seed = collections.defaultdict(list)

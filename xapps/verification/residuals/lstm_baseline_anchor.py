@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-lstm_baseline_anchor.py — 單節點時序 LSTM 基準(重現 Alimohammadi 風格),跑在 LTE 錨點序列上
+lstm_baseline_anchor.py — 單節點時序 LSTM 預測式基準(自我參照類),跑在 LTE 錨點序列上
+
+範圍界定:此為「以自身近期觀測為參照之預測式模型」,非 Alimohammadi 等人之重現——
+        其 2026 版偵測器為以帶標籤注入資料訓練之監督式時序分類器。本檔之盲點結論
+        不得外推至監督式模型;監督式之對照見 run_E9b_supervised_baseline.py。
 
 角色定位:這是論文的「被規避的對照組」。它的任務不是抓到所有攻擊,而是要展示
         「單節點時序方法對緩慢漂移天生無力」——LSTM 會逐步把漂移學成正常,

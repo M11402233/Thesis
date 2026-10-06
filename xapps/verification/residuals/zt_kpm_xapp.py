@@ -101,7 +101,7 @@ RULE = {
     "R2_SI_D1_BOUND":   ("rejected",  2, "S_i + D1 cross-corroboration (same node)"),
     "R2_SI_D1_LEGACY":  ("rejected",  2, "S_i + D1 co-occurrence, NO binding check (legacy)"),
     "R2_SI_D1_UNBOUND": ("low-trust", 2, "S_i + D1 co-occurrence (different objects)"),
-    "R2_SI_ALONE":      ("low-trust", 2, "S_i alone (escalate on persistence)"),
+    "R2_SI_ALONE":      ("low-trust", 2, "S_i alone (no persistence escalation; 4.4.0)"),
     "R2_D1_STRONG":     ("low-trust", 2, "H_i-D1 strong evidence -> investigation"),
     "R2_D1_WEAK":       ("low-trust", 2, "H_i-D1 weak evidence"),
     "R3_ABSTAIN":       ("abstain",   3, "S_i unavailable (peer<MIN_PEER)"),
@@ -206,24 +206,30 @@ class TrustAnchor:
         vals, dwell = [], collections.defaultdict(list)
         for f in train_files:
             src = TraceReplaySource(f)
-            seq = collections.defaultdict(list)     # imsi -> 狀態序列
-            for w, cells in src.windows():
+            seq = collections.defaultdict(list)     # imsi -> 狀態序列（每窗一筆）
+            wins = list(src.windows())
+            known = {i for _, cells in wins for c in cells for i in cells[c]}
+            for w, cells in wins:
                 for c, ues in cells.items():
                     if c != LTE_CELL:
                         vals += list(ues.values())
                 present = {i: ("mmw" if any(c != LTE_CELL for c in cells if i in cells[c])
                                else "lte")
                            for c in cells for i in cells[c]}
-                for i, st in present.items():
-                    seq[i].append(st)
+                for i in known:
+                    seq[i].append(present.get(i, "absent"))
+            # 與執行端相同之缺值定義（E11 規格 v2）：LTE-only 停留僅於回到 mmWave 時
+            # 構成完整事件；被缺報（absent）截斷之片段不列為停留事件。
             for i, s in seq.items():
                 run = 0
                 for st in s:
                     if st == "lte":
                         run += 1
-                    else:
+                    elif st == "mmw":
                         if run:
                             dwell[i].append(run)
+                        run = 0
+                    else:
                         run = 0
         med = np.median(vals) if vals else 0.0
         self.scale = (1.4826 * (float(np.median(np.abs(np.array(vals) - med))) + 1e-9)
@@ -450,6 +456,12 @@ def run_xapp(source, anchor, eval_mode="all", node_of_interest=None, collect=Tru
             mm = [c for c in cs if c != LTE_CELL]
             if mm:
                 last_serving[i] = min(mm)
+        # 缺報中斷連續計數（2026-10-06，E11 規格 v2）：當窗未出現於任何報告之 UE，
+        # 無法確認其仍為 LTE-only，故中斷本段計數；再次觀測到 LTE-only 時自新段起算。
+        # 中斷不代表正常或 trusted，C_i 等其他證據照規則判定。
+        for i in list(dwell_runs):
+            if i not in cur_map:
+                dwell_runs[i] = 0
 
         mmw_active = [c for c in sorted(cells) if c != LTE_CELL]
         if node_of_interest is not None:
