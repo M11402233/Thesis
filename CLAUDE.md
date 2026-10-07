@@ -70,6 +70,8 @@
 |---|---|
 | `zt_kpm_xapp.py` | 驗證 xApp、規則稽核、runtime（`--fusion bound --eval-mode all`） |
 | `datasets.py` | **資料集登錄**：`ZT_DATASET=dsh｜dc｜d28｜d30`（預設 dsh＝修訂前行為，2026-10-06 回歸逐位重現）。決定資料路徑、N_known、aux 路徑、輸出目錄（d28／d30 → `data/results/d28/`、`data/results/d30/`，不覆寫既有結果）。D-SH 專屬期望值（742／2335／83／0、1803／575／766／6、凍結 FPR、4.7.7 十等分表）僅於 dsh 檢查；非 dsh 時明示略過，其餘檢查照常 |
+| `prepare_d30.py` | D-30 分析用主檔：自原始檔截取 0–299 窗至 `data/ues30_seeds/analysis/`（d30 之 DATA_DIR），內建缺窗、前綴、N_total、aux 一致檢查；每個 seed 收集完成後執行 |
+| `prb_reader.py` | 原生 PRB 讀取（`du-cell-*.txt[.gz]`，Σ_UE `RRU.PrbUsedDl.UEID`）＋ RxPacketTrace 交叉驗證；`PRB_CONST`=139、`N_RB_CFG1`=28 |
 | `make_fig_Ci_unified.py` | Fig 4-1～4-4 統一版（讀 `Ci_unified_<tag>.json`；檔名加 `_<tag>`） |
 | `run_Ci_unified.py` | C_i 之 E0–E8 統一版（規格 `docs/thesis/Ci_unified_spec.md`）：判定一律經 `verify_ci`／`fuse`、載入經 `TraceReplaySource`、`--ues` 檢查 N_known；`--mode legacy` 須重現 D-C 舊輸出。舊 `run_Ci_experiments.py`（5 % 容忍帶）不再使用 |
 | `run_Si_reference_ablation.py` | 4.7.4 參照機制消融 |
@@ -89,8 +91,9 @@
 - 收集：`scripts/collect_ues30.sh`，兩個實例平行（A：4200/4202/4204/4206；B：4201/4203/4205/4207），log `data/ues30_seeds/collect_A.log`、`collect_B.log`。2026-10-06 14:10 UTC 開始。**一律以 `setsid nohup` 啟動**（Claude 工作階段結束會殺掉其子行程）。每個 seed 於模擬約 30 s 時檢查記憶體斜率；是否加開第 3 個實例須問使用者。
 - 校準：`data/ues30_seeds/calibration_20261006/README.md`（確定性、`--totalUes` 等價性、E2 NR 副作用、PRB 交叉驗證）。
 - **E2 NR 報表之副作用**：最後一窗遺失（故 simTime = 301）；PDCP 統計每次報表後歸零（管線不用 PDCP）；RLC／PHY 不受影響。
-- **PRB**：原生 `RRU.PrbUsedDl` = 排程符號數 ÷（slot 數 × 14）× 139；139 為原始碼寫死（configuration 1 實際 PRB 數待查證）；cell 層級欄位因 uint32 逐 UE 截斷而偏低，**以 UE 層級 `RRU.PrbUsedDl.UEID` 加總為準**；du-cell 之 timestamp 為實際時間，報表依序對應模擬第 k 秒。
-- **待辦（資料到齊後）**：分析時截斷至 0–299 窗（D-30 檔案含第 300 窗）；PRB 讀取器；28→30 之規格文件與正文更新。
+- **PRB**：原生 `RRU.PrbUsedDl` = 排程符號數 ÷（slot 數 × 14）× 139；139 為原始碼寫死（configuration 1 實際為 28，見下）；cell 層級欄位因 uint32 逐 UE 截斷而偏低，**以 UE 層級 `RRU.PrbUsedDl.UEID` 加總為準**；du-cell 之 timestamp 為實際時間，報表依序對應模擬第 k 秒。
+- **configuration 1 實際 RB 數 = 28**（numerology 2，RB 寬 720 kHz，ceil(20 MHz ÷ 720 kHz)，依 ns-3 原始碼）；139 = ceil(100 MHz ÷ 720 kHz)（configuration 2 之載波）。
+- **待辦（資料到齊後）**：每個 seed 完成後跑 `prepare_d30.py`（0–299 窗）與 `prb_reader.py <aux>`；RQ3 改用原生 PRB 之規格草稿 `docs/thesis/RQ3_PRB_spec_draft.md`（【待決】D1–D5 待使用者定案）；28→30 之規格文件與正文更新。
 - 代價須於正文誠實說明：C_i 之 seed 數由 10 降為 8（窗數由 600 增為 2,400）。
 - **D-30 執行順序**（rt 版之檢查依賴同資料集之舊版輸出，故舊版須先跑）：`export ZT_DATASET=d30` → `zt_kpm_xapp.py --fusion bound --eval-mode all` → `run_E9_operating_regime.py` → `run_E9_rt.py` → `run_E9b_rt.py`（校準目標改取同資料集 E9 空間乾淨 FPR，定義不變）→ `run_E9c_rt.py`／`run_E9d_rt.py` → `run_E13_tauS_sensitivity.py` → `run_E13_rt.py` → `run_slow_poisoning_suite.py` → `run_slow_poisoning_rt.py` → `run_E10_D1_policy_ablation.py` → `run_RQ3_decision_replay.py` → E11／E11b／E12／B4 → `run_Ci_unified.py` → 圖。rt 系列之回歸基準於 d30 為「未核對」，須人工核對後 `--set-baseline`。
 

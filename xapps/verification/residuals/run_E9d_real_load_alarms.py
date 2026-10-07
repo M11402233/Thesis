@@ -69,9 +69,7 @@ def aux_dir(sd):
 def check_aux(seeds):
     res = {}
     for sd in seeds:
-        a = os.path.join(aux_dir(sd), "DlE2RlcStats.txt")
-        b = os.path.join(SEEDS_DIR, DS.PATTERN.replace("*", sd))
-        res[sd] = os.path.exists(a) and filecmp.cmp(a, b, shallow=False)
+        res[sd] = DS.aux_matches_main(sd)
     return res
 
 

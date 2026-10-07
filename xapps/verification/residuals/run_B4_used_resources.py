@@ -62,9 +62,7 @@ def main():
     args = ap.parse_args()
     seeds = [DS.seed_of(f) for f in DS.files()]
     for s in seeds:
-        a = DS.aux_path(s, "DlE2RlcStats.txt")
-        b = os.path.join(DS.DATA_DIR, DS.PATTERN.replace("*", s))
-        if not filecmp.cmp(a, b, shallow=False):
+        if not DS.aux_matches_main(s):
             raise SystemExit(f"✗ 檢查 3：seed {s} aux 與 D-SH 不一致")
     W = {}
     for s in seeds:
