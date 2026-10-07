@@ -42,9 +42,10 @@ import glob
 import json
 import collections
 import numpy as np
+import datasets as DS
 
-DATA_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
-OUT_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+DATA_DIR = DS.DATA_DIR
+OUT_DIR = DS.results_dir()
 os.makedirs(OUT_DIR, exist_ok=True)
 
 WINDOW = 10          # LSTM 看前 10 個窗預測下一窗
@@ -79,10 +80,10 @@ def load_anchor_series(path: str) -> np.ndarray:
 
 
 def load_all():
-    files = sorted(glob.glob(os.path.join(DATA_DIR, "ues1_t300_seed*.txt")))
+    files = sorted(glob.glob(os.path.join(DATA_DIR, DS.PATTERN)))
     if not files:
         # 後備:也接受放在 uploads 或當前目錄的檔案
-        files = sorted(glob.glob("ues1_t300_seed*.txt"))
+        files = sorted(glob.glob(DS.PATTERN))
     series = {}
     for f in files:
         seed = os.path.basename(f).split("seed")[-1].replace(".txt", "")

@@ -40,13 +40,14 @@ import argparse
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import datasets as DS
 from run_Hi_experiments import (load, state_seq, dwell_events, mmw_cell_seq,
                                 detect_D2, inject_teleport)
 
 ROOT = os.path.expanduser("~/oran-zt-kpm-verification/data")
-DSH = os.path.join(ROOT, "si_lstm_seeds")
+DSH = DS.DATA_DIR
 DC = os.path.join(ROOT, "batchFinal_seeds")
-OUT_DIR = os.path.join(ROOT, "results")
+OUT_DIR = DS.results_dir()
 EDGE_SPLIT = 0.55
 K_BIN = 5
 CHI2_CRIT_001_DF4 = 13.277
@@ -83,7 +84,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", default=OUT_DIR)
     args = ap.parse_args()
-    fs = sorted(glob.glob(os.path.join(DSH, "ues1_t300_seed*.txt")))
+    fs = sorted(glob.glob(os.path.join(DSH, DS.PATTERN)))
     fc = sorted(glob.glob(os.path.join(DC, "seed*.txt")))
     if len(fs) != 4:
         raise SystemExit(f"D-SH 應為 4 檔，找到 {len(fs)}")

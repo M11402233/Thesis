@@ -1,0 +1,28 @@
+diff --git a/scratch/scenario-three.cc b/scratch/scenario-three.cc
+index 6e4dafd1..50d2c160 100644
+--- a/scratch/scenario-three.cc
++++ b/scratch/scenario-three.cc
+@@ -218,6 +218,12 @@ static ns3::GlobalValue
+ static ns3::GlobalValue g_ues ("ues", "Number of UEs for each mmWave ENB.", ns3::UintegerValue (7),
+                                ns3::MakeUintegerChecker<uint8_t> ());
+ 
++// 2026-10-06 (thesis D-30): total UE count independent of the 7 mmWave ENBs.
++// 0 (default) keeps the original behaviour nUeNodes = ues * 7.
++static ns3::GlobalValue g_totalUes ("totalUes",
++                                    "Total number of UEs; if > 0 overrides ues * nMmWaveEnbNodes",
++                                    ns3::UintegerValue (0), ns3::MakeUintegerChecker<uint32_t> (0, 255));
++
+ static ns3::GlobalValue g_indicationPeriodicity ("indicationPeriodicity", "E2 Indication Periodicity reports (value in seconds)", ns3::DoubleValue (0.1),
+                                    ns3::MakeDoubleChecker<double> (0.01, 2.0));
+ 
+@@ -598,7 +604,9 @@ main (int argc, char *argv[])
+   uint8_t nLteEnbNodes = 1;
+   GlobalValue::GetValueByName ("ues", uintegerValue);
+   uint32_t ues = uintegerValue.Get ();
+-  uint8_t nUeNodes = ues * nMmWaveEnbNodes;
++  GlobalValue::GetValueByName ("totalUes", uintegerValue);
++  uint32_t totalUes = uintegerValue.Get ();
++  uint8_t nUeNodes = (totalUes > 0) ? totalUes : ues * nMmWaveEnbNodes;
+ 
+   NS_LOG_INFO (" Bandwidth " << bandwidth << " centerFrequency " << double (centerFrequency)
+                              << " isd " << isd << " numAntennasMcUe " << numAntennasMcUe

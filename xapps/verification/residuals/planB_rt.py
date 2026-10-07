@@ -143,7 +143,8 @@ def onset_hit(flags, S, w_on):
 # ---------------- 回歸基準（人工核對後才建立） ----------------
 import json as _json
 import os as _os
-BASELINE_PATH = _os.path.expanduser("~/oran-zt-kpm-verification/data/results/planB_rt_baselines.json")
+import datasets as DS
+BASELINE_PATH = _os.path.join(DS.results_dir(), "planB_rt_baselines.json")
 
 
 def check_baseline(name, values, set_baseline=False, note=""):

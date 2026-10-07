@@ -31,11 +31,12 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import zt_kpm_xapp as X
+import datasets as DS
 
 X.FUSION_MODE = "bound"
 
-DATA_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
-OUT_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+DATA_DIR = DS.DATA_DIR
+OUT_DIR = DS.results_dir()
 
 # 4.11.2 之預期:(decision, rule_id, action)
 EXPECTED = {
@@ -98,7 +99,7 @@ def main():
         DATA_DIR, os.path.join("seeds", "si_lstm_seeds"), "."]
     files = []
     for d in search:
-        files = sorted(glob.glob(os.path.join(d, "ues1_t300_seed*.txt")))
+        files = sorted(glob.glob(os.path.join(d, DS.PATTERN)))
         if len(files) >= 2:
             break
     if len(files) < 2:

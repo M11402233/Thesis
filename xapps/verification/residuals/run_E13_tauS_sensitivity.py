@@ -36,6 +36,7 @@ import collections
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import datasets as DS
 import run_E9_operating_regime as E9
 from run_E9_operating_regime import load_cell_delay, global_scale, inject_drift, inject_step
 from run_slow_poisoning_suite import find_files, build_samples, zfun, agg_seed, REFS
@@ -176,11 +177,13 @@ def main():
     dec = decile_table(data, seeds)
     # ---- 一致性檢查 3 ----
     bad = []
-    for r, (f, z, p) in zip(dec["rows"], PUBLISHED_477):
+    for r, (f, z, p) in zip(dec["rows"], PUBLISHED_477 if DS.is_reference() else []):
         if (round(r["fpr"], 3), round(r["mean_z"], 2), round(r["mean_peer"], 2)) != (f, z, p):
             bad.append((r["decile"], (f, z, p), (round(r["fpr"], 3), round(r["mean_z"], 2),
                                                  round(r["mean_peer"], 2))))
-    if tuple(round(x, 3) for x in dec["halves_decile_mean"]) != PUBLISHED_477_HALVES:
+    if not DS.is_reference():
+        DS.skip_note("一致性檢查 3（十等分表屬 D-SH 之 4.7.7）")
+    elif tuple(round(x, 3) for x in dec["halves_decile_mean"]) != PUBLISHED_477_HALVES:
         bad.append(("halves", PUBLISHED_477_HALVES, dec["halves_decile_mean"]))
     print("── 一致性檢查 3（十等分表 vs 4.7.7）──")
     if bad:
@@ -193,10 +196,13 @@ def main():
     # ---- 一致性檢查 2 ----
     got = {k: res_f["4.0"]["counts"].get(k, 0) for k in EXPECTED_P3}
     print("── 一致性檢查 2（τ_S = 4 融合層 vs 4.9.6.5 P3）──")
-    if got != EXPECTED_P3 or res_f["4.0"]["n"] != 3150:
+    if not DS.is_reference():
+        DS.skip_note(f"一致性檢查 2（1,803／575／766／6）；本次 {got}")
+    elif got != EXPECTED_P3 or res_f["4.0"]["n"] != 3150:
         print(f"  ✗ 期望 {EXPECTED_P3}（n=3150）／本次 {got}（n={res_f['4.0']['n']}）")
         raise SystemExit("不一致，停止，不寫檔。")
-    print("  ✓ 1,803／575／766／6（n = 3,150）\n")
+    else:
+        print("  ✓ 1,803／575／766／6（n = 3,150）\n")
 
     res = {"taus": TAUS, "residual": res_r, "fusion_uebound_L1": res_f,
            "decile_spatial_tau4": dec,

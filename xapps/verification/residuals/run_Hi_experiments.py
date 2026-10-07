@@ -6,9 +6,10 @@
 """
 import collections, glob, os, json
 import numpy as np
+import datasets as DS
 
-DATA_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
-OUT_DIR  = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+DATA_DIR = DS.DATA_DIR
+OUT_DIR  = DS.results_dir()
 THETA_HIGH = 3.0   # rejected 門檻(≈3σ, p_emp≲0.01)
 THETA_LOW  = 2.0   # low-trust 門檻(≈2σ)
 
@@ -109,8 +110,8 @@ def detect_D2(mmw_seq, state):
     return cnt
 
 def main():
-    files=sorted(glob.glob(os.path.join(DATA_DIR,"ues1_t300_seed*.txt"))) or \
-          sorted(glob.glob("ues1_t300_seed*.txt"))
+    files=sorted(glob.glob(os.path.join(DATA_DIR,DS.PATTERN))) or \
+          sorted(glob.glob(DS.PATTERN))
     seeds=[os.path.basename(f).split('seed')[-1].replace('.txt','') for f in files]
     print(f"載入 {len(seeds)} seeds: {seeds}")
     results={'theta_high':THETA_HIGH,'theta_low':THETA_LOW}

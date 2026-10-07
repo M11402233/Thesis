@@ -77,13 +77,16 @@ import argparse
 import collections
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import datasets as DS   # 資料集登錄(ZT_DATASET;預設 dsh = 修訂前行為)
+
 # ---- 預設路徑(可用 --data-dir / --out-dir 覆寫)----
 SI_LSTM_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
 BATCH_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/batchFinal_seeds")
-OUT_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+OUT_DIR = DS.results_dir()
 
 # ---- 定案參數(對齊第四章)----
-N_KNOWN = 7
+N_KNOWN = DS.N_KNOWN   # D-SH/D-C = 7;D-28 = 28(由 datasets.py 依 ZT_DATASET 決定)
 LTE_CELL = 1
 TAU_S = 4.0           # S_i 共識殘差門檻
 TAU_H_WARN = 2.0      # H_i-D1 low-trust
@@ -550,9 +553,10 @@ def runtime_environment(warmup, repeat, gc_disabled, global_warmup=0):
 # 8. main
 # ==========================================================================
 def main():
-    global FUSION_MODE, OUT_DIR, D1_BINDING, ADMISSION_POLICY
+    global FUSION_MODE, OUT_DIR, D1_BINDING, ADMISSION_POLICY, N_KNOWN
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dataset", choices=["dsh", "dc"], default="dsh")
+    ap.add_argument("--dataset", choices=sorted(DS.REGISTRY), default=DS.NAME)
+    ap.add_argument("--n-known", type=int, default=None, help="覆寫 N_known(預設依資料集)")
     ap.add_argument("--data-dir", default=None, help="覆寫 seed 目錄")
     ap.add_argument("--out-dir", default=None, help="覆寫輸出目錄")
     ap.add_argument("--fusion", choices=["legacy", "bound"], default="bound",
@@ -580,10 +584,12 @@ def main():
         OUT_DIR = args.out_dir
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    pattern = "ues1_t300_seed*.txt" if args.dataset == "dsh" else "seed42*.txt"
+    cfg = DS.REGISTRY[args.dataset]
+    N_KNOWN = args.n_known if args.n_known is not None else cfg["n_known"]
+    pattern = cfg["pattern"]
     search = [args.data_dir] if args.data_dir else [
-        SI_LSTM_DIR if args.dataset == "dsh" else BATCH_DIR,
-        os.path.join("seeds", "si_lstm_seeds" if args.dataset == "dsh" else "batchFinal_seeds"),
+        cfg["dir"],
+        os.path.join("seeds", os.path.basename(cfg["dir"])),
         ".",
     ]
     files = []
@@ -595,7 +601,7 @@ def main():
         print(f"資料不足(找到 {len(files)} 檔)。用 --data-dir 指定 seed 目錄。")
         return
 
-    print(f"=== 零信任 KPM 驗證 xApp(trace replay,{len(files)} seed)===")
+    print(f"=== 零信任 KPM 驗證 xApp(trace replay,{len(files)} seed,資料集 {args.dataset},N_known={N_KNOWN})===")
     print(f"    fusion={FUSION_MODE}  eval-mode={args.eval_mode}  "
           f"d1-binding={D1_BINDING}  admission={ADMISSION_POLICY}  "
           f"warmup={args.warmup}  repeat={args.repeat}")
@@ -673,6 +679,8 @@ def main():
     # 以 legacy_none=True 重現舊版之 node=None 窗級註記:
     #   (a) 計數須等於舊版 bound/all;(b) 其餘有效節點註記須與新版逐筆一致。
     consistency = None
+    if args.dataset != "dsh" and FUSION_MODE == "bound" and args.eval_mode == "all":
+        print(f"── 舊版相容性驗證:資料集 {args.dataset} 無既有期望值(742/2335/83/0 屬 D-SH),略過")
     if (FUSION_MODE == "bound" and args.eval_mode == "all" and args.dataset == "dsh"
             and not args.data_dir):
         exp = EXPECTED_COMPAT_BOUND_ALL[D1_BINDING]

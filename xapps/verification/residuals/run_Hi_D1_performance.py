@@ -31,9 +31,10 @@ import glob
 import json
 import collections
 import numpy as np
+import datasets as DS
 
-DATA_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
-OUT_DIR  = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+DATA_DIR = DS.DATA_DIR
+OUT_DIR  = DS.results_dir()
 os.makedirs(OUT_DIR, exist_ok=True)
 
 # ---- 參數(對齊 4.7 定義)----
@@ -173,8 +174,8 @@ def run_once(tau_z=TAU_Z_REJECT):
     global TAU_Z_REJECT
     TAU_Z_REJECT = tau_z
 
-    files = sorted(glob.glob(os.path.join(DATA_DIR, "ues1_t300_seed*.txt"))) or \
-            sorted(glob.glob("ues1_t300_seed*.txt"))
+    files = sorted(glob.glob(os.path.join(DATA_DIR, DS.PATTERN))) or \
+            sorted(glob.glob(DS.PATTERN))
     seeds = [os.path.basename(f).split("seed")[-1].replace(".txt", "") for f in files]
 
     per_seed = []  # 每個 held-out seed 一組指標

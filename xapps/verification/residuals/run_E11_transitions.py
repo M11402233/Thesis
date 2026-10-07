@@ -29,10 +29,13 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import run_E10_D1_policy_ablation as E10
 import planB_rt as P
+import datasets as DS
 X = E10.X
 
-OUT_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
-RUNTIME_ANN = os.path.join(OUT_DIR, "runtime_20261006", "xapp_trust_annotations_bound_all_uebound_strict.jsonl")
+OUT_DIR = DS.results_dir()
+RUNTIME_ANN = (os.path.join(OUT_DIR, "runtime_20261006", "xapp_trust_annotations_bound_all_uebound_strict.jsonl")
+               if DS.is_reference() else
+               os.path.join(OUT_DIR, "xapp_trust_annotations_bound_all_uebound_strict.jsonl"))   # 非 D-SH：須先跑 xApp
 T_LIST = [10, 30]
 TRACK = 60
 FAKE_IMSI = 9001
@@ -342,9 +345,12 @@ def main():
         print(f"seed {sd} 完成")
 
     got = {k: clean_total.get(k, 0) for k in EXPECTED_P3}
-    print("── 檢查 1：乾淨回放合計", got, "✓" if got == EXPECTED_P3 else "✗")
-    if got != EXPECTED_P3:
-        raise SystemExit("不一致，停止，不寫檔。")
+    if DS.is_reference():
+        print("── 檢查 1：乾淨回放合計", got, "✓" if got == EXPECTED_P3 else "✗")
+        if got != EXPECTED_P3:
+            raise SystemExit("不一致，停止，不寫檔。")
+    else:
+        DS.skip_note(f"檢查 1（1,803／575／766／6）；本次乾淨回放 {got}，由檢查 2 與 xApp 逐筆比對")
     print("── 檢查 2：乾淨回放逐筆 = runtime 註記 ✓")
     print(f"── 檢查 3：可追溯性 ✓（獨立重算 {n_checked} 筆註記之 P1→P2 皆相同；注入層級皆合宣告；無無法解釋之差異）")
 

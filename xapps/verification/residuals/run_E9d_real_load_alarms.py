@@ -52,24 +52,25 @@ import run_E9_operating_regime as E9
 from run_E9_operating_regime import load_cell_delay, global_scale, TAU_S
 from run_slow_poisoning_suite import find_files, build_samples
 import run_E9c_common_mode as C
+import datasets as DS
 
 ROOT = os.path.expanduser("~/oran-zt-kpm-verification/data")
-AUX = os.path.join(ROOT, "si_lstm_aux")
-SEEDS_DIR = os.path.join(ROOT, "si_lstm_seeds")
+AUX = DS.CFG["aux_dir"]
+SEEDS_DIR = DS.DATA_DIR
 Q_MAIN = 0.75
 Q_SENS = [0.5, 0.9]
 METHODS = C.METHODS
 
 
 def aux_dir(sd):
-    return os.path.join(AUX, f"ues1_t300_seed{sd}_aux")
+    return os.path.join(AUX, DS.CFG["aux_fmt"].format(seed=sd))
 
 
 def check_aux(seeds):
     res = {}
     for sd in seeds:
         a = os.path.join(aux_dir(sd), "DlE2RlcStats.txt")
-        b = os.path.join(SEEDS_DIR, f"ues1_t300_seed{sd}.txt")
+        b = os.path.join(SEEDS_DIR, DS.PATTERN.replace("*", sd))
         res[sd] = os.path.exists(a) and filecmp.cmp(a, b, shallow=False)
     return res
 

@@ -27,9 +27,10 @@ import json
 import filecmp
 import argparse
 import collections
+import datasets as DS
 
 ROOT = os.path.expanduser("~/oran-zt-kpm-verification/data")
-OUT_DIR = os.path.join(ROOT, "results")
+OUT_DIR = DS.results_dir()
 
 
 def load_phy(seed):
@@ -37,7 +38,7 @@ def load_phy(seed):
     tb = collections.defaultdict(float)
     keys = set()
     dup = 0
-    path = os.path.join(ROOT, "si_lstm_aux", f"ues1_t300_seed{seed}_aux", "RxPacketTrace.txt.gz")
+    path = DS.aux_path(seed, "RxPacketTrace.txt.gz")
     with gzip.open(path, "rt") as fh:
         fh.readline()
         for line in fh:
@@ -59,10 +60,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", default=OUT_DIR)
     args = ap.parse_args()
-    seeds = ["4200", "4201", "4202", "4203"]
+    seeds = [DS.seed_of(f) for f in DS.files()]
     for s in seeds:
-        a = os.path.join(ROOT, "si_lstm_aux", f"ues1_t300_seed{s}_aux", "DlE2RlcStats.txt")
-        b = os.path.join(ROOT, "si_lstm_seeds", f"ues1_t300_seed{s}.txt")
+        a = DS.aux_path(s, "DlE2RlcStats.txt")
+        b = os.path.join(DS.DATA_DIR, DS.PATTERN.replace("*", s))
         if not filecmp.cmp(a, b, shallow=False):
             raise SystemExit(f"✗ 檢查 3：seed {s} aux 與 D-SH 不一致")
     W = {}

@@ -31,6 +31,7 @@ import torch.nn as nn
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import planB_rt as P
+import datasets as DS
 import run_E9_operating_regime as E9
 import run_E9b_supervised_baseline as B     # 沿用超參數常數
 
@@ -144,8 +145,14 @@ def main():
     ap.add_argument("--set-baseline", action="store_true")
     ap.add_argument("--no-fig", action="store_true")
     args = ap.parse_args()
+    global TARGET_FPR
     old = json.load(open(os.path.join(args.out_dir, "E9_operating_regime.json"), encoding="utf-8"))
-    if old["clean_fpr"]["spatial"]["mean"] != TARGET_FPR:
+    if not DS.is_reference():
+        # 定義不變：校準目標 = 同資料集之空間參照乾淨 FPR（由 run_E9_operating_regime.py 產出）
+        TARGET_FPR = old["clean_fpr"]["spatial"]["mean"]
+        CONFIG["target_fpr"] = TARGET_FPR
+        print(f"── 資料集 {DS.NAME}：校準目標取自同資料集 E9 空間乾淨 FPR = {TARGET_FPR}")
+    elif old["clean_fpr"]["spatial"]["mean"] != TARGET_FPR:
         raise SystemExit("凍結之校準目標與舊 E9 原值不符")
     seeds, data = P.load_data()
 

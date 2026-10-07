@@ -18,6 +18,8 @@
   - `data/si_lstm_aux/ues1_t300_seed42??_aux/` = D-SH 重跑之 aux（`RxPacketTrace.txt.gz`、`DlMacStats.txt.gz` 為壓縮檔；尚未產出，見下）
   - `data/si_lstm_seeds_aux/` = 舊 aux 腳本之輸出目錄，**已棄用**（空目錄）
   - `data/results/` = 所有實驗輸出
+  - **`data/ues30_seeds/` = D-30（2026-10-06 定案之主資料，收集中）**：30 UE（`--totalUes=30`）＋ E2 NR 報表（`--e2nrEnabled=true`，cell 2–8 之 `du-cell-*.txt` 含原生 `RRU.PrbUsedDl`）× **8 seed（4200–4207）** × 301 s（分析取 0–299 窗）。**收齊並通過檢查後，第四章全部實驗（含 C_i、P_i、RQ3 之 PRB）統一改用 D-30**，取代 D-C 與 D-SH；舊資料保留唯讀，僅供附錄對照
+  - `data/ues28_seeds/` = 28 UE 校準紀錄（已被 D-30 取代，僅保留校準證據）
 
 ## ⚠️ 硬性規則（違反會毀掉論文資料）
 
@@ -34,7 +36,7 @@
 | 參數 | 值 | 備註 |
 |---|---|---|
 | ns-3 configuration | 1 | 3.5 GHz／20 MHz／isd 1000 m（「mmWave」為 MC 架構命名慣例） |
-| N_known | 7 | ues=1 × 7 cell |
+| N_known | 7 → **30**（D-30 啟用後） | 由 `datasets.py` 依 `ZT_DATASET` 決定；ns-3 以 `--totalUes` 指定（`scenario-three.cc` 已 patch，預設行為不變） |
 | 觀測窗 | 1 s | indicationPeriodicity = 1.0 |
 | τ_S | 4 | S_i 門檻；尺度 s = 1.4826·MAD_global，凍結 |
 | τ_H^warn／τ_H^reject | 2／3 | H_i-D1 證據強度（非信任狀態） |
@@ -54,8 +56,8 @@
 ## 已確立之結果（引用時以腳本輸出為準）
 
 - C_i：600 窗 0 反例；配平容錯空間 0；D=1 脈衝於 L_C=2 下 100% 不升級；同窗雙掛率 0%（12,600 樣本）
-- S_i：受控消融 0.5–2%/窗 時空間 0.26–0.74 vs 時間 0.01（**「窗」為受評估之 full-consensus 窗，非實際秒；以實際秒計之結果不同，見 2026-10-06 查證**）；full-consensus 覆蓋 54.8%；$m^*_{S,50}=2$、$m^*_{S,100}=3$
-- E9：階躍 AF≥1.3 時時間參照 onset 命中 0.88–1.00 但全程偵測 0.08–0.11（被滑動視窗吸收）；空間 0.62–0.96
+- S_i（方案 B，實際秒、共同集合；2026-10-06 起為正式口徑，舊 %/窗 數字只見附錄 A）：受控消融 0.5–2 %/秒 時空間 0.57–0.86 vs 時間 0.01–0.02；乾淨誤報 0.036／0.013；full-consensus 覆蓋 54.8%；共同集合 79.4%（樣本等權）；$m^*_{S,50}=2$、$m^*_{S,100}=3$
+- E9（rt）：階躍 AF≥1.3 時時間參照 onset 命中 0.75–0.88（上限 0.875）但全程偵測 0.06–0.08；空間 0.60–0.96。E9b 監督式乾淨誤報 0.136；E9c 共模 ×1.1 監督式誤報 0.52 vs 空間 0.05
 - E10：UE 綁定（uebound，已定案）使 trusted 23.6% → 57.2%（分母 3,150 有效節點註記），偵測率與延遲不變；注入實驗中 76.9% 事件之告警窗，其（正確）歸屬節點當窗無有效節點註記（非「無節點可歸屬」）
 - xApp（bound/all/uebound，定案）：trusted 57.2%／low-trust 18.3%／abstain 24.3%／rejected 0.19%（6/3,150，全為 `R2_SI_D1_BOUND`；L1 硬否決誤觸 0）。window 對照：23.6／73.8／2.6／0。P99 0.837 ms 為舊量測，待 aux 完成後於閒置機器重測
 - **誤報口徑**：與他文 FPR 對應者僅「乾淨誤拒率」0.19%，且為對應量非等價量（單位 (節點,窗) vs (UE,record)）；low-trust／abstain 不是誤報。RQ3 之 ρ（如 C_restrict_annot 73.9%）為准入比例，勿與 low-trust 比例混用
@@ -67,6 +69,9 @@
 | 腳本 | 用途 |
 |---|---|
 | `zt_kpm_xapp.py` | 驗證 xApp、規則稽核、runtime（`--fusion bound --eval-mode all`） |
+| `datasets.py` | **資料集登錄**：`ZT_DATASET=dsh｜dc｜d28｜d30`（預設 dsh＝修訂前行為，2026-10-06 回歸逐位重現）。決定資料路徑、N_known、aux 路徑、輸出目錄（d28／d30 → `data/results/d28/`、`data/results/d30/`，不覆寫既有結果）。D-SH 專屬期望值（742／2335／83／0、1803／575／766／6、凍結 FPR、4.7.7 十等分表）僅於 dsh 檢查；非 dsh 時明示略過，其餘檢查照常 |
+| `make_fig_Ci_unified.py` | Fig 4-1～4-4 統一版（讀 `Ci_unified_<tag>.json`；檔名加 `_<tag>`） |
+| `run_Ci_unified.py` | C_i 之 E0–E8 統一版（規格 `docs/thesis/Ci_unified_spec.md`）：判定一律經 `verify_ci`／`fuse`、載入經 `TraceReplaySource`、`--ues` 檢查 N_known；`--mode legacy` 須重現 D-C 舊輸出。舊 `run_Ci_experiments.py`（5 % 容忍帶）不再使用 |
 | `run_Si_reference_ablation.py` | 4.7.4 參照機制消融 |
 | `run_E9_operating_regime.py` | 4.7.5 階躍 vs 漂移操作區對照 |
 | `run_E10_D1_policy_ablation.py` | D1 證據綁定／持續性政策消融 |
@@ -78,6 +83,16 @@
 | `make_fig_Hi_D1_grading.py` | D1 證據強度分級圖 |
 
 ## 目前狀態與待辦
+
+**資料集統一（2026-10-06 定案：D-30）**：
+- 動機：口試／審查曾質疑 C_i 與 S_i／H_i 使用不同資料集；比較之文獻以 10 之倍數 UE 為基準；reviewer 可能要求模擬器原生之 PRB。故改為單一資料集 D-30，所有殘差、融合、RQ3（含 PRB 取捨）皆在同一組資料上評估。
+- 收集：`scripts/collect_ues30.sh`，兩個實例平行（A：4200/4202/4204/4206；B：4201/4203/4205/4207），log `data/ues30_seeds/collect_A.log`、`collect_B.log`。2026-10-06 14:10 UTC 開始。**一律以 `setsid nohup` 啟動**（Claude 工作階段結束會殺掉其子行程）。每個 seed 於模擬約 30 s 時檢查記憶體斜率；是否加開第 3 個實例須問使用者。
+- 校準：`data/ues30_seeds/calibration_20261006/README.md`（確定性、`--totalUes` 等價性、E2 NR 副作用、PRB 交叉驗證）。
+- **E2 NR 報表之副作用**：最後一窗遺失（故 simTime = 301）；PDCP 統計每次報表後歸零（管線不用 PDCP）；RLC／PHY 不受影響。
+- **PRB**：原生 `RRU.PrbUsedDl` = 排程符號數 ÷（slot 數 × 14）× 139；139 為原始碼寫死（configuration 1 實際 PRB 數待查證）；cell 層級欄位因 uint32 逐 UE 截斷而偏低，**以 UE 層級 `RRU.PrbUsedDl.UEID` 加總為準**；du-cell 之 timestamp 為實際時間，報表依序對應模擬第 k 秒。
+- **待辦（資料到齊後）**：分析時截斷至 0–299 窗（D-30 檔案含第 300 窗）；PRB 讀取器；28→30 之規格文件與正文更新。
+- 代價須於正文誠實說明：C_i 之 seed 數由 10 降為 8（窗數由 600 增為 2,400）。
+- **D-30 執行順序**（rt 版之檢查依賴同資料集之舊版輸出，故舊版須先跑）：`export ZT_DATASET=d30` → `zt_kpm_xapp.py --fusion bound --eval-mode all` → `run_E9_operating_regime.py` → `run_E9_rt.py` → `run_E9b_rt.py`（校準目標改取同資料集 E9 空間乾淨 FPR，定義不變）→ `run_E9c_rt.py`／`run_E9d_rt.py` → `run_E13_tauS_sensitivity.py` → `run_E13_rt.py` → `run_slow_poisoning_suite.py` → `run_slow_poisoning_rt.py` → `run_E10_D1_policy_ablation.py` → `run_RQ3_decision_replay.py` → E11／E11b／E12／B4 → `run_Ci_unified.py` → 圖。rt 系列之回歸基準於 d30 為「未核對」，須人工核對後 `--set-baseline`。
 
 **D-SH aux 重跑狀態（2026-10-05）**：
 - 2026-10-04 以 `collect_Si_LSTM_ues1_aux.sh` 啟動之重跑**實際未執行**：4 seed 皆 0 秒 exit=1（ns-3 編譯失敗，非時間預算問題），無任何輸出。

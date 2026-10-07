@@ -21,9 +21,10 @@ run_adversarial_msweep.py — S_i 抗協同串謀的 m-sweep 實測(取代舊的
 """
 import os, glob, json, collections, itertools
 import numpy as np
+import datasets as DS
 
-DATA_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
-OUT_DIR  = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+DATA_DIR = DS.DATA_DIR
+OUT_DIR  = DS.results_dir()
 os.makedirs(OUT_DIR, exist_ok=True)
 
 TAU_S      = 4.0     # 與 run_Si_experiments 一致
@@ -51,8 +52,8 @@ def load_cell_delay(path):
 
 
 def main():
-    files = sorted(glob.glob(os.path.join(DATA_DIR, "ues1_t300_seed*.txt"))) or \
-            sorted(glob.glob("ues1_t300_seed*.txt"))
+    files = sorted(glob.glob(os.path.join(DATA_DIR, DS.PATTERN))) or \
+            sorted(glob.glob(DS.PATTERN))
     if len(files) < 2:
         print(f"資料不足(找到 {len(files)} 檔)"); return
 

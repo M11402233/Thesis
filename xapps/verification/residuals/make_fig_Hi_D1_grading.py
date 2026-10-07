@@ -41,6 +41,7 @@ import glob
 import argparse
 import collections
 import numpy as np
+import datasets as DS
 
 # ---- 門檻(對齊 4.8.5;此處僅用於證據分級,不產生信任狀態)----
 TAU_WARN = 2.0      # tau_H^warn
@@ -49,8 +50,8 @@ EDGE_SPLIT = 0.55   # LTE-only 佔比 >= 0.55 判為 edge
 MIN_EVENTS = 8      # per-UE-index 基線所需最少事件數,不足時退回群層級
 LTE_CELL = 1
 
-SI_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
-OUT_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+SI_DIR = DS.DATA_DIR
+OUT_DIR = DS.results_dir()
 
 # ---- 配色(與其他論文圖一致)----
 C_NONE = "#6C8EBF"     # 藍 — 無 D1 證據
@@ -370,7 +371,7 @@ def main():
         SI_DIR, os.path.join("seeds", "si_lstm_seeds"), "."]
     files = []
     for d in search:
-        files = sorted(glob.glob(os.path.join(d, "ues1_t300_seed*.txt")))
+        files = sorted(glob.glob(os.path.join(d, DS.PATTERN)))
         if len(files) >= 2:
             break
     if len(files) < 2:

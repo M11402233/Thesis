@@ -77,6 +77,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gzip
 import zt_kpm_xapp as X
 from run_E10_D1_policy_ablation import run_policy, load_windows
+import datasets as DS
 
 X.FUSION_MODE = "bound"
 
@@ -85,8 +86,8 @@ RESOURCE_INVENTORY = {c: 20e6 for c in range(2, 9)}
 INVENTORY_SOURCE = ("scenario-three.cc configuration 1: Config::SetDefault "
                     "MmWavePhyMacCommon::Bandwidth=20e6, CenterFreq=3.5e9; cells 2-8")
 
-DATA_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
-OUT_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+DATA_DIR = DS.DATA_DIR
+OUT_DIR = DS.results_dir()
 
 # 攻擊：攻擊者壓低自身回報延遲以吸引流量
 ATTACKS = [
@@ -177,7 +178,7 @@ def main():
         DATA_DIR, os.path.join("seeds", "si_lstm_seeds"), "."]
     files = []
     for d in search:
-        files = sorted(glob.glob(os.path.join(d, "ues1_t300_seed*.txt")))
+        files = sorted(glob.glob(os.path.join(d, DS.PATTERN)))
         if len(files) >= 2:
             break
     if len(files) < 2:

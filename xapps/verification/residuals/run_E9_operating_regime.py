@@ -41,9 +41,10 @@ import json
 import argparse
 import collections
 import numpy as np
+import datasets as DS
 
-DATA_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
-OUT_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+DATA_DIR = DS.DATA_DIR
+OUT_DIR = DS.results_dir()
 
 # ---- 與 run_Si_reference_ablation.py 完全相同之參數 ----
 TAU_S = 4.0
@@ -143,7 +144,7 @@ def main():
         DATA_DIR, os.path.join("seeds", "si_lstm_seeds"), "."]
     files = []
     for d in search:
-        files = sorted(glob.glob(os.path.join(d, "ues1_t300_seed*.txt")))
+        files = sorted(glob.glob(os.path.join(d, DS.PATTERN)))
         if len(files) >= 2:
             break
     if len(files) < 2:

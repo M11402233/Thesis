@@ -47,6 +47,7 @@ import math
 import argparse
 import collections
 import numpy as np
+import datasets as DS
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
@@ -59,8 +60,8 @@ if not hasattr(X, "RULE") or "R2_SI_D1_UNBOUND" not in X.RULE:
 
 X.FUSION_MODE = "bound"
 
-DATA_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
-OUT_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+DATA_DIR = DS.DATA_DIR
+OUT_DIR = DS.results_dir()
 
 POLICIES = [
     ("P0_window_L1", "window", 1),
@@ -190,7 +191,7 @@ def main():
         DATA_DIR, os.path.join("seeds", "si_lstm_seeds"), "."]
     files = []
     for d in search:
-        files = sorted(glob.glob(os.path.join(d, "ues1_t300_seed*.txt")))
+        files = sorted(glob.glob(os.path.join(d, DS.PATTERN)))
         if len(files) >= 2:
             break
     if len(files) < 2:
@@ -296,10 +297,13 @@ def main():
     # ---- 舊版相容性驗證 ----
     ok = True
     print("\n── 舊版相容性驗證（含 node=None 窗級註記）──")
+    if not DS.is_reference():
+        DS.skip_note("計數 742／2335／83／0、1813／575／766／6（有效節點逐筆一致仍檢查）")
     for name, exp in EXPECTED_COMPAT.items():
         c = res[name]["compat"]
         got = {k: c["decisions_with_none_rows"].get(k, 0) for k in exp}
-        ok_n = got == exp and sum(c["decisions_with_none_rows"].values()) == sum(exp.values())
+        ok_n = (got == exp and sum(c["decisions_with_none_rows"].values()) == sum(exp.values())) \
+            if DS.is_reference() else True        # 期望計數屬 D-SH；他資料集僅檢查逐筆一致
         ok_r = c["valid_row_diff"] == 0
         ok = ok and ok_n and ok_r
         print(f"  {name:<15} 計數 {'✓' if ok_n else '✗'} {got}　有效節點逐筆 "

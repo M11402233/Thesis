@@ -35,9 +35,10 @@ import zt_kpm_xapp as X
 import run_RQ3_decision_replay as RQ3
 import run_E11_transitions as E11
 import planB_rt as P
+import datasets as DS
 
 X.FUSION_MODE = "bound"
-OUT_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+OUT_DIR = DS.results_dir()
 L_S_LIST = [None, 2, 3, 5, 10]            # None = ∞（定案政策）
 DRIFTS = [0.005, 0.01, 0.02]
 STEPS = [1.3, 1.5]
@@ -236,7 +237,7 @@ def main():
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(out, fh, indent=1, ensure_ascii=False)
 
-    print("\n══ 1／3. 乾淨資料（分母 3,150）：新增誤拒（前半／後半）與新增不准入 ══")
+    print("\n══ 1／3. 乾淨資料（分母 = 有效節點註記數）：新增誤拒（前半／後半）與新增不准入 ══")
     for L in [lab(x) for x in L_S_LIST]:
         tot = collections.Counter()
         for c in clean[L].values():

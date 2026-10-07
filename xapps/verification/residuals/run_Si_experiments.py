@@ -27,9 +27,10 @@ S_i 定義(v2 定案):
 """
 import os, glob, json, collections
 import numpy as np
+import datasets as DS
 
-DATA_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
-OUT_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+DATA_DIR = DS.DATA_DIR
+OUT_DIR = DS.results_dir()
 os.makedirs(OUT_DIR, exist_ok=True)
 
 DRIFT_RATES = [0.005, 0.01, 0.02, 0.04, 0.08, 0.15]
@@ -83,9 +84,9 @@ def global_scale(train_data):
 
 
 def main():
-    files = sorted(glob.glob(os.path.join(DATA_DIR, "ues1_t300_seed*.txt")))
+    files = sorted(glob.glob(os.path.join(DATA_DIR, DS.PATTERN)))
     if not files:
-        files = sorted(glob.glob("ues1_t300_seed*.txt"))
+        files = sorted(glob.glob(DS.PATTERN))
     if len(files) < 2:
         print(f"資料不足(找到 {len(files)} 檔),至少需 2 個 seed。"); return
     seeds = [os.path.basename(f).split("seed")[-1].replace(".txt", "") for f in files]

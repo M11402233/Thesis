@@ -58,6 +58,7 @@ def main():
     seeds = [os.path.basename(f).split("seed")[-1].replace(".txt", "") for f in files]
     orig_LC = X.L_C
     res = collections.defaultdict(collections.Counter)
+    clean_by_L = {}
     n_traced = 0
     try:
         for L in L_CS:
@@ -100,12 +101,18 @@ def main():
                                 if kk == k and j != sm.cell:
                                     res[key][f"同窗其他節點|{o['decision']}|{o['rule_id']}"] += 1
             got = {k: clean_total.get(k, 0) for k in E.EXPECTED_P3}
+            if not E.DS.is_reference():
+                clean_by_L[L] = got; continue
             if got != E.EXPECTED_P3:
                 raise SystemExit(f"✗ 檢查 1：L_C={L} 乾淨回放 {got}")
     finally:
         X.L_C = orig_LC
 
-    print("── 檢查 1：三個 L_C 下乾淨回放皆 = 1,803／575／766／6 ✓")
+    if E.DS.is_reference():
+        print("── 檢查 1：三個 L_C 下乾淨回放皆 = 1,803／575／766／6 ✓")
+    else:
+        E.DS.skip_note("檢查 1（1,803／575／766／6）")
+        print(f"  （各 L_C 之乾淨回放：{clean_by_L}）")
     print(f"── 檢查 2：可追溯性 ✓（獨立重算 {n_traced} 筆）")
     print("── 檢查 3：所有間隔窗之 C_i 皆正常 ✓\n")
     out = {}

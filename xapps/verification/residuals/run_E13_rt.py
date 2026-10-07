@@ -75,10 +75,10 @@ def main():
         if {k: fus[str(tau)]["counts"].get(k, 0) for k in E13.EXPECTED_P3} != \
            {k: old["fusion_uebound_L1"][str(tau)]["counts"].get(k, 0) for k in E13.EXPECTED_P3}:
             bad.append(("融合層", tau))
-    if {k: fus["4.0"]["counts"].get(k, 0) for k in E13.EXPECTED_P3} != E13.EXPECTED_P3:
+    if E13.DS.is_reference() and {k: fus["4.0"]["counts"].get(k, 0) for k in E13.EXPECTED_P3} != E13.EXPECTED_P3:
         bad.append(("融合層 τ=4 vs 1803/575/766/6",))
     dec = E13.decile_table(data, seeds)
-    for r, (f, z, p) in zip(dec["rows"], E13.PUBLISHED_477):
+    for r, (f, z, p) in zip(dec["rows"], E13.PUBLISHED_477 if E13.DS.is_reference() else []):
         if (round(r["fpr"], 3), round(r["mean_z"], 2), round(r["mean_peer"], 2)) != (f, z, p):
             bad.append(("十等分", r["decile"]))
     print("── 不受方案 B 影響之檢查 ──")

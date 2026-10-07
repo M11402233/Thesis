@@ -23,9 +23,10 @@ run_Si_reference_ablation.py — 參照機制受控消融實驗(S_i 的核心論
 """
 import os, glob, json, collections
 import numpy as np
+import datasets as DS
 
-DATA_DIR = os.path.expanduser("~/oran-zt-kpm-verification/data/si_lstm_seeds")
-OUT_DIR  = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+DATA_DIR = DS.DATA_DIR
+OUT_DIR  = DS.results_dir()
 os.makedirs(OUT_DIR, exist_ok=True)
 
 TAU_S        = 4.0
@@ -66,8 +67,8 @@ def inject_drift(v, t0, rate, mean):
 
 
 def main():
-    files = sorted(glob.glob(os.path.join(DATA_DIR, "ues1_t300_seed*.txt"))) or \
-            sorted(glob.glob("ues1_t300_seed*.txt"))
+    files = sorted(glob.glob(os.path.join(DATA_DIR, DS.PATTERN))) or \
+            sorted(glob.glob(DS.PATTERN))
     if len(files) < 2:
         print(f"資料不足(找到 {len(files)} 檔)"); return
     seeds = [os.path.basename(f).split("seed")[-1].replace(".txt", "") for f in files]

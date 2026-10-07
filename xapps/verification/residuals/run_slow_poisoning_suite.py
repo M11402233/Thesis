@@ -51,6 +51,7 @@ import collections
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import datasets as DS
 import run_E9_operating_regime as E9
 from run_E9_operating_regime import (load_cell_delay, global_scale, inject_drift,
                                      TAU_S, MIN_NEIGHBOR, W_HIST, MIN_LEN)
@@ -80,7 +81,7 @@ Q6_EVAL_RATES = [0.005, 0.01, 0.02, 0.04]
 def find_files(data_dir):
     search = [data_dir] if data_dir else [DATA_DIR, os.path.join("seeds", "si_lstm_seeds"), "."]
     for d in search:
-        files = sorted(glob.glob(os.path.join(d, "ues1_t300_seed*.txt")))
+        files = sorted(glob.glob(os.path.join(d, DS.PATTERN)))
         if len(files) >= 2:
             return files
     return []
