@@ -191,7 +191,7 @@ property，其違反可由單一窗即刻觀察，故為布林斷言而非連續
 
 ```
 N_total(t) = | ∪_all-cells { IMSI }(t) |          （全場域相異 UE 總數，含 LTE 錨點）
-conserved(t) := ( N_total(t) = N_known )          （N_known = 7）
+conserved(t) := ( N_total(t) = N_known )          （D-30：N_known = 30）
 C_i violated ⟺ N_total(t) ≠ N_known
 ```
 
@@ -345,9 +345,9 @@ title: 第四章
 
 ### 4.2.1 平台與場景
 
-**平台**：ns-O-RAN（ns-3.42 + mmWave module + `oran-interface` E2 termination）。場景建立 **7 個 gNB + 1 個 LTE eNB** 之 MC 雙連結拓樸，提供跨節點空間驗證所需之多 cell 觀測。ns-O-RAN 具備 E2 termination 能力（RAN Function ID 2，ORAN-E2SM-KPM），惟**本研究之資料收集採其離線檔案記錄模式（`enableE2FileLogging=true`），未經由 Near-RT RIC 之 E2 indication 路徑**；E2 runtime 整合之嘗試與受阻點見 4.2.5。
+**平台**：ns-O-RAN（ns-3.38，`wineslab/ns-o-ran-ns3-mmwave` commit 8c42089d；mmWave module + `oran-interface` E2 termination）。場景建立 **7 個 gNB + 1 個 LTE eNB** 之 MC 雙連結拓樸，提供跨節點空間驗證所需之多 cell 觀測。ns-O-RAN 具備 E2 termination 能力（RAN Function ID 2，ORAN-E2SM-KPM），惟**本研究之資料收集採其離線檔案記錄模式（`enableE2FileLogging=true`），未經由 Near-RT RIC 之 E2 indication 路徑**；E2 runtime 整合之嘗試與受阻點見 4.2.5。
 
-**場景**：`scratch/scenario-three.cc`，`configuration=1`（3.5 GHz／20 MHz／isd = 1000 m／單天線）。
+**場景**：`scratch/scenario-three.cc`，`configuration=1`（3.5 GHz／20 MHz／isd = 1000 m／單天線）。本研究對場景程式僅作一項修改：新增 `--totalUes` 參數，以指定 UE 總數（原程式之 UE 數只能為 `ues` × 7）；參數為 0 時維持原行為。修改後之執行檔於原參數下之全部輸出與修改前逐位相同（校準紀錄，見 4.2.3）。UE 初始位置為以場域中心為圓心之均勻圓盤分布，不逐基地台分配，故 UE 總數不必為 7 之倍數。
 
 > **註**：ns-O-RAN 將節點命名為「mmWave gNB」，係沿用其 MC 雙連結架構之命名慣例；於 `configuration=1` 下實體載波為 sub-6 GHz。S_i 建立於 delay 之跨節點一致性，與載波頻段無關，此命名不影響方法有效性。
 
@@ -355,26 +355,41 @@ title: 第四章
 
 記錄週期與分析窗均為 **1 秒**（`indicationPeriodicity=1.0`），二者對齊，每模擬秒產生一個聚合窗。全章所有「窗」均指此 1 秒聚合窗。
 
-**定案參數**（兩批資料集共用，僅 `SIMTIME` 與 seed 數不同）：
+**定案參數**（主資料集 D-30）：
 
 ```bash
 CONFIG=1          # 3.5 GHz / 20 MHz / isd=1000m
-UES=1             # 每 cell 1 UE × 7 cell = N_known=7
-SIMTIME=60        # D-C（D-SH 用 300）
+TOTAL_UES=30      # --totalUes=30，N_known = 30
+SIMTIME=301       # 分析取 0–299 共 300 窗（見 4.2.3）
 PERIOD=1.0        # 1 秒觀測窗
 MINSPEED=3
 MAXSPEED=10
 HEURISTIC=-1      # 不啟用節能 heuristic
+E2NR=true         # --e2nrEnabled=true：cell 2–8 輸出 E2SM-KPM DU 報表（含 RRU.PrbUsedDl）
+SEEDS=4200–4207   # RngRun，8 個獨立 seed
 ```
 
 ### 4.2.3 資料集
 
 | 代號 | 規模 | 窗數 | 用途 |
 |---|---|---:|---|
-| **D-C** | 10 seed（RngRun 4200–4209）× 60 s | 600 | C_i 之 E0–E8 |
-| **D-SH** | 4 seed（RngRun 4200–4203）× 300 s | 1,200 | S_i、H_i、E9、E10、C-ZT 之決策分布與運算開銷、對抗性分析、決策重放（4.12） |
+| **D-30**（主資料） | 30 UE × 8 seed（RngRun 4200–4207）× 300 s | 2,400 | 第四章全部實驗：C_i、S_i、H_i、E9 系列、E10–E13、C-ZT 之決策分布與運算開銷、對抗性分析、規則回放、決策重放（4.12，含原生 PRB） |
+| D-SH（前版） | 7 UE × 4 seed × 300 s | 1,200 | 僅供附錄對照 |
+| D-C（前版） | 7 UE × 10 seed × 60 s | 600 | 僅供附錄對照 |
 
-S_i／H_i 目前為 4 seed，屬初步實驗規模，信賴區間以 seed 為 cluster 計算且變異較大。須注意 D-C 之 60 秒全段落於 S_i 之啟動暫態區間內（見 4.7.7），故 D-C 不用於 S_i 之評估。
+**單一資料集**：所有殘差、融合與資源評估皆於同一組 D-30 上評估。前版以 D-C 評估 C_i、以 D-SH 評估其餘；改為單一資料集後，C_i 之 seed 數由 10 降為 8，窗數則由 600 增為 2,400。
+
+**規模之選擇**：UE 數取 30，與比較文獻常用之 10 之倍數規模一致。35 UE 之試跑推估單一 seed 之記憶體需求約 20 GB，超出實驗機器可平行執行之範圍，故未採用。每個 seed 之模擬約需 40 小時。
+
+**分析窗**：開啟 E2 NR 報表時，模擬結束之最後一窗不輸出 RLC 統計，故模擬 301 秒、分析取 0–299 窗；分析檔由 `prepare_d30.py` 自原始檔截取，並內建缺窗、N_total 與 aux 一致性檢查。
+
+**E2 NR 報表之副作用**（校準實測）：RLC 統計與 PHY trace 於開啟前後之共同窗逐位相同；PDCP 統計改為每次報表後歸零。本研究之分析不使用 PDCP 統計。
+
+**校準**：正式收集前，以 5 秒模擬驗證：同一 seed 兩次執行之輸出逐位相同（僅實際時間戳欄不同）、每窗 N_total = 30、`--totalUes` 修改不影響原參數下之輸出，以及原生 PRB 與排程符號數之交叉驗證（`data/ues30_seeds/calibration_20261006/`）。
+
+**參數凍結**：所有門檻與政策（τ_S、τ_H、L_C、L_H、MIN_PEER、准入政策等）沿用於 7 UE 資料上定案之值，於 D-30 之結果產出前凍結，D-30 未用於選擇任何門檻；尺度 s、D1 停留基線與監督式分類器依其定義以 LOSO 之訓練 seed 重新估計。τ_S 之敏感度另以 E13 於 D-30 上報告（`docs/thesis/D30_parameter_freeze.md`）。
+
+8 個 seed 屬中等規模；信賴區間以 seed 為 cluster 計算。【待填：D-30 收集完成日期與全部 seed 之檢查結果】
 
 ### 4.2.4 威脅注入方法論
 
@@ -619,15 +634,15 @@ NIST SP 800-207 將信任演算法區分為 criteria-based（一組合格條件�
 
 ```
 N_total(t) = | ∪_all-cells { IMSI }(t) |          （含 LTE 錨點）
-conserved(t) := ( N_total(t) = N_known )          （N_known = 7）
+conserved(t) := ( N_total(t) = N_known )          （D-30：N_known = 30）
 C_i violated ⟺ N_total(t) ≠ N_known
 ```
 
-**布林斷言，非容忍帶**：N = 7 時 5% 容忍帶等同零容忍（7×0.95 = 6.65，少 1 即出界），故採嚴格相等；重連瞬態以持續窗條件吸收（連續 L_C 窗違反方升級 rejected）。
+**布林斷言，非容忍帶**：5% 容忍帶於 N = 30 時下界為 28.5，將容忍缺漏 1 個 UE（N_total = 29 仍在帶內），使單一 UE 之虛減無法被偵測，故採嚴格相等；重連瞬態以持續窗條件吸收（連續 L_C 窗違反方升級 rejected）。
 
 | 參數 | 值 | 理由 |
 |---|---|---|
-| `N_known` | **7**（ues=1 × 7 cell） | 原設計 35 因 MC 候選 cell 評估於高 UE 密度下成本超線性、無法穩定長跑；7 為實測可長跑之規模。此為場域規模之實驗限制，其對運算開銷之意涵見 4.9.5 |
+| `N_known` | **30**（`--totalUes=30`） | 與比較文獻之 10 之倍數規模一致；35 UE 之記憶體需求超出實驗機器之平行執行範圍（4.2.3）。此為場域規模之實驗限制，其對運算開銷之意涵見 4.9.5 |
 | 判定 | 嚴格相等 | safety property，零閾值布林斷言 |
 | L_C | 2 | 吸收斷線重連瞬態（代價見 4.6.7） |
 
@@ -1670,7 +1685,28 @@ $$\rho = \frac{\sum_t \sum_{j \in \mathcal{A}(t)} m_j(t)\, K_j}{\sum_t \sum_{j \
 1. 此量描述「其量測被准入、因而可供消費端納入決策之節點，其組態容量之佔比」。它不是量測到之頻譜使用量，亦不能用以驗證吞吐量上報——純吞吐量竄改仍未涵蓋（4.5.2）。
 2. 本場景（configuration 1）之七個 mmWave gNB 採同一載波設定（中心頻率 3.5 GHz、頻寬 20 MHz，由 `scenario-three.cc` 之全域預設設定，無逐 cell 覆寫），故 $K_j$ 相同。分母 $\mathcal{A}(t)$ 取**當窗有上報之 mmWave 節點**；LTE 錨點為驗證用輔助輸入，不在准入範圍內；無活躍 mmWave 節點之窗（`n/a`）不產生註記，亦不在評估之窗內。$K_j$ 相同時，$\rho$ 於上式之彙總定義下即等於**可用量測產出率**（准入之註記佔全部註記之比例）；4.12.4 所報者即此量。
 
-以實際排程之 PHY 資源取代組態容量之版本：【待填：待 D-SH aux 通過逐位比對後，由 `RxPacketTrace.txt` 計算】。
+**原生 PRB 之保留比例（主指標）**：以模擬器輸出之 E2SM-KPM `RRU.PrbUsedDl` 為資源量。令 $U_j(t)$ 為 cell $j$ 於第 $t$ 秒之 PRB 時間占用率（各 UE 之 `RRU.PrbUsedDl.UEID` 加總 ÷ 139，取自乾淨模擬、僅下行），則
+
+$$\rho_{\text{PRB}} = \frac{\sum_t \sum_{j} m_j(t)\, U_j(t)}{\sum_t \sum_{j \in \mathcal{A}(t)} U_j(t)}, \qquad V_{\text{PRB}} = 1 - \rho_{\text{PRB}}$$
+
+$\rho_{\text{PRB}}$ 為「已使用之 PRB 中，其 KPM 仍被准入決策採用之比例」；$V_{\text{PRB}}$ 稱為 **PRB 能見度損失**，即其 KPM 被排除、消費端決策時看不到之 PRB 負載比例。**$V_{\text{PRB}}$ 不是容量損失**：被排除之節點仍持續排程。$\rho$（組態容量版本，以下稱 $\rho_{\text{cap}}$）保留為輔助指標，便於與前版對照。
+
+**原生 PRB 之性質**（依 ns-O-RAN 原始碼查證）：
+1. 此模擬器之 MAC 為分時排程，每次配置佔滿整個頻寬，無頻域 PRB 配置；`RRU.PrbUsedDl.UEID` = 該 UE 於報告窗之排程 OFDM 符號數 ÷（報告窗之 slot 數 × 14）× 139。故原生 PRB 用量等於符號占用率乘以常數。
+2. 常數 139 為原始碼寫死之值，等於 ceil(100 MHz ÷ 720 kHz)，即 configuration 2 之載波；configuration 1（20 MHz、numerology 2）實際為 28 RB。本節主表報占用率與比值（與此常數無關）；絕對 PRB 數另以 28 RB 尺度換算。
+3. cell 層級之 `RRU.PrbUsedDl` 欄位於原始碼中以整數逐 UE 累加、每次截斷小數，系統性偏低，故不採用，改以 UE 層級值加總。
+4. 每個 seed 均以 `RxPacketTrace` 之下行排程符號數重算並交叉驗證（`prb_reader.py`，容許差 0.5 PRB）。
+
+**資源指標之區分**：
+
+| 指標 | 意義 |
+|---|---|
+| PRB 使用量（usage） | 觀測窗內實際使用之資源 |
+| PRB 配額（quota） | 設定之資源比例或分配上限，非量測值 |
+| 分配成功率（allocation success） | 依各研究定義之成功服務之請求比例 |
+| 保留可用容量（ρ_cap） | 准入政策下，可用量測所屬節點之組態容量佔比 |
+| PRB 能見度損失（V_PRB） | 已使用之 PRB 中，其 KPM 未被准入決策採用之比例；非容量損失 |
+| 吞吐量（throughput） | 實際送達之資料率；與資源分配相關，但不等同 PRB 數 |
 
 **政策引致之可用性成本**：乾淨資料上之 $1 - \rho$，即無攻擊時因誤報與證據不可得而未被准入之比例。
 
@@ -1692,12 +1728,12 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 
 | 項目 | 設定 |
 |---|---|
-| 資料 | D-SH，評估區間為序列後半段 |
-| 攻擊 | 受控節點壓低自身回報延遲以吸引流量：階躍 ×0.8／×0.6；漸進 1%／2% 每窗 |
+| 資料 | D-30（8 seed），評估區間為序列後半段 |
+| 攻擊 | 受控節點壓低自身回報延遲以吸引流量：階躍 ×0.8／×0.6；漸進 1%／2% 每秒 |
 | 攻擊者 | 逐一以各 mmWave 節點為攻擊者，結果彙總 |
 | 准入政策 | `C_none`：不執行准入（對照）；`C_strict`：Policy Enforcement 之 `strict` admitted view，僅 allow 准入；`C_restrict_annot`：Policy Enforcement 之 `restrict_annotated` admitted view，allow 與 restrict（附註記）准入，defer 與 exclude 不准入；`C_notrej`：消費端僅排除 rejected，**包含 abstain（defer）**，不符合 defer 不准入之原則，保留為寬鬆對照組，非 Policy Enforcement 之准入政策 |
 | 註記政策 | **uebound**（定案，4.9.6.5）；window（對照） |
-| 指標 | 保留可用容量比 $\rho$（$K_j$ 相同，等於可用產出率）、決策可用率、相對 regret、誤選率、**誘導率**（攻擊者之 cell 被選中且非最佳之比例）、最佳候選被濾除率；另輸出逐窗之資源准入遮罩（`RQ3_eligibility_mask.jsonl.gz`） |
+| 指標 | **原生 PRB 之保留比例 $\rho_{\text{PRB}}$ 與 PRB 能見度損失 $V_{\text{PRB}}$**（主）、保留可用容量比 $\rho_{\text{cap}}$（$K_j$ 相同，等於可用產出率）、決策可用率、相對 regret、誤選率、**誘導率**（攻擊者之 cell 被選中且非最佳之比例）、最佳候選被濾除率；另輸出逐窗之資源准入遮罩（`RQ3_eligibility_mask.jsonl.gz`）與保護效果對 PRB 能見度損失之取捨圖 |
 | 一致性檢查 | 註記由 `zt_kpm_xapp.py` 之 P1–P3 產出；乾淨資料上與 E10 之 `run_policy` 逐筆相同（差異 0）。改用 xApp 後，`C_none`／`C_strict`／`C_notrej` 之 270 個指標值與改版前逐位相同 |
 
 ### 4.12.4 結果
@@ -1774,7 +1810,9 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 ### 4.12.6 界定
 
 - 導向策略為本研究定義之**代理決策**（單一新流、以延遲為唯一準則），非真實 RIC 排程器；未建模負載回饋與換手成本。
-- $\rho$ 之容量參考來自組態而非量測；以 PHY 排程資源計算之版本待補（4.12.1）。
+- **開迴路**：$U_j(t)$ 取自乾淨模擬；攻擊誘導之流量轉移不會改變 PRB 用量（未建模負載回饋）。故 $\rho_{\text{PRB}}$ 描述決策時可見之 PRB 負載，而非攻擊後之實際 PRB 分配。
+- **PRB 本身未經驗證**：`RRU.PrbUsedDl` 亦可被受攻陷之 O-DU 竄改。本節以乾淨之 PRB 為權重，不以上報值為權重；竄改 PRB 之情境屬 P_i（內部一致性）之範圍，本節未評估。
+- 原生 PRB 之絕對數以寫死之常數 139 計算（4.12.1）；比值型指標不受影響。
 - 若消費端之目標函數依賴未被驗證之量（如吞吐量，4.5.2 之 B2），C-ZT 無法提供保護。本實驗以延遲為準則，正因其為 S_i 所驗證之維度。
 - 攻擊僅含延遲類；基數類與成員類攻擊對下游決策之影響未評估。
 - 本節為離線決策重放；消費端於閉迴路中之行為未評估。
@@ -1932,9 +1970,9 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 |---|---|---|
 | `collect_Ci_60s_10seed.sh` | D-C 資料集收集 | 4.2.3 |
 | `cardinality.py` | C_i 核心函式庫（斷言、攻擊注入） | 4.6 |
-| `run_Ci_experiments.py` | C_i 主實驗 E0–E5 | 4.6.2–4.6.8 |
-| `run_Ci_extended_E6E8.py` | E6／E7／E8 | 4.6.4、4.6.5、4.6.7 |
-| `make_fig_Ci_final.py` | Fig 4-1 ～ 4-4 | 4.6 |
+| `run_Ci_unified.py` | C_i 之 E0–E8（判定經 `zt_kpm_xapp.verify_ci`／`fuse`；規格 `docs/thesis/Ci_unified_spec.md`） | 4.6.2–4.6.8 |
+| `make_fig_Ci_unified.py` | Fig 4-1 ～ 4-4 | 4.6 |
+| `run_Ci_experiments.py`、`run_Ci_extended_E6E8.py`、`make_fig_Ci_final.py` | 前版（D-C）之 C_i 腳本；僅供附錄對照 | 附錄 |
 | `audit_Si_data.py` | S_i 資料盤點（差分、離散度） | 4.7.1 |
 | `run_Si_experiments.py` | S_i 定義與漂移實驗 | 4.7.2 |
 | `planB_rt.py` | 實際秒定義之共用核心（共同集合、2c 準則、回歸基準） | 4.7.4–4.7.8 |
@@ -1952,6 +1990,9 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 | `run_Hi_D1_performance.py` | D1 效能（FPR、TPR、delay） | 4.8.6 |
 | `make_fig_Hi_H1_H4.py` | Fig 4-9 ～ 4-12（含對帳） | 4.8.1、4.8.2、4.8.4、4.8.6 |
 | `make_fig_Hi_D1_grading.py` | Fig 4-13 | 4.8.5 |
+| `datasets.py` | 資料集登錄（`ZT_DATASET`）：資料路徑、N_known、aux 路徑、輸出目錄 | 全章 |
+| `prepare_d30.py` | D-30 分析檔（0–299 窗）與一致性檢查 | 4.2.3 |
+| `prb_reader.py` | 原生 PRB 讀取與 `RxPacketTrace` 交叉驗證 | 4.12 |
 | `zt_kpm_xapp.py` | C-ZT 三模組之邏輯、規則稽核、runtime benchmark | 4.9 |
 | `run_E10_D1_policy_ablation.py` | E10：D1 節點歸屬政策消融 | 4.9.6.5 |
 | `run_adversarial_msweep.py` | 抗串謀 m-sweep | 4.10 |

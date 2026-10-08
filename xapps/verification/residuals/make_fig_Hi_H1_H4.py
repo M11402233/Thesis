@@ -85,9 +85,11 @@ def main():
     ap.add_argument("--out-dir", default=OUT_DIR)
     args = ap.parse_args()
     fs = sorted(glob.glob(os.path.join(DSH, DS.PATTERN)))
-    fc = sorted(glob.glob(os.path.join(DC, "seed*.txt")))
-    if len(fs) != 4:
+    fc = sorted(glob.glob(os.path.join(DC, "seed*.txt"))) if DS.is_reference() else []   # D-C 對照僅屬前版
+    if DS.is_reference() and len(fs) != 4:
         raise SystemExit(f"D-SH 應為 4 檔，找到 {len(fs)}")
+    if len(fs) < 2:
+        raise SystemExit(f"資料集 {DS.NAME} 至少需 2 檔，找到 {len(fs)}")
     runs = per_run(fs)
     runs_dc = per_run(fc) if fc else []
 
@@ -122,16 +124,20 @@ def main():
 
     # ---- 對帳 ----
     bad = []
-    if round(le12 * 100) != PUBLISHED["le12_pct"]:
+    if not DS.is_reference():
+        DS.skip_note("對帳正文已發表之數字（≤12 窗、χ²、D2 乾淨、分群）")
+        if det != nin:                                   # 與資料集無關：注入之瞬移須全數偵測
+            bad.append(("D2 注入須全數偵測", nin, det))
+    elif round(le12 * 100) != PUBLISHED["le12_pct"]:
         bad.append(("≤12 窗比例", PUBLISHED["le12_pct"], le12))
-    for g, v in PUBLISHED["chi2"].items():
+    for g, v in (PUBLISHED["chi2"].items() if DS.is_reference() else []):
         if round(chi[g][0], 1) != v:
             bad.append((f"χ² {g}", v, round(chi[g][0], 1)))
-    if clean_dsh != PUBLISHED["d2_clean_dsh"] or nin != PUBLISHED["d2_inject"] or det != PUBLISHED["d2_detect"]:
+    if DS.is_reference() and (clean_dsh != PUBLISHED["d2_clean_dsh"] or nin != PUBLISHED["d2_inject"] or det != PUBLISHED["d2_detect"]):
         bad.append(("D2 D-SH", (0, 28, 28), (clean_dsh, nin, det)))
     if runs_dc and clean_dc != PUBLISHED["d2_clean_dc"]:
         bad.append(("D2 D-C 乾淨", 0, clean_dc))
-    if split != PUBLISHED["split"]:
+    if DS.is_reference() and split != PUBLISHED["split"]:
         bad.append(("分群", PUBLISHED["split"], split))
     print("── 對帳（正文已發表之數字）──")
     if bad:

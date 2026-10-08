@@ -215,11 +215,21 @@ def main():
 
     # ---------------- 一致性檢查：漂移族須重現 4.7.4 ----------------
     mismatch = []
-    for r in refs:
-        for rate, pub in PUBLISHED_474[r].items():
+    if DS.is_reference():
+        ref474 = PUBLISHED_474                       # D-SH：已發表之 4.7.4 數字
+    else:                                            # 他資料集：同資料集之 run_Si_reference_ablation 輸出
+        sp = os.path.join(out_dir, "Si_reference_ablation.json")
+        ref474 = None
+        if os.path.exists(sp):
+            sa = json.load(open(sp, encoding="utf-8"))["drift_detection"]
+            ref474 = {r: {float(k): round(v, 2) for k, v in sa[r].items()} for r in refs}
+    for r in (refs if ref474 is not None else []):
+        for rate, pub in ref474[r].items():
             got = round(res["drift"][r][str(rate)]["mean"], 2)
             if abs(got - pub) > 0.005:
                 mismatch.append((r, rate, pub, got))
+    if ref474 is None:
+        mismatch = "not checked: Si_reference_ablation.json missing in out_dir"
     res["consistency_with_4_7_4"] = "ok" if not mismatch else mismatch
 
     with open(os.path.join(out_dir, "E9_operating_regime.json"), "w", encoding="utf-8") as fh:
@@ -230,8 +240,11 @@ def main():
     print(f"乾淨 FPR（注入區間）: 空間 {res['clean_fpr']['spatial']['mean']:.3f}  "
           f"時間 {res['clean_fpr']['temporal']['mean']:.3f}\n")
 
-    print("── 一致性檢查（漂移族 vs 4.7.4 已發表數字）──")
-    if not mismatch:
+    print("── 一致性檢查（漂移族 vs " + ("4.7.4 已發表數字" if DS.is_reference()
+                                  else "同資料集之 Si_reference_ablation.json") + "）──")
+    if isinstance(mismatch, str):
+        print(f"  ⚠ {mismatch}\n")
+    elif not mismatch:
         print("  ✓ 全部吻合，E9 與 4.7.4 為同一實作，可並列呈現\n")
     else:
         print("  ✗ 不一致，請先排查再使用 E9 結果：")
