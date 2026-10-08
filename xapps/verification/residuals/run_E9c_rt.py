@@ -52,6 +52,7 @@ def main():
     ap.add_argument("--set-baseline", action="store_true")
     ap.add_argument("--no-fig", action="store_true")
     args = ap.parse_args()
+    BR.init_target(args.out_dir)                 # 與 E9b_rt 同一校準目標（D-30 時取同資料集之值）
     seeds, data = P.load_data()
     e9rt = json.load(open(os.path.join(args.out_dir, "E9_operating_regime_rt.json"), encoding="utf-8"))
     e9brt = json.load(open(os.path.join(args.out_dir, "E9b_supervised_baseline_rt.json"), encoding="utf-8"))

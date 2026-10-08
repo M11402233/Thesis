@@ -40,6 +40,7 @@ def main():
     ap.add_argument("--out-dir", default=E9.OUT_DIR)
     ap.add_argument("--set-baseline", action="store_true")
     args = ap.parse_args()
+    BR.init_target(args.out_dir)                 # 與 E9b_rt 同一校準目標（D-30 時取同資料集之值）
     seeds, data = P.load_data()
     ok = check_aux(seeds)
     print("── 資料一致性 ──", " ".join(f"{s}:{'✓' if v else '✗'}" for s, v in ok.items()))

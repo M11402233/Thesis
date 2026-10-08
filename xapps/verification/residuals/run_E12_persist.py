@@ -218,7 +218,9 @@ def main():
     for L in L_S_LIST:
         rq3[lab(L)] = rq3_metrics(files, L)
         if L is None:
-            bad = [k for k, v in rq3["∞"].items() if old.get(k) != v]
+            # 只比對 E12 重算之指標（D-30 之 RQ3 另含原生 PRB 欄位，不在 E12 重算範圍）
+            bad = [k for k, v in rq3["∞"].items()
+                   if k not in old or {kk: old[k].get(kk) for kk in v} != v]
             if bad:
                 raise SystemExit(f"✗ 檢查 3：L_S=∞ 之 RQ3 與既有輸出不符：{bad[:4]}")
             print(f"── 檢查 3：L_S=∞ 之 RQ3（uebound，{len(rq3['∞'])} 組指標）與 RQ3_decision_replay.json 逐位相同 ✓")

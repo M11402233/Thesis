@@ -138,6 +138,20 @@ def sup_flags(m, sm, v, med, s, thr):
     return out
 
 
+def init_target(out_dir):
+    """設定校準目標 TARGET_FPR（E9b_rt、E9c_rt、E9d_rt 共用，確保三者之監督式門檻一致）。
+    D-SH：凍結常數，須等於舊 E9 原值；他資料集：定義不變，取同資料集 E9 之空間參照乾淨 FPR。"""
+    global TARGET_FPR
+    old = json.load(open(os.path.join(out_dir, "E9_operating_regime.json"), encoding="utf-8"))
+    if not DS.is_reference():
+        TARGET_FPR = old["clean_fpr"]["spatial"]["mean"]
+        CONFIG["target_fpr"] = TARGET_FPR
+        print(f"── 資料集 {DS.NAME}：校準目標取自同資料集 E9 空間乾淨 FPR = {TARGET_FPR}")
+    elif old["clean_fpr"]["spatial"]["mean"] != TARGET_FPR:
+        raise SystemExit("凍結之校準目標與舊 E9 原值不符")
+    return old
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", default=OUT_DIR)
@@ -145,15 +159,7 @@ def main():
     ap.add_argument("--set-baseline", action="store_true")
     ap.add_argument("--no-fig", action="store_true")
     args = ap.parse_args()
-    global TARGET_FPR
-    old = json.load(open(os.path.join(args.out_dir, "E9_operating_regime.json"), encoding="utf-8"))
-    if not DS.is_reference():
-        # 定義不變：校準目標 = 同資料集之空間參照乾淨 FPR（由 run_E9_operating_regime.py 產出）
-        TARGET_FPR = old["clean_fpr"]["spatial"]["mean"]
-        CONFIG["target_fpr"] = TARGET_FPR
-        print(f"── 資料集 {DS.NAME}：校準目標取自同資料集 E9 空間乾淨 FPR = {TARGET_FPR}")
-    elif old["clean_fpr"]["spatial"]["mean"] != TARGET_FPR:
-        raise SystemExit("凍結之校準目標與舊 E9 原值不符")
+    init_target(args.out_dir)
     seeds, data = P.load_data()
 
     acc = collections.defaultdict(list)
