@@ -55,7 +55,7 @@
 
 ## 已確立之結果（引用時以腳本輸出為準）
 
-- C_i：600 窗 0 反例；配平容錯空間 0；D=1 脈衝於 L_C=2 下 100% 不升級；同窗雙掛率 0%（12,600 樣本）
+- C_i：600 窗 0 反例；配平容錯空間 0；D=1 脈衝於 L_C=2 下 100% 不升級；同窗雙掛率 0%（樣本數 12,600 與比例之分母不一致，待 D-30 重算；見 thesis 4.6.5【待查證】）
 - S_i（方案 B，實際秒、共同集合；2026-10-06 起為正式口徑，舊 %/窗 數字只見附錄 A）：受控消融 0.5–2 %/秒 時空間 0.57–0.86 vs 時間 0.01–0.02；乾淨誤報 0.036／0.013；full-consensus 覆蓋 54.8%；共同集合 79.4%（樣本等權）；$m^*_{S,50}=2$、$m^*_{S,100}=3$
 - E9（rt）：階躍 AF≥1.3 時時間參照 onset 命中 0.75–0.88（上限 0.875）但全程偵測 0.06–0.08；空間 0.60–0.96。E9b 監督式乾淨誤報 0.136；E9c 共模 ×1.1 監督式誤報 0.52 vs 空間 0.05
 - E10：UE 綁定（uebound，已定案）使 trusted 23.6% → 57.2%（分母 3,150 有效節點註記），偵測率與延遲不變；注入實驗中 76.9% 事件之告警窗，其（正確）歸屬節點當窗無有效節點註記（非「無節點可歸屬」）
@@ -93,7 +93,7 @@
 - **E2 NR 報表之副作用**：最後一窗遺失（故 simTime = 301）；PDCP 統計每次報表後歸零（管線不用 PDCP）；RLC／PHY 不受影響。
 - **PRB**：原生 `RRU.PrbUsedDl` = 排程符號數 ÷（slot 數 × 14）× 139；139 為原始碼寫死（configuration 1 實際為 28，見下）；cell 層級欄位因 uint32 逐 UE 截斷而偏低，**以 UE 層級 `RRU.PrbUsedDl.UEID` 加總為準**；du-cell 之 timestamp 為實際時間，報表依序對應模擬第 k 秒。
 - **configuration 1 實際 RB 數 = 28**（numerology 2，RB 寬 720 kHz，ceil(20 MHz ÷ 720 kHz)，依 ns-3 原始碼）；139 = ceil(100 MHz ÷ 720 kHz)（configuration 2 之載波）。
-- **待辦（資料到齊後）**：每個 seed 完成後跑 `prepare_d30.py`（0–299 窗）與 `prb_reader.py <aux>`；RQ3 改用原生 PRB 之規格草稿 `docs/thesis/RQ3_PRB_spec_draft.md`（【待決】D1–D5 待使用者定案）；28→30 之規格文件與正文更新。
+- **待辦（資料到齊後）**：每個 seed 完成後跑 `prepare_d30.py`（0–299 窗）與 `prb_reader.py <aux>`；RQ3 改用原生 PRB 之規格 `docs/thesis/RQ3_PRB_spec.md`（v1 定案：ρ_PRB 主、ρ_cap 輔、僅 DL、不新增 PRB 準則決策、占用率＋28 RB 尺度、B4 移附錄）；28→30 之規格文件與正文更新。
 - 代價須於正文誠實說明：C_i 之 seed 數由 10 降為 8（窗數由 600 增為 2,400）。
 - **D-30 執行順序**（rt 版之檢查依賴同資料集之舊版輸出，故舊版須先跑）：`export ZT_DATASET=d30` → `zt_kpm_xapp.py --fusion bound --eval-mode all` → `run_E9_operating_regime.py` → `run_E9_rt.py` → `run_E9b_rt.py`（校準目標改取同資料集 E9 空間乾淨 FPR，定義不變）→ `run_E9c_rt.py`／`run_E9d_rt.py` → `run_E13_tauS_sensitivity.py` → `run_E13_rt.py` → `run_slow_poisoning_suite.py` → `run_slow_poisoning_rt.py` → `run_E10_D1_policy_ablation.py` → `run_RQ3_decision_replay.py` → E11／E11b／E12／B4 → `run_Ci_unified.py` → 圖。rt 系列之回歸基準於 d30 為「未核對」，須人工核對後 `--set-baseline`。
 
