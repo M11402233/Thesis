@@ -21,6 +21,9 @@ BASE = os.path.expanduser("~/oran-zt-kpm-verification")
 # 可用命令列指定資料夾：python3 audit_Si_data.py [資料夾路徑]
 if len(sys.argv) > 1:
     DATA_DIR = os.path.expanduser(sys.argv[1])
+elif "ZT_DATASET" in os.environ:                  # 明示資料集時經 datasets.py（D-30 讀 0–299 窗之分析檔）
+    import datasets as DS
+    DATA_DIR = DS.DATA_DIR
 else:
     DATA_DIR = os.path.join(BASE, "data/batchFinal_seeds")
     if not os.path.isdir(DATA_DIR):
