@@ -296,7 +296,7 @@ title: 第四章
 
 ## 第四章　基於物理與架構不變量的零信任 KPM 驗證：設計與評估
 
-> 【過渡狀態（2026-10-08）】4.2 已改以 D-30 為主資料集，但 4.6–4.13 之結果數字仍為前版 D-SH／D-C 之輸出，尚未以 D-30 重算。D-30 收齊（8 seed）並依 CLAUDE.md 之執行順序重跑後，逐節替換並刪除本註記。在此之前，本章之數字不得與 4.2 之 D-30 描述並列引用。
+> 【過渡狀態（2026-10-09）】4.0、4.2 已改以 D-30 為主資料集，但 4.6–4.13 之結果數字仍為前版 D-SH／D-C 之輸出，尚未以 D-30 重算。D-30 收齊（8 seed）並依 CLAUDE.md 之執行順序重跑後，逐節替換並刪除本註記。在此之前，本章之數字不得與 4.2 之 D-30 描述並列引用。
 
 **符號與參數**：S_i 操作門檻 τ_S = 4；H_i-D1 門檻 τ_H^warn = 2、τ_H^reject = 3；C_i 持續窗門檻 L_C = 2；S_i 最少 peer 數 MIN_PEER = 2。信任狀態 $D_i(t) \in$ {trusted, low-trust, rejected, abstain} 之定義與判定規則見 **4.4.0**，由階層式規則產生，並非由連續信任分數決定。S_i 與 H_i-D1 均採 robust z 統計量，但門檻各自校準，不共用數值。
 
@@ -311,6 +311,109 @@ title: 第四章
 
 ---
 
+## 4.0 資料集與威脅注入方法論
+
+### 4.0.1 為何獨立說明：乾淨基線與攻擊注入之分離
+
+本章所有偵測結果之可信度，取決於一個可被檢驗之前提：**乾淨基線與攻擊樣本之界線明確，且注入邏輯獨立於偵測邏輯。** 若攻擊資料係「為被偵測而構造」，高偵測率即淪為循環論證。本節說明三件事：
+
+1. 乾淨基線全部來自 ns-3 封包級模擬之輸出，未經任何人工修改；原始檔唯讀，並以 sha256 記錄（4.0.3）。
+2. 所有攻擊樣本均為於乾淨 trace **副本**上之**離線後處理注入**；注入程式與偵測程式為獨立程式碼，不共享門檻、參數或標籤（4.0.4）。
+3. 每種攻擊之注入位置、幅度與對應之偵測依據逐一列明（4.0.4）。
+
+乾淨資料**不含任何攻擊**，為 3.5 GHz 非公眾網路於正常運作下之模擬遙測。攻擊並非另外模擬之異常資料，而是事後於乾淨 trace 之可控欄位上施加之修改，等價模擬受攻陷 O-DU 於 KPM 組裝點之輸出（4.1）。故偵測率反映「偵測器能否分辨乾淨與被竄改」，而非「模擬器能否產生必然被偵測之資料」。
+
+### 4.0.2 底層模擬與資料型別
+
+底層模擬為 ns-O-RAN 之 `scratch/scenario-three.cc`（`configuration=1`：3.5 GHz、20 MHz、isd = 1,000 m、單天線；平台與參數見 4.2.1–4.2.2）。場景含 1 個 LTE eNB（cell 1，錨點）與 7 個 gNB（cell 2–8）之 MC 雙連結拓樸、30 個 UE；模擬器以封包層級計算 SINR、雙連結之服務 cell 切換與封包延遲，並以 1 秒為觀測窗輸出統計。
+
+**主要 KPM 來源**為 RLC 層統計（`DlE2RlcStats.txt`），經前處理（4.3）解析為每窗、每 cell、每 UE 之觀測量：
+
+| 欄位 | 型別 | 語意 | 使用者 |
+|---|---|---|---|
+| start／end | float | 觀測窗起訖（秒） | 全部（窗對齊） |
+| CellId | int | 節點識別（cell 1 = LTE 錨點） | C_i、H_i |
+| IMSI | int | UE 識別 | C_i、H_i |
+| delay | float | 該窗之 RLC 平均延遲（檔案單位為秒，前處理轉為毫秒） | **S_i** |
+| RxBytes／TxBytes | int | 該窗之位元組量（前處理見 4.3.3） | 未用於殘差（吞吐量竄改未涵蓋，4.5.2） |
+
+**輔助資料**（同一模擬之其他輸出，用於資源評估與交叉驗證）：
+
+| 檔案 | 語意 | 使用者 |
+|---|---|---|
+| `du-cell-2…8.txt`（E2 NR 報表） | E2SM-KPM DU 報表，含逐 UE 之 `RRU.PrbUsedDl` | RQ3 之原生 PRB（4.12） |
+| `RxPacketTrace.txt` | 每個傳輸區塊之 cell、排程符號數、TB 大小、MCS、SINR | 原生 PRB 之交叉驗證、P_i、附錄 B4、E9d |
+
+> **組態命名註**：`configuration=1` 下實體載波為 sub-6 GHz；ns-O-RAN 將節點命名為「mmWave gNB」，係沿用其 MC 雙連結架構之命名。S_i 建立於 delay 之跨節點一致性，與載波頻段無關，此命名不影響方法有效性。RLC 統計不含 PRB 與 CQI；PRB 改由 E2 NR 報表取得（4.12.1），CQI 未取得。
+
+### 4.0.3 乾淨資料集 D-30
+
+第四章全部實驗使用**單一資料集 D-30**：
+
+| 項目 | 設定 |
+|---|---|
+| 規模 | 30 UE（`--totalUes=30`）× 8 seed（RngRun 4200–4207） |
+| 時長 | 每 seed 模擬 301 秒，分析取 0–299 共 300 窗；全資料 2,400 窗 |
+| 收集腳本 | `scripts/collect_ues30.sh`（逐 seed 輸出至 `data/ues30_seeds/`） |
+| 其餘參數 | `indicationPeriodicity=1.0`、`minSpeed=3`／`maxSpeed=10`（m/s）、`heuristicType=-1`、`--e2nrEnabled=true`（4.2.2） |
+| 分析檔 | `prepare_d30.py` 自原始檔截取 0–299 窗至 `data/ues30_seeds/analysis/`，並記錄原始檔與分析檔之 sha256 |
+| 收集時之完成檢查 | 每窗 N_total = 30、IMSI 1–30 齊全、0–299 窗無缺 |
+
+**為何以單一資料集**：前版以兩批資料分別評估 C_i（D-C：10 seed × 60 s）與其餘檢查（D-SH：4 seed × 300 s），兩者 UE 數皆為 7。改為單一資料集後，C_i、S_i、H_i、融合與資源評估皆於同一組軌跡上評估，結論可直接對照。代價為 C_i 之 seed 數由 10 降為 8；窗數則由 600 增為 2,400。前版資料集保留唯讀，僅供附錄對照。
+
+**規模之選擇**：UE 數取 30，與比較文獻常用之 10 之倍數規模一致。35 UE 之試跑推估單一 seed 之記憶體需求約 20 GB，超出實驗機器可平行執行之範圍，故未採用；每個 seed 之模擬約需 36–41 小時。
+
+**校準**：正式收集前以 5 秒模擬驗證四點（`data/ues30_seeds/calibration_20261006/`）：（1）同一 seed 兩次執行之輸出逐位相同，僅實際時間戳欄不同；（2）每窗 N_total = 30；（3）新增之 `--totalUes` 參數於原參數下不改變任何輸出；（4）原生 PRB 與排程符號數之換算相符。開啟 E2 NR 報表之副作用見 4.2.3。
+
+**乾淨基線之性質**：收集腳本對每個 seed 檢查每窗 N_total = 30。【待填：8 seed 完成後之檢查結果，以及乾淨資料上各殘差之基線（C_i 反例數、跨 mmWave cell 直接轉移數等），均由腳本輸出】
+
+**參數凍結**：所有門檻與政策沿用於 7 UE 資料上定案之值，於 D-30 之結果產出前凍結，D-30 未用於選擇任何門檻（`docs/thesis/D30_parameter_freeze.md`）。
+
+### 4.0.4 攻擊樣本：注入方法與獨立性
+
+所有攻擊樣本由**離線注入函式**於乾淨 trace 之副本上產生，修改 KPM 之可控欄位（IMSI 集合、CellId 與 IMSI 之對應、delay），等價模擬受攻陷 O-DU 之輸出。注入原則：
+
+1. **乾淨 trace 永不修改**：原始 RLC 統計為唯一真值來源，所有注入於其副本上進行。
+2. **注入為獨立程式**：注入程式不讀取偵測器之門檻或內部狀態。
+3. **偵測器不知情**：偵測器以同一介面、同一組凍結門檻處理乾淨與注入樣本，不接收任何標籤。
+
+| 攻擊型態 | 注入操作（於乾淨 trace 副本上） | 竄改欄位 | 對應之偵測依據 | 腳本 |
+|---|---|---|---|---|
+| A 灌水（+k） | 加入 k 個未登記 IMSI | IMSI 集合 | C_i：N_total 淨增 | `run_Ci_unified.py` |
+| A 虛減（−k） | 刪除 k 個真實 IMSI | IMSI 集合 | C_i：N_total 淨減 | `run_Ci_unified.py` |
+| E3 守恆式替換 | 同窗 +k 假、−k 真 | IMSI 集合 | C_i 之盲點（刻意保留，4.6.6） | `run_Ci_unified.py` |
+| B1 階躍 | 受測 cell 之 delay 乘以放大因子 | delay | S_i：偏離同窗共識 | `run_E9_rt.py` |
+| D 漸進漂移 | 受測 cell 之 delay 每**實際秒**遞增 r × 平均值 | delay | S_i：對同窗共識累積偏離 | `run_E9_rt.py`、`run_slow_poisoning_rt.py` |
+| C 瞬移 | 竄改 IMSI 與 CellId 之對應，使 UE 不經錨點跨 mmWave cell | CellId | H_i-D2：無合法過渡 | `run_Hi_experiments.py` |
+| 超時消失 | 使 UE 自 mmWave cell 消失並滯留錨點 | CellId | H_i-D1：停留超出基線 | `run_E10_D1_policy_ablation.py` |
+| 延遲壓低（RQ3） | 受控節點壓低自身回報延遲以吸引流量 | delay | 融合後之准入（4.12） | `run_RQ3_decision_replay.py` |
+
+注入之獨立性可由程式結構檢驗：S_i 之共識中心取自受測節點以外之 cell，偵測器不讀取任何注入標記，只能經由殘差判定。
+
+**注入不偏袒偵測器之證據**：E3 守恆式替換**刻意構造為 C_i 無法偵測**（N_total 不變）。若注入係為「保證被偵測」而設計，即不會包含此函式並如實呈現 C_i 未偵測之結果。E3 之存在本身即顯示注入邏輯不服務於偵測率；此盲點並導出 S_i／H_i 之必要性（4.6.6）。
+
+### 4.0.5 Seeds 明細與可追溯性
+
+| seed | 時長 | 用途 | 攻擊注入 | 統計單位 |
+|---|---|---|---|---|
+| 4200–4207 | 300 窗 | 全部殘差、融合、xApp、對抗性分析、規則回放、RQ3 | 依 4.0.4；S_i 類注入於各 (seed, cell) 序列中點 | seed（cluster） |
+
+**攻擊實例規模**：S_i 類注入之樣本單位為 (seed, cell)，同一 seed 內之 cell 共用軌跡與共識參照，非獨立樣本，信賴區間以 seed 為 cluster 計算。【待填：D-30 之 (seed, cell) 樣本數、H_i-D2 瞬移實例數、C_i 逐窗注入之窗數，均由腳本輸出】
+
+**LOSO 無洩漏聲明**：S_i 之全域尺度 s 與 H_i 之 per-UE 基線，於每個 LOSO fold 僅由訓練 seed 估計，held-out seed 不參與。門檻（τ_S 等）於前版資料上選定、於 D-30 結果產出前凍結，未以 D-30 調整（4.0.3）。
+
+**per-UE 基線之身分對齊限制**：H_i 之 per-UE 基線跨 seed 以 IMSI 編號彙整，然不同 seed 之同號 IMSI 對應不同初始位置與軌跡之 UE；LOSO 下 held-out seed 之 UE 個體無自身歷史可循，此為架構固有限制（4.8.7）。
+
+### 4.0.6 E2 runtime 整合之嘗試與限制
+
+**資料取得路徑之界定**：本研究之資料**並非經由 E2 介面即時上報、於 near-RT RIC 落地**，而是由 ns-O-RAN 之離線檔案記錄機制（`enableE2FileLogging=true`，原始碼註解明載為「產生離線檔案記錄，而非連接 RIC」）直接輸出之統計檔。數值仍由完整之封包級模擬產生，但驗證層並未實際消費 E2SM-KPM indication 訊息。
+
+**整合嘗試與受阻點**：本研究曾嘗試以 FlexRIC 作為 near-RT RIC 建立 E2AP／E2SM runtime 連線。**E2 Setup 已成功**：FlexRIC 於本機迴路（127.0.0.1:36421）收到 E2 節點之 E2 SETUP REQUEST，並接受其宣告之 RAN Function。其後於 RIC Indication 之產生路徑上，依序排除兩專案因獨立版本演進所致之相容性落差，包括：E2AP 訊息型別不相容導致之 RIC 端斷言失敗、ASN.1 標頭安裝路徑缺漏、e2sim 函式庫 callback 註冊 API 之簽名變更（`register_callback` → `register_sm_callback`）、核心裝置類別缺少之存取方法，以及 ns-3 屬性系統中多項 E2 屬性未於配對版本註冊。最終阻滯於 **RIC Indication Header 之 ASN.1 PER 編碼階段**（`ric-KPM-Node-List`），錯誤發生於編碼函式庫內部，其排除需深入第三方 codec，超出本研究時程之可控範圍，遂停損。
+
+**對本研究之影響**：驗證邏輯之輸入改由離線 trace 提供（4.9.1 之 `IndicationSource` 抽象層），攻擊注入改採於模擬輸出上之等價後處理。兩條路徑承載之數值出自同一封包級模擬，**未經驗證者為傳輸路徑，而非驗證邏輯本身**；端到端 E2 訊息處理延遲、runtime 注入 hook 與實際 RIC 決策之影響，均因此無法量測，列為後續工作。
+
+---
+
 ## 4.1 攻擊架構與注入點定位
 
 本研究之威脅為一個**身分合法、但資料造假**的內部 O-DU 節點。攻擊者不破壞 E2 介面之 IPsec、不偽造 E2AP 格式、不碰無線層——竄改發生於**量測收集完成後、E2SM-KPM indication 編碼前**的資料組裝環節，使上報之數值或 IMSI 偏離物理真實。此威脅已由 O-RAN WG11 點名為 Key Issue #14「Malicious E2 Node」：惡意行為者可濫用已正確完成認證之被攻陷 E2 節點，送出變造與誤導性資料（xApp-TR §5.15）。E2 路徑上之傳輸與身分保護（IPsec ESP 與 IKEv2 憑證認證；E2GAP §7.3）對此無效，現行之單值範圍檢查（SRCS SEC-CTL-NEAR-RT-17）亦無法偵測落在合法範圍內之偽造值，此即需要跨來源一致性驗證之根本原因（呼應第一章）。
@@ -320,7 +423,7 @@ title: 第四章
 - **UPF／核網（N3/N6）**：研究範圍外。UPF 非 E2 節點、不參與 E2SM-KPM 通訊。
 - **O-DU（E2 節點）KPM 組裝點**：**本研究攻擊面**。ns-O-RAN 單體 gNB 架構下 CU/DU 未實際物理切分，攻擊點準確描述為「E2 節點內、量測聚合完成至 E2SM-KPM indication 編碼之間」之資料層。
 
-> 威脅模型之**概念注入點**位於 O-DU KPM 組裝點；**本章實驗以離線後處理修改該點可控欄位、等價模擬其輸出效果，尚未完成 runtime E2SM-KPM indication hook**（見 4.2.5）。本章所有攻擊實驗均屬此離線注入層級。
+> 威脅模型之**概念注入點**位於 O-DU KPM 組裝點；**本章實驗以離線後處理修改該點可控欄位、等價模擬其輸出效果，尚未完成 runtime E2SM-KPM indication hook**（見 4.0.6）。本章所有攻擊實驗均屬此離線注入層級。
 
 **完整攻擊流程**：
 
@@ -347,9 +450,9 @@ title: 第四章
 
 ### 4.2.1 平台與場景
 
-**平台**：ns-O-RAN（ns-3.38，`wineslab/ns-o-ran-ns3-mmwave` commit 8c42089d；mmWave module + `oran-interface` E2 termination）。場景建立 **7 個 gNB + 1 個 LTE eNB** 之 MC 雙連結拓樸，提供跨節點空間驗證所需之多 cell 觀測。ns-O-RAN 具備 E2 termination 能力（RAN Function ID 2，ORAN-E2SM-KPM），惟**本研究之資料收集採其離線檔案記錄模式（`enableE2FileLogging=true`），未經由 Near-RT RIC 之 E2 indication 路徑**；E2 runtime 整合之嘗試與受阻點見 4.2.5。
+**平台**：ns-O-RAN（ns-3.38，`wineslab/ns-o-ran-ns3-mmwave` commit 8c42089d；mmWave module + `oran-interface` E2 termination）。場景建立 **7 個 gNB + 1 個 LTE eNB** 之 MC 雙連結拓樸，提供跨節點空間驗證所需之多 cell 觀測。ns-O-RAN 具備 E2 termination 能力（RAN Function ID 2，ORAN-E2SM-KPM），惟**本研究之資料收集採其離線檔案記錄模式（`enableE2FileLogging=true`），未經由 Near-RT RIC 之 E2 indication 路徑**；E2 runtime 整合之嘗試與受阻點見 4.0.6。
 
-**場景**：`scratch/scenario-three.cc`，`configuration=1`（3.5 GHz／20 MHz／isd = 1000 m／單天線）。本研究對場景程式僅作一項修改：新增 `--totalUes` 參數，以指定 UE 總數（原程式之 UE 數只能為 `ues` × 7）；參數為 0 時維持原行為。修改後之執行檔於原參數下之全部輸出與修改前逐位相同（校準紀錄，見 4.2.3）。UE 初始位置為以場域中心為圓心之均勻圓盤分布，不逐基地台分配，故 UE 總數不必為 7 之倍數。
+**場景**：`scratch/scenario-three.cc`，`configuration=1`（3.5 GHz／20 MHz／isd = 1000 m／單天線）。本研究對場景程式僅作一項修改：新增 `--totalUes` 參數，以指定 UE 總數（原程式之 UE 數只能為 `ues` × 7）；參數為 0 時維持原行為。修改後之執行檔於原參數下之全部輸出與修改前逐位相同（校準紀錄，見 4.0.3）。UE 初始位置為以場域中心為圓心之均勻圓盤分布，不逐基地台分配，故 UE 總數不必為 7 之倍數。
 
 > **註**：ns-O-RAN 將節點命名為「mmWave gNB」，係沿用其 MC 雙連結架構之命名慣例；於 `configuration=1` 下實體載波為 sub-6 GHz。S_i 建立於 delay 之跨節點一致性，與載波頻段無關，此命名不影響方法有效性。
 
@@ -371,43 +474,21 @@ E2NR=true         # --e2nrEnabled=true：cell 2–8 輸出 E2SM-KPM DU 報表（
 SEEDS=4200–4207   # RngRun，8 個獨立 seed
 ```
 
-### 4.2.3 資料集
+### 4.2.3 資料集與 E2 NR 報表之技術細節
 
-| 代號 | 規模 | 窗數 | 用途 |
-|---|---|---:|---|
-| **D-30**（主資料） | 30 UE × 8 seed（RngRun 4200–4207）× 300 s | 2,400 | 第四章全部實驗：C_i、S_i、H_i、E9 系列、E10–E13、C-ZT 之決策分布與運算開銷、對抗性分析、規則回放、決策重放（4.12，含原生 PRB） |
-| D-SH（前版） | 7 UE × 4 seed × 300 s | 1,200 | 僅供附錄對照 |
-| D-C（前版） | 7 UE × 10 seed × 60 s | 600 | 僅供附錄對照 |
+資料集 D-30 之規模、收集、校準與參數凍結見 **4.0.3**。以下為分析時須知之技術細節：
 
-**單一資料集**：所有殘差、融合與資源評估皆於同一組 D-30 上評估。前版以 D-C 評估 C_i、以 D-SH 評估其餘；改為單一資料集後，C_i 之 seed 數由 10 降為 8，窗數則由 600 增為 2,400。
-
-**規模之選擇**：UE 數取 30，與比較文獻常用之 10 之倍數規模一致。35 UE 之試跑推估單一 seed 之記憶體需求約 20 GB，超出實驗機器可平行執行之範圍，故未採用。每個 seed 之模擬約需 40 小時。
-
-**分析窗**：開啟 E2 NR 報表時，模擬結束之最後一窗不輸出 RLC 統計，故模擬 301 秒、分析取 0–299 窗；分析檔由 `prepare_d30.py` 自原始檔截取，並內建缺窗、N_total 與 aux 一致性檢查。
-
-**E2 NR 報表之副作用**（校準實測）：RLC 統計與 PHY trace 於開啟前後之共同窗逐位相同；PDCP 統計改為每次報表後歸零。本研究之分析不使用 PDCP 統計。
-
-**校準**：正式收集前，以 5 秒模擬驗證：同一 seed 兩次執行之輸出逐位相同（僅實際時間戳欄不同）、每窗 N_total = 30、`--totalUes` 修改不影響原參數下之輸出，以及原生 PRB 與排程符號數之交叉驗證（`data/ues30_seeds/calibration_20261006/`）。
-
-**參數凍結**：所有門檻與政策（τ_S、τ_H、L_C、L_H、MIN_PEER、准入政策等）沿用於 7 UE 資料上定案之值，於 D-30 之結果產出前凍結，D-30 未用於選擇任何門檻；尺度 s、D1 停留基線與監督式分類器依其定義以 LOSO 之訓練 seed 重新估計。τ_S 之敏感度另以 E13 於 D-30 上報告（`docs/thesis/D30_parameter_freeze.md`）。
-
-8 個 seed 屬中等規模；信賴區間以 seed 為 cluster 計算。【待填：D-30 收集完成日期與全部 seed 之檢查結果】
+- **分析窗**：開啟 E2 NR 報表時，模擬結束之最後一窗不輸出 RLC 統計，故模擬 301 秒、分析取 0–299 窗；分析檔由 `prepare_d30.py` 截取，並內建缺窗、N_total 與 aux 一致性檢查。
+- **E2 NR 報表之副作用**（校準實測）：RLC 統計與 PHY trace 於開啟前後之共同窗逐位相同；PDCP 統計改為每次報表後歸零。本研究之分析不使用 PDCP 統計。
+- **確定性**：同一台機器上，同一 seed 重跑之輸出逐位相同（實際時間戳欄除外）。
 
 ### 4.2.4 威脅注入方法論
 
-本章所有攻擊樣本均依以下原則產生，確保注入與偵測之獨立性：
-
-1. **乾淨 trace 永不修改**：ns-3 產出之 RLC trace 為唯一真值來源，所有注入於其副本上進行。
-2. **注入為獨立程式**：注入程式僅修改可控欄位（IMSI 集合、CellId↔IMSI 對應、delay），不讀取偵測器之門檻或內部狀態。
-3. **偵測器不知情**：偵測器以同一介面、同一組固定門檻處理乾淨與注入樣本，不接收任何標籤。
-
-**結構性佐證**：注入套件包含守恆式替換函式（E3、E7），而偵測器對其如實回報「未偵測」（0/600）。一個為保證偵測而設計之注入套件不會包含此函式——其存在與其結果，構成注入與偵測相互獨立之證據。
+見 **4.0.4**。
 
 ### 4.2.5 E2 runtime 整合之嘗試與限制
 
-本研究曾嘗試將 ns-O-RAN 接上 FlexRIC 作為 Near-RT RIC。**E2 Setup 已成功**：FlexRIC 於本機迴路（127.0.0.1:36421）收到 E2 節點之 E2 SETUP REQUEST，並接受其宣告之 RAN Function。然而於 RIC Indication 之產生路徑上，依序遭遇協定版本不一致、ASN.1 標頭路徑、API 更名、未實作函式、缺漏模組與方法、函式庫版本不相容等問題，最終阻滯於 RIC Indication Header 之 ASN.1 PER 編碼階段，且錯誤發生於 codec 內部。經評估其修復已超出本研究時程之可控範圍，遂停損。
-
-**對本研究之影響**：驗證邏輯之輸入改由離線 trace 提供（見 4.9.1 之 `IndicationSource` 抽象層）。兩條路徑承載之數值出自同一封包級模擬，**未經驗證者為傳輸路徑，而非驗證邏輯本身**；惟端到端 E2 訊息處理延遲、runtime 注入 hook 與實際 RIC 決策之影響，均因此無法量測，列為後續工作。
+見 **4.0.6**。
 
 ---
 
@@ -644,7 +725,7 @@ C_i violated ⟺ N_total(t) ≠ N_known
 
 | 參數 | 值 | 理由 |
 |---|---|---|
-| `N_known` | **30**（`--totalUes=30`） | 與比較文獻之 10 之倍數規模一致；35 UE 之記憶體需求超出實驗機器之平行執行範圍（4.2.3）。此為場域規模之實驗限制，其對運算開銷之意涵見 4.9.5 |
+| `N_known` | **30**（`--totalUes=30`） | 與比較文獻之 10 之倍數規模一致；35 UE 之記憶體需求超出實驗機器之平行執行範圍（4.0.3）。此為場域規模之實驗限制，其對運算開銷之意涵見 4.9.5 |
 | 判定 | 嚴格相等 | safety property，零閾值布林斷言 |
 | L_C | 2 | 吸收斷線重連瞬態（代價見 4.6.7） |
 
@@ -1350,7 +1431,7 @@ LOSO，注入超時消失，per-seed 明細：
 **實作層級之誠實聲明**：
 
 - 三個模組之邏輯（逐窗對齊、三類證據之計算、階層式融合、依信任狀態產生准入動作）已實作並於重放 trace 上執行。三者目前於同一行程（`zt_kpm_xapp.py`）內依 P1→P2→P3 依序執行，模組間之 evidence record、trust state 與 admitted view 以行程內資料結構傳遞，未經 RIC 之 shared data service 與訊息匯流排。故本章所驗證者為各模組之邏輯及其介面內容，而非三個獨立部署之 xApp 間之通訊。
-- **資料入口為 trace replay，E2 訂閱綁定尚未完成**（見 4.2.5）。程式以 `IndicationSource` 抽象層隔離資料來源，將 `TraceReplaySource` 替換為 `E2SubscriptionSource` 即可接上 live RIC，驗證邏輯無須改動。
+- **資料入口為 trace replay，E2 訂閱綁定尚未完成**（見 4.0.6）。程式以 `IndicationSource` 抽象層隔離資料來源，將 `TraceReplaySource` 替換為 `E2SubscriptionSource` 即可接上 live RIC，驗證邏輯無須改動。
 - Policy Enforcement 對合作消費端之效果以離線決策重放評估（4.12），未涉及 runtime 控制。
 - 運算開銷量測反映驗證層之計算成本，**不含 E2SM-KPM 解碼與 SCTP 傳輸延遲**。
 
@@ -1970,7 +2051,8 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 
 | 檔案 | 功能 | 對應章節 |
 |---|---|---|
-| `collect_Ci_60s_10seed.sh` | D-C 資料集收集 | 4.2.3 |
+| `collect_ues30.sh` | D-30 資料集收集（30 UE、E2 NR 報表、8 seed） | 4.0.3 |
+| `collect_Ci_60s_10seed.sh` | 前版 D-C 資料集收集 | 附錄 |
 | `cardinality.py` | C_i 核心函式庫（斷言、攻擊注入） | 4.6 |
 | `run_Ci_unified.py` | C_i 之 E0–E8（判定經 `zt_kpm_xapp.verify_ci`／`fuse`；規格 `docs/thesis/Ci_unified_spec.md`） | 4.6.2–4.6.8 |
 | `make_fig_Ci_unified.py` | Fig 4-1 ～ 4-4 | 4.6 |
@@ -1993,7 +2075,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 | `make_fig_Hi_H1_H4.py` | Fig 4-9 ～ 4-12（含對帳） | 4.8.1、4.8.2、4.8.4、4.8.6 |
 | `make_fig_Hi_D1_grading.py` | Fig 4-13 | 4.8.5 |
 | `datasets.py` | 資料集登錄（`ZT_DATASET`）：資料路徑、N_known、aux 路徑、輸出目錄 | 全章 |
-| `prepare_d30.py` | D-30 分析檔（0–299 窗）與一致性檢查 | 4.2.3 |
+| `prepare_d30.py` | D-30 分析檔（0–299 窗）與一致性檢查 | 4.0.3、4.2.3 |
 | `prb_reader.py` | 原生 PRB 讀取與 `RxPacketTrace` 交叉驗證 | 4.12 |
 | `zt_kpm_xapp.py` | C-ZT 三模組之邏輯、規則稽核、runtime benchmark | 4.9 |
 | `run_E10_D1_policy_ablation.py` | E10：D1 節點歸屬政策消融 | 4.9.6.5 |
