@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import datasets as DS
 
 ROOT = os.path.expanduser("~/oran-zt-kpm-verification/data")
-R = os.path.join(ROOT, "results")
+R = DS.results_dir()
 
 
 def anchor_seconds(path):

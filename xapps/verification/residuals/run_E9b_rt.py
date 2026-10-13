@@ -233,7 +233,7 @@ def main():
         json.dump(res, fh, indent=2, ensure_ascii=False)
     ref = res["reference_E9_rt_common"]
     R = res["thr_cal"]["common"]
-    print(f"══ common 集合，thr_cal（校準目標 0.0369）：實際測試乾淨 FPR {R['clean_fpr']['mean']:.3f}"
+    print(f"══ common 集合，thr_cal（校準目標 {TARGET_FPR:.4f}）：實際測試乾淨 FPR {R['clean_fpr']['mean']:.3f}"
           f"（空間 {ref['spatial']['clean_fpr']:.3f}、時間 {ref['temporal']['clean_fpr']:.3f}）══")
     print(f"{'漂移%/秒':>8} {'監督':>6} {'空間':>6} {'時間':>6} | 2c 未偵測 偵測秒數中位")
     for k in E9.DRIFT_RATES:
@@ -257,7 +257,7 @@ def draw(res, path):
     a1.plot(x, [ref["spatial"]["drift"][str(r)] for r in E9.DRIFT_RATES], "o-", color="#2b8a3e", lw=2, label="spatial consensus")
     a1.plot(x, [ref["temporal"]["drift"][str(r)] for r in E9.DRIFT_RATES], "s--", color="#c92a2a", lw=2, label="temporal self-reference")
     a1.plot(x, [R["drift"][str(r)]["mean"] for r in E9.DRIFT_RATES], "^-", color="#5f3dc4", lw=1.6,
-            label=f"supervised LSTM [level, 2-channel] (calibration target FPR 0.0369; "
+            label=f"supervised LSTM [level, 2-channel] (calibration target FPR {TARGET_FPR:.4f}; "
                   f"test clean FPR {R['clean_fpr']['mean']:.3f} vs spatial {ref['spatial']['clean_fpr']:.3f})")
     xs = range(len(E9.STEP_AFS))
     a2.plot(xs, [ref["spatial"]["step"][str(k)] for k in E9.STEP_AFS], "o-", color="#2b8a3e", lw=2)

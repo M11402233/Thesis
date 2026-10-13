@@ -6,8 +6,9 @@ import json
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import datasets as DS
 
-R = os.path.expanduser("~/oran-zt-kpm-verification/data/results")
+R = DS.results_dir()
 
 
 def main():
@@ -29,7 +30,7 @@ def main():
     ax[1].set_xlabel("τ_S"); ax[1].set_ylabel("trusted (%)"); ax[1].axvline(4, color="k", lw=0.6, ls=":")
     a2 = ax[1].twinx()
     a2.bar(taus, [fu[str(t)]["counts"]["rejected"] for t in taus], width=0.2, alpha=0.4, color="C3", label="clean rejected")
-    a2.set_ylabel("clean rejected (of 3,150)")
+    a2.set_ylabel(f"clean rejected (of {fu[str(taus[0])]['n']:,})")
     ax[1].set_title("Fusion layer (uebound, L_H = 1)")
     h1, l1 = ax[1].get_legend_handles_labels(); h2, l2 = a2.get_legend_handles_labels()
     ax[1].legend(h1 + h2, l1 + l2, fontsize=8, loc="center right")

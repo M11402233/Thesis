@@ -80,6 +80,9 @@ def geom_chi2(ev):
     return float(((obs - exp) ** 2 / exp).sum()), obs.tolist(), exp.tolist(), float(p), n
 
 
+DSLABEL = {"dsh": "D-SH", "dc": "D-C", "d28": "D-28", "d30": "D-30"}.get(DS.NAME, DS.NAME)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", default=OUT_DIR)
@@ -185,7 +188,7 @@ def draw(res, grp, out):
     a2.text(13, 0.5, f"{res['le12_frac']*100:.1f}% ≤ 12", fontsize=9)
     a2.set_xscale("log"); a2.set_xlabel("LTE-only dwell (windows, log)"); a2.set_ylabel("CDF")
     a2.legend(fontsize=8); a2.grid(alpha=0.3)
-    fig.suptitle(f"H_i clean baseline: LTE-only dwell distribution (D-SH, {res['n_dwell_events']} events)", fontsize=11)
+    fig.suptitle(f"H_i clean baseline: LTE-only dwell distribution ({DSLABEL}, {res['n_dwell_events']} events)", fontsize=11)
     fig.tight_layout(); fig.savefig(os.path.join(out, "fig_Hi_H1_dwell_dist.png"), dpi=200); plt.close(fig)
 
     # H2
@@ -219,25 +222,30 @@ def draw(res, grp, out):
 
     # H4
     d2 = res["d2"]
-    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11, 3.8), gridspec_kw={"width_ratios": [1, 1.4]})
+    sc = sorted(d2["dc_per_seed"])          # D-C 對照僅屬前版；其他資料集只畫單一面板
+    if sc:
+        fig, (a1, a2) = plt.subplots(1, 2, figsize=(11, 3.8), gridspec_kw={"width_ratios": [1, 1.4]})
+    else:
+        fig, a1 = plt.subplots(figsize=(7.5, 3.8))
     sd = sorted(d2["dsh_per_seed"]); x = np.arange(len(sd))
     a1.bar(x - 0.25, [d2["dsh_per_seed"][s]["clean"] for s in sd], 0.25, color="#495057", label="clean transitions")
     a1.bar(x, [d2["dsh_per_seed"][s]["inject"] for s in sd], 0.25, color="#adb5bd", label="injected teleports")
     a1.bar(x + 0.25, [d2["dsh_per_seed"][s]["detect"] for s in sd], 0.25, color="#c92a2a", label="detected")
     for i, s_ in enumerate(sd):
         a1.text(i - 0.25, 0.1, str(d2["dsh_per_seed"][s_]["clean"]), ha="center", fontsize=9, fontweight="bold")
-    a1.set_xticks(x); a1.set_xticklabels(sd); a1.set_title("D-SH (300 s)", fontsize=10)
-    a1.set_ylabel("count"); a1.legend(fontsize=8); a1.grid(alpha=0.3, axis="y")
-    sc = sorted(d2["dc_per_seed"]); xc = np.arange(len(sc))
-    a2.bar(xc, [d2["dc_per_seed"][s] for s in sc], 0.5, color="#495057")
-    a2.set_xticks(xc); a2.set_xticklabels(sc, rotation=45, fontsize=8)
-    for i, s_ in enumerate(sc):
-        a2.text(i, 0.05, str(d2["dc_per_seed"][s_]), ha="center", fontsize=10, fontweight="bold")
-    a2.set_ylim(0, 1); a2.set_yticks([0, 1]); a2.set_ylabel("count")
-    a2.set_title(f"D-C (60 s): clean cross-mmWave transitions = {d2['dc_clean']} in all seeds", fontsize=10)
-    a2.grid(alpha=0.3, axis="y")
-    fig.suptitle("D2 integrity check — clean baseline is 0 because no legitimate handover occurs (vacuous); "
-                 "injected detection is by construction", fontsize=10)
+    a1.set_xticks(x); a1.set_xticklabels(sd); a1.set_title(f"{DSLABEL} (300 s)", fontsize=10)
+    a1.set_ylabel("count"); a1.legend(fontsize=8, loc="center right"); a1.grid(alpha=0.3, axis="y")
+    if sc:
+        xc = np.arange(len(sc))
+        a2.bar(xc, [d2["dc_per_seed"][s] for s in sc], 0.5, color="#495057")
+        a2.set_xticks(xc); a2.set_xticklabels(sc, rotation=45, fontsize=8)
+        for i, s_ in enumerate(sc):
+            a2.text(i, 0.05, str(d2["dc_per_seed"][s_]), ha="center", fontsize=10, fontweight="bold")
+        a2.set_ylim(0, 1); a2.set_yticks([0, 1]); a2.set_ylabel("count")
+        a2.set_title(f"D-C (60 s): clean cross-mmWave transitions = {d2['dc_clean']} in all seeds", fontsize=10)
+        a2.grid(alpha=0.3, axis="y")
+    fig.suptitle("D2 integrity check — clean baseline is 0 because no legitimate handover occurs (vacuous);"
+                 + (" " if sc else "\n") + "injected detection is by construction", fontsize=10)
     fig.tight_layout(); fig.savefig(os.path.join(out, "fig_Hi_H4_teleport.png"), dpi=200); plt.close(fig)
     print(f"圖已存: {out}/fig_Hi_H1_dwell_dist.png, fig_Hi_H2_edge_ue.png, fig_Hi_H3_geom_reject.png, fig_Hi_H4_teleport.png")
 

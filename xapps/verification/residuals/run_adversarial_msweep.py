@@ -123,7 +123,7 @@ def main():
         ax.set_ylabel("S_i bypass rate on full-consensus windows (%)")
         ax.set_title("Anti-collusion strength of S_i (6σ coordinated delay fabrication)")
         ax.set_xticks(ms); ax.set_ylim(-5, 105); ax.grid(alpha=0.3)
-        ax.legend(loc="lower right")
+        ax.legend(loc="upper left")
         fig.tight_layout()
         fig.savefig(os.path.join(OUT_DIR, "fig_adversarial_mstar.png"), dpi=150)
         print("圖已存: fig_adversarial_mstar.png")
