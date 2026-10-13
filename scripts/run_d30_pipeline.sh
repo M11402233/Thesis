@@ -39,6 +39,11 @@ run 22_Hi_D1        run_Hi_D1_performance.py
 run 23_Ci           run_Ci_unified.py
 run 25_resource_eval        resource_eval_xapp.py --admission strict              # 須在 RQ3 與 xApp 之後（內建檢查讀其輸出）
 run 26_resource_eval_annot  resource_eval_xapp.py --admission restrict_annotated
+# 補充實驗（規格 docs/thesis/E15_E18_supplementary_spec.md）：皆有「重現既有輸出」之內建檢查
+run 40_E14          run_E14_D1_sensitivity.py
+run 41_E15_E16      run_E15_E16_D1_robustness.py
+run 42_E17          run_slow_poisoning_rt.py --q6-k 1,2,3,4,5
+run 43_E18          resource_eval_xapp.py --attacks
 fig 30_fig_Hi_grading make_fig_Hi_D1_grading.py
 fig 31_fig_Hi_H1_H4   make_fig_Hi_H1_H4.py
 fig 32_fig_Ci         make_fig_Ci_unified.py --tag unified

@@ -106,7 +106,14 @@ def main():
     ap.add_argument("--out-dir", default=E9.OUT_DIR)
     ap.add_argument("--set-baseline", action="store_true")
     ap.add_argument("--no-fig", action="store_true")
+    ap.add_argument("--q6-k", default=None,
+                    help="E17：Q6 之 k 清單（例 1,2,3,4,5）。指定且異於預設時，結果另寫 slow_poisoning_Q6_ext.json，"
+                         "不覆寫主輸出、不作圖；回歸基準仍只比對預設 k 之鍵")
     args = ap.parse_args()
+    q6_k = [int(x) for x in args.q6_k.split(",")] if args.q6_k else list(Q6_K)
+    q6_ext = q6_k != list(Q6_K)
+    if q6_ext and (args.set_baseline or not set(Q6_K) <= set(q6_k)):
+        raise SystemExit("--q6-k 須包含預設之 k，且不得與 --set-baseline 併用")
     seeds, data = P.load_data()
     acc = collections.defaultdict(list)
     q2rows = collections.defaultdict(list)
@@ -213,7 +220,7 @@ def main():
     print("── 檢查 2：Q6 未中毒空間乾淨誤報 = E9_rt ──", "✓" if ok2 else "✗")
     if not ok2:
         raise SystemExit("先查原因，不寫檔。")
-    for k in Q6_K:
+    for k in q6_k:
         for kind, mag in Q6_POISON:
             scales, eps = {}, {}
             for ts in seeds:
@@ -243,9 +250,22 @@ def main():
                 for b in BETAS:
                     vals[f"q4|{st}|{r}|{vr}|{b}|bias"] = res["Q4_threshold_hugging"][st][r][vr][str(b)]["bias_pct"]["mean"]
     for name, v in Q6["poisoned"].items():
+        if v["k"] not in Q6_K:                      # E17 之延伸 k 不屬回歸基準
+            continue
         vals[f"q6|{name}|common|spatial|0.01"] = v["common"]["spatial"]["drift"]["0.01"]["mean"]
     res["baseline_status"] = P.check_baseline("slow_rt", vals, args.set_baseline, note="2026-10-06 人工核對")
     print("── 回歸基準 slow_rt：", res["baseline_status"], "──\n")
+    if q6_ext:
+        if res["baseline_status"] != "ok":
+            raise SystemExit("✗ E17：預設 k 之結果未通過回歸基準，不寫檔。")
+        path = os.path.join(args.out_dir, "slow_poisoning_Q6_ext.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"spec": "docs/thesis/E15_E18_supplementary_spec.md v1 (E17)", "post_hoc": True, "q6_k": q6_k,
+                       "baseline_status_default_k": res["baseline_status"], "Q6_calibration_poisoning": Q6}, fh,
+                      indent=2, ensure_ascii=False)
+        report(res)
+        print(f"\n寫入 {path}（主輸出 slow_poisoning_suite_rt.json 未變更）")
+        return
     path = os.path.join(args.out_dir, "slow_poisoning_suite_rt.json")
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(res, fh, indent=2, ensure_ascii=False)

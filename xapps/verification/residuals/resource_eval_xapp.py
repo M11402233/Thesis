@@ -24,8 +24,14 @@ resource_eval_xapp.py — 可用資源評估 xApp（Available-resource evaluatio
   3. 有上報之 (cell, 窗) 皆有 PRB 值（不補值）。
   4. 全序列之准入註記數 = zt_kpm_xapp 之 rule breakdown 之 admitted（僅 strict）。
 
-跑法：ZT_DATASET=d30 python3 resource_eval_xapp.py [--admission strict|restrict_annotated]
+【補充模式】（規格 docs/thesis/E15_E18_supplementary_spec.md v1）
+  --attacks    E18：將 RQ3 之四種攻擊注入後之 trace 送入 P1–P3，由本 xApp 逐窗回報；
+               每一（攻擊, 准入政策）須重現 RQ3_decision_replay.json 之 ρ_cap、ρ_PRB 與窗數。
+  --benchmark  M1：同一次執行中逐窗量測 P1–P3 與本 xApp 之處理時間及其合計。
+
+跑法：ZT_DATASET=d30 python3 resource_eval_xapp.py [--admission strict|restrict_annotated] [--attacks | --benchmark]
 """
+import gc
 import os
 import sys
 import json
@@ -106,16 +112,113 @@ def aggregate(recs):
             "windows_with_no_admitted_input": sum(1 for r in recs if r["active"] and not r["admitted"])}
 
 
+def run_attacks(files, out_dir, mw):
+    """E18：攻擊情境下由本 xApp 逐窗產出資源指標；須重現 RQ3 重放腳本之值。"""
+    import run_RQ3_decision_replay as Q
+    rq3 = json.load(open(os.path.join(out_dir, "RQ3_decision_replay.json"), encoding="utf-8"))
+    cons = {"strict": "C_strict", "restrict_annotated": "C_restrict_annot"}
+    acc = {}
+    for test in files:
+        sd = DS.seed_of(test)
+        anchor = X.TrustAnchor([f for f in files if f != test])
+        base = Q.load_windows(test)
+        td = Q.true_delays(base)
+        t0 = len(base) // 2
+        cells_all = sorted({c for d in td for c in d})
+        rt = ResourceTermination(os.path.dirname(DS.aux_path(sd, "x")), mw)     # PRB 取自乾淨模擬（開迴路）
+        idx = {w: k for k, (w, _) in enumerate(base)}
+        for atk_name, kind, param in Q.ATTACKS:
+            if kind is None:
+                continue
+            for atk_cell in cells_all:
+                mod = Q.apply_attack(base, atk_cell, kind, param, t0)
+                for adm in sorted(X.ADMISSION):
+                    db = SharedDB(); app = AvailableResourceEvaluationXApp(db, rt)
+
+                    def on_published(w, cells, view, rec, db=db, app=app):
+                        db.publish(w, view, rec); app.on_window(w, idx[w])
+
+                    X.run_xapp(Q.ListSource(mod), anchor, "all", collect=False, admission=adm, on_published=on_published)
+                    ev = [r for r in app.records if r["k"] >= t0 and len(td[r["k"]]) >= 2]   # RQ3 之評估窗
+                    a = acc.setdefault((atk_name, adm), {"recs": [], "missing": 0, "mismatch": 0})
+                    a["recs"] += ev; a["missing"] += app.missing
+                    a["mismatch"] += sum(1 for r in app.records if not r["db_admitted_matches_p3"])
+        print(f"  完成 seed {sd}")
+    out, ok = {}, True
+    print("\n攻擊          准入政策              准入輸入可用率    ρ_PRB    V_PRB   無准入輸入之窗   與 RQ3 之差（ρ_cap／ρ_PRB）")
+    for (atk, adm), a in acc.items():
+        g = aggregate(a["recs"]); r = rq3[f"uebound|{atk}|{cons[adm]}"]
+        d1, d2 = abs(g["admitted_input_availability"] - r["rho"]), abs(g["rho_prb"] - r["rho_prb"])
+        good = d1 <= 1e-12 and d2 <= 1e-12 and g["windows"] == r["windows"] and a["missing"] == 0 and a["mismatch"] == 0
+        ok &= good
+        out[f"{atk}|{adm}"] = dict(g, rq3_key=f"uebound|{atk}|{cons[adm]}", diff_rho_cap=d1, diff_rho_prb=d2, check="ok" if good else "FAIL")
+        print(f"{atk:<13}{adm:<20}{g['admitted_input_availability']:>12.1%}{g['rho_prb']:>10.1%}{g['v_prb']:>9.1%}"
+              f"{g['windows_with_no_admitted_input']:>10}／{g['windows']}   {d1:.1e}／{d2:.1e} {'✓' if good else '✗'}")
+    if not ok:
+        print("  ✗ 檢查未通過。停止：不寫入任何輸出。請回報，勿調參數。"); sys.exit(2)
+    p = os.path.join(out_dir, "resource_eval_xapp_attacks.json")
+    json.dump({"spec": "docs/thesis/E15_E18_supplementary_spec.md v1 (E18)", "post_hoc": True, "dataset": DS.NAME,
+               "prb_source": "clean simulation (open loop)", "checks": "ok", "results": out},
+              open(p, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+    print(f"\n── 檢查：全部（攻擊, 准入政策）皆重現 RQ3_decision_replay.json ✓\n寫入 {p}")
+
+
+def run_benchmark(files, out_dir, mw, admission, warmup=3, repeat=5):
+    """M1：逐窗量測 P1–P3、本 xApp 及其合計之處理時間（每 seed 暖身後取逐窗中位數；量測期間停用 gc）。"""
+    p13, p4 = [], []
+    for test in files:
+        sd = DS.seed_of(test)
+        anchor = X.TrustAnchor([f for f in files if f != test])
+        src = X.TraceReplaySource(test)
+        idx = {w: k for k, (w, _) in enumerate(src.windows())}
+        rt = ResourceTermination(os.path.dirname(DS.aux_path(sd, "x")), mw)
+        runs13, runs4 = [], []
+        for i in range(warmup + repeat):
+            db = SharedDB(); app = AvailableResourceEvaluationXApp(db, rt)
+
+            def on_published(w, cells, view, rec, db=db, app=app):
+                db.publish(w, view, rec); app.on_window(w, idx[w])
+
+            gc.collect(); gc.disable()
+            try:
+                lat = X.run_xapp(src, anchor, "all", collect=False, admission=admission, on_published=on_published)[1]
+            finally:
+                gc.enable()
+            if i >= warmup:
+                runs13.append(lat); runs4.append(np.array(app.latency_ms))
+        p13.append(np.median(np.array(runs13), axis=0)); p4.append(np.median(np.array(runs4), axis=0))
+    a, b = np.concatenate(p13), np.concatenate(p4)
+    st = lambda v: {"mean": float(v.mean()), "p95": float(np.percentile(v, 95)), "p99": float(np.percentile(v, 99)), "max": float(v.max())}
+    res = {"P1_P3": st(a), "resource_eval_xapp": st(b), "four_xapps_total": st(a + b), "windows": int(len(a)),
+           "warmup": warmup, "repeat": repeat, "admission": admission, "dataset": DS.NAME}
+    for k, lab in (("P1_P3", "P1–P3"), ("resource_eval_xapp", "可用資源評估 xApp"), ("four_xapps_total", "四個 xApp 合計")):
+        v = res[k]; print(f"  {lab:<16} mean={v['mean']:.3f} ms  P95={v['p95']:.3f}  P99={v['p99']:.3f}  max={v['max']:.3f}")
+    return res
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--admission", choices=sorted(X.ADMISSION), default="strict")
     ap.add_argument("--out-dir", default=None)
+    ap.add_argument("--attacks", action="store_true", help="E18：攻擊情境下之逐窗輸出")
+    ap.add_argument("--benchmark", action="store_true", help="M1：四個 xApp 合計之每窗處理時間")
+    ap.add_argument("--tag", default=None, help="--benchmark 之輸出檔後綴（重複量測用）")
     args = ap.parse_args()
     out_dir = args.out_dir or DS.results_dir()
     files = DS.files()
     if len(files) < 2:
         raise SystemExit("資料不足")
     mw = DS.CFG.get("max_window")
+    if args.attacks:
+        print(f"=== E18：可用資源評估 xApp 於攻擊情境（{len(files)} seed，資料集 {DS.NAME}）===")
+        return run_attacks(files, out_dir, mw)
+    if args.benchmark:
+        print(f"=== M1：四個 xApp 之每窗處理時間（{len(files)} seed，資料集 {DS.NAME}，admission={args.admission}）===")
+        res = run_benchmark(files, out_dir, mw, args.admission)
+        p = os.path.join(out_dir, f"resource_eval_xapp_benchmark{('_' + args.tag) if args.tag else ''}.json")
+        json.dump(res, open(p, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+        print(f"寫入 {p}")
+        return
     print(f"=== 可用資源評估 xApp（trace replay，{len(files)} seed，資料集 {DS.NAME}，admission={args.admission}）===")
     all_recs, eval_recs, per_seed, lat, missing, mismatch = [], [], {}, [], 0, 0
     for test in files:
