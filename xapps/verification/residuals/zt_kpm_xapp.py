@@ -429,7 +429,7 @@ def enforce(win_ann, cells, w, admission=None):
 # 6. xApp 主迴圈:P1 證據偵測 → P2 信任評估 → P3 政策執行
 # ==========================================================================
 def run_xapp(source, anchor, eval_mode="all", node_of_interest=None, collect=True,
-             binding=None, admission=None, legacy_none=False):
+             binding=None, admission=None, legacy_none=False, on_published=None):
     """回傳 (annotations, per-window latency array, per-window record 數, execution records)。
 
     latency 量測範圍:自窗聚合完成起,至該窗 policy-admitted view 與 execution record
@@ -437,6 +437,10 @@ def run_xapp(source, anchor, eval_mode="all", node_of_interest=None, collect=Tru
 
     無活躍 mmWave 節點之窗不產生節點註記,僅於 execution record 記為 status=n/a。
     legacy_none=True 僅供舊版相容性驗證:重現舊版之 node=None 窗級註記。
+
+    on_published:P3 發布後之回呼 (w, cells, view, rec),代表 policy-admitted view 寫入共享資料層(DB)
+    後,其他 xApp(合作消費端、可用資源評估 xApp)於同一窗讀取之時點。於 P1–P3 計時結束後呼叫,
+    不計入 C-ZT 之延遲;預設 None 時行為與先前完全相同。
     """
     binding = binding or D1_BINDING
     annotations, latencies, recs, exec_recs = [], [], [], []
@@ -512,6 +516,8 @@ def run_xapp(source, anchor, eval_mode="all", node_of_interest=None, collect=Tru
 
         latencies.append((time.perf_counter_ns() - t0) / 1e6)   # ms
         recs.append(n_rec)
+        if on_published is not None:                             # P3 → DB → 其他 xApp(計時範圍之外)
+            on_published(w, cells, view, rec)
         if collect:
             annotations += win_ann
             exec_recs.append(rec)

@@ -234,14 +234,14 @@ CQI 仍未取得。
 
 **符號與參數**：S_i 操作門檻 τ_S = 4；H_i-D1 門檻 τ_H^warn = 2、τ_H^reject = 3；C_i 持續窗門檻 L_C = 2；S_i 最少 peer 數 MIN_PEER = 2。信任狀態 $D_i(t) \in$ {trusted, low-trust, rejected, abstain} 之定義與判定規則見 **4.4.0**，由階層式規則產生，並非由連續信任分數決定。S_i 與 H_i-D1 均採 robust z 統計量，但門檻各自校準，不共用數值。
 
-**本章與 C-ZT 架構、研究問題之對應**：本研究之驗證層由三個職責分離之 xApp 組成（合稱 C-ZT，架構見 4.9）。簡報所稱 Population／Peer／Mobility Check 分別即本章之 C_i／S_i／H_i。
+**本章與 C-ZT 架構、研究問題之對應**：本研究之驗證層由三個職責分離之 xApp 組成（合稱 C-ZT，架構見 4.9），另有一個於 Near-RT RIC 內與之同時運作之可用資源評估 xApp（Available-resource evaluation xApp）。簡報所稱 Population／Peer／Mobility Check 分別即本章之 C_i／S_i／H_i。
 
 | 模組（程序） | 職責 | 對應節 | 研究問題 |
 |---|---|---|---|
 | **Detection xApp**（P1） | 對齊上報；計算 C_i、S_i、H_i 三類一致性證據，並記錄各證據之適用對象與可得性 | 4.3、4.6–4.8、4.10 | RQ1 |
 | **Trust Assessment xApp**（P2） | 依階層式規則將證據合成信任狀態，並記錄觸發規則與證據 | 4.4、4.9.6、4.11 | RQ2 |
 | **Policy Enforcement xApp**（P3） | 依信任狀態對合作消費端之 KPM 輸入執行 allow／restrict／exclude／defer | 4.9.3 | RQ2 |
-| **Resource-policy evaluation**（離線） | 以 eligibility mask 與 resource inventory 評估保留之可用資源與政策代價 | 4.9.5、4.12 | RQ3 |
+| **Available-resource evaluation xApp**（可用資源評估 xApp；與 P1–P3 同時運作） | 於每窗 P3 發布後，經 Resource Termination 自共享資料層（DB）讀取 policy-admitted KPM 與 PRB 用量，回報准入輸入可用率與 PRB 能見度損失；不做驗證、不改變信任狀態 | 4.9.2、4.12 | RQ3 |
 
 ---
 
@@ -1390,24 +1390,26 @@ LOSO，注入超時消失，per-seed 明細：
 
 ### 4.9.1 定位與實作層級
 
-本節將三類一致性證據與階層式融合組織為三個職責分離之 xApp——Detection、Trust Assessment、Policy Enforcement（合稱 C-ZT）——並量測其運算開銷。E2 Termination、Subscription Management 與 shared data service 為 Near-RT RIC 平台之既有功能，非本研究之貢獻。
+本節將三類一致性證據與階層式融合組織為三個職責分離之 xApp——Detection、Trust Assessment、Policy Enforcement（合稱 C-ZT）——並量測其運算開銷；另定義一個可用資源評估 xApp（Available-resource evaluation xApp），於 Near-RT RIC 內與 C-ZT 同時運作，逐窗評估准入政策下之可用資源（4.9.2、4.12）。E2 Termination、Subscription Management 與 shared data service 為 Near-RT RIC 平台之既有功能，非本研究之貢獻。
 
 **實作層級之誠實聲明**：
 
 - 三個模組之邏輯（逐窗對齊、三類證據之計算、階層式融合、依信任狀態產生准入動作）已實作並於重放 trace 上執行。三者目前於同一行程（`zt_kpm_xapp.py`）內依 P1→P2→P3 依序執行，模組間之 evidence record、trust state 與 admitted view 以行程內資料結構傳遞，未經 RIC 之 shared data service 與訊息匯流排。故本章所驗證者為各模組之邏輯及其介面內容，而非三個獨立部署之 xApp 間之通訊。
 - **資料入口為 trace replay，E2 訂閱綁定尚未完成**（見 4.0.6）。程式以 `IndicationSource` 抽象層隔離資料來源，將 `TraceReplaySource` 替換為 `E2SubscriptionSource` 即可接上 live RIC，驗證邏輯無須改動。
-- Policy Enforcement 對合作消費端之效果以離線決策重放評估（4.12），未涉及 runtime 控制。
+- Policy Enforcement 將 policy-admitted KPM 與 execution record 寫入共享資料層（DB）；合作消費端（RC xApp）與可用資源評估 xApp 皆自 DB 讀取。可用資源評估 xApp 於**每窗 P3 發布後即執行**（`resource_eval_xapp.py`），與 P1–P3 同時運作，而非事後之離線統計。於本原型中，DB 與 Resource Termination 為行程內之抽象層，尚未接上 RIC 之 shared data service。
+- 攻擊情境下對合作消費端之保護效果，以注入後之 trace 經同一管線重放評估（4.12），未涉及 runtime 控制與閉迴路。
 - 運算開銷量測反映驗證層之計算成本，**不含 E2SM-KPM 解碼與 SCTP 傳輸延遲**。
 
 ### 4.9.2 模組定義與程序
 
-![C-ZT 架構圖](【待填：新版三 xApp 架構圖之連結】)
+![C-ZT 架構圖](【待填：簡報 v0.6 第 27 頁之架構圖連結——P1 Detection、P2 Trust Assessment、P3 Policy Enforcement、RC xApp、DB、Resource Termination、Available-resource evaluation xApp、E2 Termination、Subscription Management】)
 
 | xApp | 職責 | 輸入 | 輸出 |
 |---|---|---|---|
 | **① Detection** | 將各 E2 節點（含 LTE 錨點）之上報對齊至 1 秒窗；計算 C_i、S_i、H_i-D1、H_i-D2；記錄每項證據之適用對象（場域／cell／UE）與可得性 | E2SM-KPM 上報（REPORT style，granularity period = 1 s）；已知 UE 母體；凍結基線 | evidence record |
 | **② Trust Assessment** | 套用 4.4.0 之階層式規則、交叉佐證之綁定檢查與持續窗條件 | evidence record | 逐 (節點, 窗) 之信任狀態、觸發規則代碼與佐證證據 |
-| **③ Policy Enforcement** | 依設定之准入政策將信任狀態轉為 allow／restrict／exclude／defer，並發布 policy-admitted KPM | 信任狀態；准入政策設定 | policy-admitted KPM、註記與 execution record |
+| **③ Policy Enforcement** | 依設定之准入政策將信任狀態轉為 allow／restrict／exclude／defer，並將 policy-admitted KPM 寫入共享資料層（DB） | 信任狀態；准入政策設定 | policy-admitted KPM、註記與 execution record（寫入 DB） |
+| **Available-resource evaluation**（可用資源評估 xApp） | 與 ①–③ 同時運作；每窗於 P3 發布後，經 Resource Termination 自 DB 讀取准入結果與各 cell 之 PRB 用量，計算可用資源指標。**不做驗證、不改變信任狀態** | DB 中之 policy-admitted KPM 與 execution record；PRB 用量（`RRU.PrbUsedDl`） | 逐窗之准入輸入可用率、$\rho_{\text{PRB}}$、PRB 能見度損失 $V_{\text{PRB}}$ |
 
 **程序**：
 
@@ -1417,7 +1419,7 @@ LOSO，注入超時消失，per-seed 明細：
 | **P1** 證據偵測 | 對齊上報；計算一致性證據及其適用對象與可得性 |
 | **P2** 信任評估 | 套用融合規則與狀態轉移條件，產出信任註記 |
 | **P3** 政策執行 | 套用准入政策，發布 policy-admitted KPM 並記錄執行結果 |
-| 平行評估 | Resource-policy evaluation：以資源准入決策與容量參考評估保留之可用容量（離線，見 4.12） |
+| 同時運作 | Available-resource evaluation xApp：每窗於 P3 發布後，自 DB 讀取准入結果與 PRB 用量，回報准入輸入可用率與 PRB 能見度損失（4.12） |
 
 **evidence record 之欄位**：C_i 之 `n_total` 與嫌疑 cell；S_i 之 $z$ 值與 peer 數；D2 之瞬移 IMSI 與來源／目的 cell；D1 之 $z_d$ 值、對應 UE 及其歸屬節點（4.9.6.5）。每筆信任註記含決策、觸發規則代碼與上述證據欄位；證據隨決策一併發布，使消費端與稽核者可追溯判定依據。
 
@@ -1773,7 +1775,7 @@ $$m^*_{S,50} = \min\{\, m : P(\text{bypass} \mid \text{full consensus}) \geq 0.5
 
 ## 4.12 資源—政策評估：排除不可採信量測後之可用資源與決策品質
 
-> **定位**：本節回答 RQ3，為離線決策重放，與 4.11 屬同一方法論層級；未涉及 runtime 控制，亦無閉迴路。
+> **定位**：本節回答 RQ3。資源指標（准入輸入可用率、$\rho_{\text{PRB}}$、$V_{\text{PRB}}$）由**可用資源評估 xApp** 於 Near-RT RIC 內與 C-ZT 同時運作、逐窗產出（4.12.4 之「線上輸出」）；攻擊情境下之保護效果與下游決策品質，則以注入後之 trace 經同一管線重放、搭配代理決策評估。二者皆為 trace replay 上之整合原型，未涉及 runtime 控制，亦無閉迴路。
 
 ### 4.12.1 問題與量之定義
 
@@ -1843,7 +1845,18 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 
 ### 4.12.4 結果
 
-**註記政策 = uebound（定案）**
+**可用資源評估 xApp 之線上輸出（乾淨資料，全序列）**
+
+可用資源評估 xApp 於每窗 P3 發布後，自 DB 讀取准入結果、經 Resource Termination 取得各 cell 之 PRB 用量，逐窗回報。下表為其於 D-30 乾淨資料全序列（2,400 窗、15,534 筆節點註記）之彙總；括號內為 seed 間範圍：
+
+| 准入政策 | 准入輸入可用率 | $\rho_{\text{PRB}}$ | $V_{\text{PRB}}$ | 無任何准入輸入之窗 | 每窗已用 PRB／其 KPM 被准入者（28 RB 尺度，七個 cell 合計） |
+|---|---:|---:|---:|---:|---:|
+| `strict` | 50.3%（40.5%–60.5%） | 51.5%（41.4%–58.4%） | 48.5%（41.6%–58.6%） | 11／2,400 | 127.1／65.5 RB |
+| `restrict_annotated` | 99.0%（96.3%–100%） | 99.5%（97.9%–100%） | 0.5%（0.0%–2.1%） | 0／2,400 | — |
+
+內建檢查：（一）本 xApp 自 DB 讀到之准入節點與 P3 之 execution record 逐窗相同；（二）限於下表之評估窗（序列後半段，1,200 窗）彙總時，其 $\rho_{\text{cap}}$ 與 $\rho_{\text{PRB}}$ 與下表乾淨資料之 `C_strict`／`C_restrict_annot` 相同（差 < 10⁻¹²）；（三）有上報之 (cell, 窗) 皆有 PRB 值；（四）全序列之准入註記數（7,810）與 4.9.6.5 之 trusted 筆數相同。本 xApp 自身之每窗處理時間平均 0.017 ms（P99 0.037 ms），不計入 4.9.5 之 C-ZT 開銷。（腳本 `resource_eval_xapp.py`）
+
+**攻擊情境下之重放：註記政策 = uebound（定案）**
 
 > 表中 $\rho_{\text{PRB}}$、$\rho_{\text{cap}}$ 為**准入比例**（4.12.1），隨准入政策而變，與 4.9.6 之信任狀態分布為不同量；例如 `C_restrict_annot` 之 $\rho$ 包含 trusted 與附註記之 low-trust，不可讀作 low-trust 比例或誤報率。評估窗為各 seed 之後半段，共 1,200 窗。
 
@@ -1927,7 +1940,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 - 原生 PRB 之絕對數以寫死之常數 139 計算（4.12.1）；比值型指標不受影響。
 - 若消費端之目標函數依賴未被驗證之量（如吞吐量，4.5.2 之 B2），C-ZT 無法提供保護。本實驗以延遲為準則，正因其為 S_i 所驗證之維度。
 - 攻擊僅含延遲類；基數類與成員類攻擊對下游決策之影響未評估。
-- 本節為離線決策重放；消費端於閉迴路中之行為未評估。
+- 可用資源評估 xApp 之逐窗輸出為整合原型上之 trace replay：其 DB 與 Resource Termination 為行程內之抽象層，未經 live RIC 之 shared data service。攻擊情境之結果為注入後 trace 之重放；消費端於閉迴路中之行為未評估。
 
 （腳本 `run_RQ3_decision_replay.py`，註記與准入取自 `zt_kpm_xapp.py` 之 P1–P3；一致性檢查依賴 `run_E10_D1_policy_ablation.py`）
 
@@ -1935,7 +1948,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 
 ## 4.13 本章總結
 
-本章提出並初步驗證 C-ZT：以 Detection、Trust Assessment、Policy Enforcement 三個 xApp，持續評估 E2 量測資料之可信度並對合作消費端執行准入。在本 ns-O-RAN MC 場景與 1 秒觀測粒度下，就三項研究問題之結果如下。
+本章提出並初步驗證 C-ZT：以 Detection、Trust Assessment、Policy Enforcement 三個 xApp，持續評估 E2 量測資料之可信度並對合作消費端執行准入；另以一個同時運作之可用資源評估 xApp，逐窗回報准入政策下之可用資源。在本 ns-O-RAN MC 場景與 1 秒觀測粒度下，就三項研究問題之結果如下。
 
 **RQ1：上報值何時構成違反**
 
@@ -1956,7 +1969,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 - 嚴格准入之代價：乾淨資料上之保留可用容量比 $\rho_{\text{cap}}$ 為 49.5%、原生 PRB 之保留比例 $\rho_{\text{PRB}}$ 為 50.6%（PRB 能見度損失 49.4%），決策可用率 99.8%，並引入 1.3% 之 regret。僅排除 rejected 之准入政策於 ×0.8 階躍無保護效果，於較大幅度之攻擊下誘導率仍有 57.2%–59.1%。
 - 驗證層之運算開銷於 P99 為 1.16–1.42 ms（三次量測），佔 1 秒量測週期之 0.12%–0.14%。
 
-上述結果支持 E2 量測資料持續零信任驗證之**初步方法可行性**。尚未完成者：三類證據之聯合端到端效能、live E2 綁定與端到端延遲、三個 xApp 之獨立部署與其間通訊、閉迴路下之決策保護效果、依部署規模校準 D1 門檻與交叉佐證強度，以及吞吐量與資源之內部一致性（P_i）納入融合。
+上述結果支持 E2 量測資料持續零信任驗證之**初步方法可行性**。尚未完成者：三類證據之聯合端到端效能、live E2 綁定與端到端延遲、各 xApp 之獨立部署與其間經 shared data service 之通訊、閉迴路下之決策保護效果、依部署規模校準 D1 門檻與交叉佐證強度，以及吞吐量與資源之內部一致性（P_i）納入融合。
 
 ---
 
@@ -2112,7 +2125,8 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 | `run_E11_transitions.py`、`run_E11b_pulses.py`、`run_E12_persist.py` | 轉移與恢復、重複單窗脈衝、$S_i$ 持續性升級（候選） | 4.4.0（四）、4.6.7 |
 | `run_adversarial_msweep.py` | 抗串謀 m-sweep | 4.10 |
 | `run_fusion_replay.py` | 規則回放 | 4.11 |
-| `run_RQ3_decision_replay.py` | 決策重放（RQ3；含原生 PRB 指標） | 4.12 |
+| `resource_eval_xapp.py` | 可用資源評估 xApp：每窗於 P3 發布後自 DB 讀取准入結果與 PRB，回報可用率與 PRB 能見度損失（含 `SharedDB`、`ResourceTermination` 之抽象） | 4.9.2、4.12 |
+| `run_RQ3_decision_replay.py` | 攻擊情境之決策重放（RQ3；含原生 PRB 指標） | 4.12 |
 | `run_Pi_experiments.py` | P_i 獨立評估（未納入融合） | 附錄 B |
 | `scripts/run_d30_pipeline.sh` | D-30 全部實驗之執行順序（任一內建檢查失敗即停止） | 全章 |
 
@@ -2281,7 +2295,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 | 3b 准入後之下游決策品質 | 決策可用率、以真值計算之 regret、誘導率 | 4.12 |
 | 3c 驗證延遲 | 每窗延遲分布；佔量測週期之比例；隨節點數之外推 | 4.9.5 |
 
-> **範圍聲明**：本問題以離線決策重放與代理決策評估；PRB 取自乾淨模擬之原生 `RRU.PrbUsedDl`（開迴路），容量參考取自場域組態，二者皆非受測節點之上報值；無閉迴路，消費端於實際控制迴圈中之行為未評估。
+> **範圍聲明**：資源指標由可用資源評估 xApp 逐窗產出（整合原型、trace replay）；攻擊下之保護效果以注入後 trace 之重放與代理決策評估；PRB 取自乾淨模擬之原生 `RRU.PrbUsedDl`（開迴路），容量參考取自場域組態，二者皆非受測節點之上報值；無閉迴路，消費端於實際控制迴圈中之行為未評估。
 
 ---
 
@@ -2316,7 +2330,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 - 嚴格准入之代價：乾淨資料上原生 PRB 之保留比例 $\rho_{\text{PRB}}$ 為 50.6%（PRB 能見度損失 49.4%），保留可用容量比 $\rho_{\text{cap}}$ 為 49.5%。
 - 驗證層之運算開銷於 P99 為 1.16–1.42 ms（三次量測），佔 1 秒量測週期之 0.12%–0.14%。
 
-> **驗證層級**：離線決策重放，決策為本研究定義之代理決策。PRB 取自模擬器原生之 `RRU.PrbUsedDl`（乾淨模擬、開迴路），並以 PHY 排程符號數交叉驗證；閉迴路下之效果未評估。
+> **驗證層級**：資源指標由可用資源評估 xApp 於整合原型上逐窗產出（trace replay；DB 與 Resource Termination 為行程內抽象）；攻擊情境為注入後 trace 之重放，決策為本研究定義之代理決策。PRB 取自模擬器原生之 `RRU.PrbUsedDl`（乾淨模擬、開迴路），並以 PHY 排程符號數交叉驗證；閉迴路下之效果未評估。
 
 **與文獻差異：**
 

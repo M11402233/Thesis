@@ -91,6 +91,7 @@
 ## 目前狀態與待辦
 
 **2026-10-13：D-30 收齊、全流程跑完、正文第四章已全部換成 D-30。** 以 `scripts/run_d30_pipeline.sh` 重跑（`setsid nohup`；任一檢查失敗即停）。融合維持 C_i／S_i／H_i 三類（依簡報 v0.6 之流程圖）；P_i 不納入。
+- **架構（簡報 v0.6 第 27 頁，2026-10-13 與老師確認）**：P1 Detection → P2 Trust Assessment → P3 Policy Enforcement；P3 將 policy-admitted KPM 寫入 DB；RC xApp 與 **Available-resource evaluation xApp** 自 DB 讀取（後者經 Resource Termination）。可用資源評估**是一個 xApp、與 P1–P3 同時運作、逐窗執行，不是離線統計**（`resource_eval_xapp.py`；`run_xapp(on_published=…)` 回呼）。原型中 DB／Resource Termination 為行程內抽象，正文須如實寫。使用者說的「P1／P2／P3」是程序，**不是 P_i**；勿混淆。
 - 待辦：35 張圖上傳 HackMD 並填連結（`data/results/d30_figs_20261013.tar.gz`）；簡報（`~/Downloads/Cindy_Thesis_v0.6.pptx`，前 40 頁已與老師確認）之結果頁換 D-30 數字；FNWF 2024／Hung／Hashem Eiza／ns-O-RAN 之 PDF 待使用者補；push 由使用者執行。
 - 論文題目定案：Zero-Trust Verification and Admission of KPM Reports in Non-Public O-RAN: Countering Falsification by Authenticated Nodes with Field-Referenced Consistency Evidence（簡報 v0.6 第 1 頁仍為舊題目）。
 - 以下各小節為歷史紀錄。
