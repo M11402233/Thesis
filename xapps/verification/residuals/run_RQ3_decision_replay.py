@@ -78,6 +78,7 @@ import gzip
 import zt_kpm_xapp as X
 from run_E10_D1_policy_ablation import run_policy, load_windows
 import datasets as DS
+import prb_reader as PRB
 
 X.FUSION_MODE = "bound"
 
@@ -185,11 +186,32 @@ def main():
         print("資料不足，用 --data-dir 指定。"); return
     print(f"載入 {len(files)} seed\n")
 
+    # ---- 原生 PRB（RQ3_PRB_spec.md v1）：僅於有 du-cell 報表之資料集（D-30）啟用；
+    #      無報表時（D-SH 等）輸出與修訂前逐位相同 ----
+    prb_on, U, U_sym = False, {}, {}
+    if DS.CFG.get("aux_dir"):
+        seeds_ = [DS.seed_of(f) for f in files]
+        aux_ = {s: os.path.dirname(DS.aux_path(s, "x")) for s in seeds_}
+        prb_on = all(any(os.path.exists(os.path.join(aux_[s], f"du-cell-2.txt{z}")) for z in ("", ".gz"))
+                     for s in seeds_)
+    if prb_on:
+        mw = DS.CFG.get("max_window")
+        for s in seeds_:
+            n, mx, _, bad = PRB.cross_check(aux_[s], mw)                       # 檢查 1
+            if bad or n == 0:
+                print(f"  ✗ PRB 交叉驗證未通過：seed {s} {bad[:3]}"); sys.exit(2)
+            U[s] = {k: e["prb"] / PRB.PRB_CONST for k, e in PRB.load_du_prb(aux_[s], mw).items()}
+            den = PRB.SLOTS_PER_S * PRB.SYMS_PER_SLOT
+            U_sym[s] = {k: v / den for k, v in PRB.symbols_from_phy(aux_[s], mw).items()}
+            print(f"── PRB seed {s}：交叉驗證 ✓（{n} 筆，最大差 {mx:.3f} PRB）")
+
     # acc[(ann_pol, atk_name, consumer)] = counters
     acc = collections.defaultdict(lambda: {
         "win": 0, "avail": 0, "regret": [], "regret_rel": [], "wrong": 0,
         "lured": 0, "lure_opportunity": 0, "ann": 0, "usable_ann": 0,
-        "cap_base": 0.0, "cap_kept": 0.0, "opt_excluded": 0})
+        "cap_base": 0.0, "cap_kept": 0.0, "opt_excluded": 0,
+        "prb_base": 0.0, "prb_kept": 0.0, "sym_base": 0.0, "sym_kept": 0.0,
+        "one_base": 0, "one_kept": 0, "prb_missing": 0})
 
     # ---- 內建一致性檢查：xApp 與 run_policy 於乾淨資料逐筆相同 ----
     n_diff = 0
@@ -214,6 +236,7 @@ def main():
     for test in files:
         anchor = X.TrustAnchor([f for f in files if f != test])
         base = load_windows(test)
+        sd = DS.seed_of(test)
         td_base = true_delays(base)
         t0 = len(base) // 2
         cells_all = sorted({c for d in td_base for c in d})
@@ -243,6 +266,14 @@ def main():
                             a["usable_ann"] += len(adm)
                             a["cap_base"] += sum(RESOURCE_INVENTORY[j] for j in rep[k])
                             a["cap_kept"] += sum(RESOURCE_INVENTORY[j] for j in adm)
+                            if prb_on:                       # U 取自乾淨模擬（開迴路，見規格 §5）
+                                for j in rep[k]:
+                                    if (j, k) not in U[sd]:
+                                        a["prb_missing"] += 1                    # 檢查 5：不補值
+                                    u, us = U[sd].get((j, k), 0.0), U_sym[sd].get((j, k), 0.0)
+                                    a["prb_base"] += u; a["sym_base"] += us; a["one_base"] += 1
+                                    if j in adm:
+                                        a["prb_kept"] += u; a["sym_kept"] += us; a["one_kept"] += 1
                             if opt_cell not in adm:          # 真值最佳者被過濾掉
                                 a["opt_excluded"] += 1
                             ch = decide(rep[k], adm)
@@ -286,12 +317,40 @@ def main():
             "lured_rate": (a["lured"] / a["lure_opportunity"]
                            if a["lure_opportunity"] else None),
         }
+        if prb_on:
+            r = res[f"{ann_name}|{atk_name}|{consumer}"]
+            rp = a["prb_kept"] / a["prb_base"] if a["prb_base"] else None
+            r.update({"rho_prb": rp, "prb_visibility_loss": (1 - rp) if rp is not None else None,
+                      "rho_prb_from_symbols": a["sym_kept"] / a["sym_base"] if a["sym_base"] else None,
+                      "used_rb28_per_window_base": a["prb_base"] * PRB.N_RB_CFG1 / a["win"] if a["win"] else None,
+                      "used_rb28_per_window_kept": a["prb_kept"] * PRB.N_RB_CFG1 / a["win"] if a["win"] else None,
+                      "_u1_rho": a["one_kept"] / a["one_base"] if a["one_base"] else None,
+                      "prb_missing_cell_windows": a["prb_missing"]})
+    if prb_on:
+        bad = []
+        for key, r in res.items():
+            if r.get("rho") is not None and abs(r["_u1_rho"] - r["rho"]) > 1e-12:          # 檢查 3
+                bad.append(("U≡1 未重現 ρ_cap", key))
+            if r["rho_prb"] is not None and abs(r["rho_prb"] - r["rho_prb_from_symbols"]) > 1e-3:  # 檢查 4
+                bad.append(("原生 PRB 與符號換算之 ρ_PRB 差 > 1e-3", key, r["rho_prb"], r["rho_prb_from_symbols"]))
+            if r["prb_missing_cell_windows"]:                                              # 檢查 5
+                bad.append(("缺 PRB 報表", key, r["prb_missing_cell_windows"]))
+        print("── PRB 檢查 3（U≡1 重現 ρ_cap）、4（兩種來源一致）、5（無缺報）──", "✗ " + str(bad[:4]) if bad else "✓")
+        if bad:
+            print("  停止：不寫入任何輸出。請回報，勿調參數。"); sys.exit(2)
+        for r in res.values():
+            r.pop("_u1_rho")
     res["_meta"] = {"resource_inventory_hz": RESOURCE_INVENTORY,
                     "inventory_source": INVENTORY_SOURCE,
                     "A_t": "mmWave nodes reporting in window t; LTE anchor out of scope",
                     "C_notrej_note": "includes abstain (defer); lenient consumer-side baseline, "
                                      "violates defer-not-admitted",
                     "consistency_xapp_vs_run_policy": "ok"}
+    if prb_on:
+        res["_meta"]["prb"] = {"spec": "docs/thesis/RQ3_PRB_spec.md v1",
+                               "U": "sum_UE RRU.PrbUsedDl.UEID / 139 (clean run, DL only)",
+                               "rb_scale": f"absolute RB on configuration-1 scale = U x {PRB.N_RB_CFG1}",
+                               "open_loop": "PRB from clean simulation; attack-induced traffic shift not modelled"}
     with open(os.path.join(out_dir, "RQ3_decision_replay.json"), "w", encoding="utf-8") as fh:
         json.dump(res, fh, indent=2, ensure_ascii=False)
 
@@ -308,11 +367,49 @@ def main():
                       f"{f2(r['regret_mean_ms'],'>11.4f')}{f2(r['regret_rel_mean'],'>9.1%')}"
                       f"{f2(r['wrong_rate'],'>8.1%')}{f2(r['lured_rate'],'>8.1%')}"
                       f"{f2(r['optimal_excluded_rate'],'>9.1%')}")
+    if prb_on:
+        print("\n═══ 原生 PRB（uebound）：ρ_PRB／PRB 能見度損失 V_PRB ═══")
+        for atk_name, *_ in ATTACKS:
+            print(f"{atk_name:<12}" + "".join(
+                f"{c}: {res[f'uebound|{atk_name}|{c}']['rho_prb']:.1%}／{res[f'uebound|{atk_name}|{c}']['prb_visibility_loss']:.1%}  "
+                for c in CONSUMERS))
     print(f"\n寫入 {os.path.join(out_dir, 'RQ3_decision_replay.json')}")
     print(f"寫入 {mask_path}")
 
     if not args.no_fig:
         draw(res, os.path.join(out_dir, "fig_RQ3_decision_replay.png"))
+        if prb_on:
+            draw_prb_tradeoff(res, os.path.join(out_dir, "fig_RQ3_prb_tradeoff.png"))
+
+
+def draw_prb_tradeoff(res, path):
+    """保護效果（誘導率）對 PRB 能見度損失；每點 = (攻擊, 准入政策)，uebound"""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(7.5, 5))
+    marks = ["o", "s", "^", "D", "v", "P", "X", "*"]
+    for (atk_name, *_), mk in zip(ATTACKS, marks):
+        for consumer, col in zip(CONSUMERS, ["#adb5bd", "#2b8a3e", "#e8590c", "#1971c2"]):
+            r = res[f"uebound|{atk_name}|{consumer}"]
+            if r["lured_rate"] is None or r["prb_visibility_loss"] is None:
+                continue
+            # C_restrict_annot 與 C_notrej 之數值可能完全相同：前者以空心大標記繪於外圈，避免互相遮蔽
+            hollow = consumer == "C_restrict_annot"
+            ax.scatter(100 * r["prb_visibility_loss"], 100 * r["lured_rate"], marker=mk, s=150 if hollow else 45,
+                       facecolors="none" if hollow else col, edgecolors=col, linewidths=1.6 if hollow else 0.5,
+                       zorder=2 if hollow else 3)
+    for consumer, col in zip(CONSUMERS, ["#adb5bd", "#2b8a3e", "#e8590c", "#1971c2"]):
+        hollow = consumer == "C_restrict_annot"
+        ax.scatter([], [], facecolors="none" if hollow else col, edgecolors=col, linewidths=1.6 if hollow else 0.5,
+                   s=90 if hollow else 45, label=consumer + (" (hollow)" if hollow else ""))
+    for (atk_name, *_), mk in zip(ATTACKS, marks):
+        ax.scatter([], [], marker=mk, color="k", label=atk_name)
+    ax.set_xlabel("PRB visibility loss V_PRB (% of used PRB excluded from decisions)")
+    ax.set_ylabel("lure rate (%)")
+    ax.set_title("RQ3: protection vs native-PRB visibility (uebound, open-loop replay)")
+    ax.grid(alpha=0.3); ax.legend(fontsize=7, ncol=2)
+    fig.tight_layout(); fig.savefig(path, dpi=180); plt.close(fig)
 
 
 def draw(res, path):
