@@ -75,6 +75,8 @@ def severity(mults):
         all_w = sorted(set(w for im, wm in rec.items() for w in wm))
         tp = {m: {"edge": [0, 0], "resident": [0, 0]} for m in mults}
         delays = {m: [] for m in mults}
+        # 分解（E16b）：偵測發生於注入段之內或之後；注入長度是否受「至少 2 窗」之下限抬高
+        dec = {m: {g: {"within": 0, "beyond": 0, "floor": 0} for g in ("edge", "resident")} for m in mults}
         for imsi, wm in rec.items():
             seq = H.state_seq(wm, all_w)
             grp = "edge" if H.ue_lte_fraction(seq) >= H.EDGE_SPLIT else "resident"
@@ -89,17 +91,21 @@ def severity(mults):
                         run += 1
                         if H.is_violated(run, med, sig, clean)[0]:
                             delays[m].append(t - inj + 1); detected = True
+                            dec[m][grp]["within" if run <= extra else "beyond"] += 1
                             break
                     else:
                         break
                 tp[m][grp][1] += 1
+                if base_hi * m < 2:
+                    dec[m][grp]["floor"] += 1
                 if detected:
                     tp[m][grp][0] += 1
         r = lambda p: p[0] / p[1] if p[1] else float("nan")
         for m in mults:
             e, rs = tp[m]["edge"], tp[m]["resident"]
             res[m].append({"seed": ts, "tpr_all": r([e[0] + rs[0], e[1] + rs[1]]), "tpr_edge": r(e),
-                           "tpr_resident": r(rs), "n": e[1] + rs[1], "det": e[0] + rs[0], "delays": delays[m]})
+                           "tpr_resident": r(rs), "n": e[1] + rs[1], "det": e[0] + rs[0], "delays": delays[m],
+                           "n_edge": e[1], "n_resident": rs[1], "decomp": dec[m]})
     return res
 
 
@@ -149,8 +155,24 @@ def main():
         print(f"{m:<6}{f(e['tpr_all']):>26}{f(e['tpr_resident']):>26}{f(e['tpr_edge']):>26}"
               f"{('—' if e['mean_delay_detected'] is None else format(e['mean_delay_detected'], '.1f')):>14}   （{e['detected']}/{e['n']}）")
 
+    # ---- E16b：偵測之分解（描述性；回應 E16 之「未分解」）----
+    E16b = {}
+    print("\n══ E16b：偵測發生之位置（注入段之內／注入段結束後仍連續停留於 LTE）與 2 窗下限 ══")
+    print(f"{'倍數':<6}{'群':<10}{'注入數':>6}{'段內偵測':>9}{'段後偵測':>9}{'受 2 窗下限抬高之注入':>20}")
+    for m in MULTS:
+        E16b[str(m)] = {}
+        for g in ("resident", "edge"):
+            n = sum(r["n_" + g] for r in sev[m])
+            d = {k: sum(r["decomp"][g][k] for r in sev[m]) for k in ("within", "beyond", "floor")}
+            E16b[str(m)][g] = dict(d, n=n)
+            print(f"{m:<6}{g:<10}{n:>6}{d['within']:>9}{d['beyond']:>9}{d['floor']:>20}")
+        tot = sum(E16b[str(m)][g]["within"] + E16b[str(m)][g]["beyond"] for g in ("resident", "edge"))
+        if tot != E16[str(m)]["detected"]:
+            print("  ✗ 分解之合計與偵測數不符。停止。"); sys.exit(2)
+    print("── 檢查 4：各倍數之（段內 + 段後）= 偵測數 ✓")
+
     out = {"spec": "docs/thesis/E15_E18_supplementary_spec.md v1", "post_hoc": True, "dataset": DS.NAME, "tau_z": TAU_Z,
-           "decision_rule": H.DECISION_RULE, "checks": "ok", "E15_edge_split": E15, "E16_severity": E16,
+           "decision_rule": H.DECISION_RULE, "checks": "ok", "E15_edge_split": E15, "E16_severity": E16, "E16b_decomposition": E16b,
            "clean_fpr_reference": E15[str(FROZEN_SPLIT)]["fpr_all"]}
     p = os.path.join(out_dir, "E15_E16_D1_robustness.json")
     json.dump(out, open(p, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
