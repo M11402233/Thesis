@@ -37,7 +37,6 @@ run 20_msweep       run_adversarial_msweep.py
 run 21_Hi           run_Hi_experiments.py
 run 22_Hi_D1        run_Hi_D1_performance.py
 run 23_Ci           run_Ci_unified.py
-run 24_Pi           run_Pi_experiments.py --aux "$REPO/data/ues30_seeds/ues30_t300_seed42??_aux" --out-dir $REPO/data/results/d30
 run 25_resource_eval        resource_eval_xapp.py --admission strict              # 須在 RQ3 與 xApp 之後（內建檢查讀其輸出）
 run 26_resource_eval_annot  resource_eval_xapp.py --admission restrict_annotated
 fig 30_fig_Hi_grading make_fig_Hi_D1_grading.py

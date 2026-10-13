@@ -4,7 +4,7 @@
 
 ## 專案一句話
 
-被攻陷但身分合法的 O-DU 在 E2SM-KPM 組裝點竄改量測。本研究以外部佐證（C_i 基數守恆、S_i 跨節點同時態共識、H_i 成員轉移）與內部一致性（P_i 吞吐量—資源，路線 B 進行中）驗證 KPM 數值，經階層式規則融合為逐 (node, window) 信任註記。
+被攻陷但身分合法的 O-DU 在 E2SM-KPM 組裝點竄改量測。本研究以三類外部佐證（C_i 基數守恆、S_i 跨節點同時態共識、H_i 成員轉移）驗證 KPM 數值，經階層式規則融合為逐 (node, window) 信任註記。C-ZT 為**四個 xApp**：Detection、Trust Assessment、Policy Enforcement（P1–P3）與 Available-resource evaluation。**P_i（吞吐量—資源，路線 B）已於 2026-10-13 由使用者決定自論文移除**，正文不得再出現；`run_Pi_experiments.py` 僅留存於 repo。
 
 ## 路徑
 
@@ -42,14 +42,13 @@
 | τ_H^warn／τ_H^reject | 2／3 | H_i-D1 證據強度（非信任狀態） |
 | L_C | 2 | C_i 持續窗 |
 | MIN_PEER | 2 | S_i 最少同窗 peer 數 |
-| τ_P | 4 | P_i-C（路線 B） |
 | LTE 錨點 | CellId 1 | C_i 聯集必含 |
 
 ## 信任狀態與融合（權威定義在第四章 4.4.0）
 
 四狀態：trusted ／ low-trust ／ abstain ／ rejected。嚴重度 trusted ≺ abstain ≺ low-trust ≺ rejected。**rejected 指不採信該筆 KPM，不代表節點是攻擊者。** abstain 永不等於可信（fail-closed）。不繼承：每窗重新判定。
 
-規則依序評估：L1 硬否決（`R1_CI_VETO`、`R1_CI_PENDING`、`R1_D2_VETO`、`R1_STAGE1`）→ L2 統計證據（`R2_SI_D1_BOUND`、`R2_SI_D1_UNBOUND`、`R2_SI_ALONE`、`R2_D1_STRONG`、`R2_D1_WEAK`）→ L3 `R3_ABSTAIN` → L0 `R0_CLEAN`。路線 B 將新增 `R1_PI_BOUND`、`R2_SI_PI_BOUND`、`R2_PI_ALONE`。
+規則依序評估：L1 硬否決（`R1_CI_VETO`、`R1_CI_PENDING`、`R1_D2_VETO`、`R1_STAGE1`）→ L2 統計證據（`R2_SI_D1_BOUND`、`R2_SI_D1_UNBOUND`、`R2_SI_ALONE`、`R2_D1_STRONG`、`R2_D1_WEAK`）→ L3 `R3_ABSTAIN` → L0 `R0_CLEAN`。
 
 **已知結構缺口（已處理）**：window 政策下 `R2_SI_D1_BOUND` 無合法觸發路徑（D1 證據 UE 必在錨點）；定案之 uebound 以「UE 消失前之 serving mmWave cell」綁定，使其可觸發，代價為乾淨資料 6 筆誤拒（4.9.6.5）。
 
@@ -65,7 +64,7 @@
 - **D1 規模效應（主要限制）**：逐 UE 誤報 0.102（與 7 UE 之 0.116 相當），但 48.3% 節點註記綁有 D1 證據；159 筆誤拒為 S_i 誤報 × D1 之機率重合（獨立時預期 197）。E14（事後新增，規格 `E14_D1_sensitivity_spec.md`）：τ_H 6／7 時 trusted 71.2%、延遲 2.2→6.4 窗，誤拒仍 0.64–0.71%。**主結果維持凍結值，不得依 E14 改門檻**
 - RQ3（uebound）：不驗證誘導率 93.8–99.2%；C_strict：×0.6 → 2.2%、漂移 → 4.1–8.3%、×0.8 → 46.2%（regret 6.1%→3.7%，**前版「×0.8 時 regret 反升」未重現**）；乾淨 ρ_cap 49.5%、ρ_PRB 50.6%；`C_restrict_annot` ≡ `C_notrej`（abstain=0）
 - E12（候選、未採用）：L_S=2 使 C_notrej 誘導率降至 8.6–17.2%，新增乾淨誤拒 81 筆（0.52%）
-- P_i（獨立評估、**未納入融合**，thesis 附錄 B）：覆蓋率 21.1%、乾淨誤報 4.3%、最小可偵測 2.0×
+- 可用資源評估 xApp（`resource_eval_xapp.py`，乾淨全序列）：strict 准入輸入可用率 50.3%、ρ_PRB 51.5%、V_PRB 48.5%、無准入輸入之窗 11／2,400；restrict_annotated 99.0%／99.5%／0.5%
 - 回歸基準：rt 系列 6 個已於 2026-10-13 `--set-baseline`（`data/results/d30/`）
 
 ## 主要腳本
@@ -90,7 +89,7 @@
 
 ## 目前狀態與待辦
 
-**2026-10-13：D-30 收齊、全流程跑完、正文第四章已全部換成 D-30。** 以 `scripts/run_d30_pipeline.sh` 重跑（`setsid nohup`；任一檢查失敗即停）。融合維持 C_i／S_i／H_i 三類（依簡報 v0.6 之流程圖）；P_i 不納入。
+**2026-10-13：D-30 收齊、全流程跑完、正文第四章已全部換成 D-30。** 以 `scripts/run_d30_pipeline.sh` 重跑（`setsid nohup`；任一檢查失敗即停）。融合維持 C_i／S_i／H_i 三類（依簡報 v0.6 之流程圖）；P_i 已自論文移除；C-ZT 稱為四個 xApp（簡報第 27 頁標題仍寫 Three-xApp，待使用者改）。
 - **架構（簡報 v0.6 第 27 頁，2026-10-13 與老師確認）**：P1 Detection → P2 Trust Assessment → P3 Policy Enforcement；P3 將 policy-admitted KPM 寫入 DB；RC xApp 與 **Available-resource evaluation xApp** 自 DB 讀取（後者經 Resource Termination）。可用資源評估**是一個 xApp、與 P1–P3 同時運作、逐窗執行，不是離線統計**（`resource_eval_xapp.py`；`run_xapp(on_published=…)` 回呼）。原型中 DB／Resource Termination 為行程內抽象，正文須如實寫。使用者說的「P1／P2／P3」是程序，**不是 P_i**；勿混淆。
 - 待辦：35 張圖上傳 HackMD 並填連結（`data/results/d30_figs_20261013.tar.gz`）；簡報（`~/Downloads/Cindy_Thesis_v0.6.pptx`，前 40 頁已與老師確認）之結果頁換 D-30 數字；FNWF 2024／Hung／Hashem Eiza／ns-O-RAN 之 PDF 待使用者補；push 由使用者執行。
 - 論文題目定案：Zero-Trust Verification and Admission of KPM Reports in Non-Public O-RAN: Countering Falsification by Authenticated Nodes with Field-Referenced Consistency Evidence（簡報 v0.6 第 1 頁仍為舊題目）。
@@ -134,7 +133,7 @@ for s in 4200 4201 4202 4203; do cmp data/si_lstm_seeds/ues1_t300_seed$s.txt dat
 - 每項貢獻附「驗證層級」誠實標記；未評估者明寫未評估。
 - 標準引用只用 Citation Map v2 已核實之條號（TS 33.501 V20.2.0、TR 33.809 V18.1.0、SRCS v15、xApp-TR v07、ZTA-TR v06、E2GAP V4.1.0、E2SM-KPM v08、NIST SP 800-207）。**不引** 舊版 Security-Requirements-Specification、「MARRS 框架」、未查證之 T-AIML 威脅編號。
 - Alimohammadi 引 FNWF 2024（攻擊 + LSTM）與 arXiv:2512.01596（2026 多層框架），**不寫 2025**。
-- P_i 屬「內部一致性」類，**不得**併入「證據來源皆在受測節點之外」之主張。
+- 正文不寫 P_i（已移除）。
 - 自我參照之盲點只能宣稱於「以自身近期觀測為參照者」，不外推至監督式模型。
 
 ## 參考文件（需要時再開，勿全部載入）
