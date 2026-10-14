@@ -440,7 +440,7 @@ SEEDS=4200–4207   # RngRun，8 個獨立 seed
 start, end, CellId, IMSI, RNTI, LCID, nTxPDUs, TxBytes, nRxPDUs, RxBytes, delay
 ```
 
-RLC trace **不含 PRB 使用率與 CQI**。D-30 另開啟 ns-O-RAN 之 E2 NR 報表（`--e2nrEnabled=true`），由 cell 2–8 之 DU 報表取得原生 `RRU.PrbUsedDl`（定義與性質見 4.12.1）；PRB 相關量測之原始定義屬 3GPP TS 28.552【待查證：不在已核實之引用清單】，E2SM-KPM 本身並未列舉 `RRU.PrbUsedDl`。CQI 仍未取得。
+RLC trace **不含 PRB 使用率與 CQI**。D-30 另開啟 ns-O-RAN 之 E2 NR 報表（`--e2nrEnabled=true`），由 cell 2–8 之 DU 報表取得原生 `RRU.PrbUsedDl`（定義與性質見 4.12.1）；`RRU.PrbUsedDl` 之原始定義見 3GPP TS 28.552 V20.4.0 §5.1.1.2.5（Mean DL PRB used for data traffic：量測期間 T 內下行資料傳輸所用 PRB 數之算術平均，為單一整數），E2SM-KPM 本身並未列舉 `RRU.PrbUsedDl`。CQI 仍未取得。
 
 ### 4.3.3 吞吐量的差分前處理
 
@@ -1844,7 +1844,7 @@ $$\rho_{\text{PRB}} = \frac{\sum_t \sum_{j} m_j(t)\, U_j(t)}{\sum_t \sum_{j \in 
 $\rho_{\text{PRB}}$ 為「已使用之 PRB 中，其 KPM 仍被准入決策採用之比例」；$V_{\text{PRB}}$ 稱為 **PRB 能見度損失**，即其 KPM 被排除、消費端決策時看不到之 PRB 負載比例。**$V_{\text{PRB}}$ 不是容量損失**：被排除之節點仍持續排程。$\rho$（組態容量版本，以下稱 $\rho_{\text{cap}}$）保留為輔助指標，便於與前版對照。
 
 **原生 PRB 之性質**（依 ns-O-RAN 原始碼查證）：
-1. 此模擬器之 MAC 為分時排程，每次配置佔滿整個頻寬，無頻域 PRB 配置；`RRU.PrbUsedDl.UEID` = 該 UE 於報告窗之排程 OFDM 符號數 ÷（報告窗之 slot 數 × 14）× 139。故原生 PRB 用量等於符號占用率乘以常數。
+1. 此模擬器之 MAC 為分時排程，每次配置佔滿整個頻寬，無頻域 PRB 配置；`RRU.PrbUsedDl.UEID` = 該 UE 於報告窗之排程 OFDM 符號數 ÷（報告窗之 slot 數 × 14）× 139。故原生 PRB 用量等於符號占用率乘以常數。此計算方式與 3GPP TS 28.552 V20.4.0 §5.1.1.2.5 之定義（期間內所用 PRB 數之算術平均、單一整數）不同：模擬器以時間占用比例近似、輸出為非整數。故本研究將其視為模擬器提供之資源用量代理，主表報告占用率與比值，不宣稱與實際設備依 TS 28.552 回報之值等價。
 2. 常數 139 為原始碼寫死之值，等於 ceil(100 MHz ÷ 720 kHz)，即 configuration 2 之載波；configuration 1（20 MHz、numerology 2）實際為 28 RB。本節主表報占用率與比值（與此常數無關）；絕對 PRB 數另以 28 RB 尺度換算。
 3. cell 層級之 `RRU.PrbUsedDl` 欄位於原始碼中以整數逐 UE 累加、每次截斷小數，系統性偏低，故不採用，改以 UE 層級值加總。
 4. 每個 seed 均以 `RxPacketTrace` 之下行排程符號數重算並交叉驗證（`prb_reader.py`，容許差 0.5 PRB）。
@@ -2203,7 +2203,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 **3GPP 規範**
 - 3GPP TS 33.501 V20.2.0 (2026-06), Rel-20.
 - 3GPP TS 23.501 V20.2.0 (2026-06), Rel-20.
-- 3GPP TS 28.552 V20.3.0, Rel-20. *5G performance measurements.*（發布年月待補）
+- 3GPP TS 28.552 V20.4.0 (2026-09), Rel-20. *Management and orchestration; 5G performance measurements.*
 - 3GPP TR 33.809 V18.1.0 (2023-09), Rel-18. *Study on 5G security enhancements against False Base Stations.*
 
 **其他規範**
@@ -2215,8 +2215,9 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 - Alimohammadi, H., Mayhoub, S., Chatzimiltis, S., Shojafar, M., Bhutta, M. N. M. (2026). "Towards a Multi-Layer Defence Framework for Securing Near-Real-Time Operations in Open RAN." arXiv:2512.01596.
 - Katsis, C., Karim, I., Bertino, E. (2025). "Zero-Trust Strategies for O-RAN Cellular Networks: Principles, Challenges and Research Directions." arXiv:2511.18568.
 - Yu, H. et al. (2025). "Closing the Visibility Gap: A Monitoring Framework for Verifiable Open RAN Operations." arXiv:2509.03000.
-- Hung, C.-F., Tseng, C.-H., Cheng, S.-M. (2025). "Anomaly Detection for Mitigating xApp and E2 Interface Threats in O-RAN Near-RT RIC." *IEEE OJCOMS.*【書目待核對：原文未取得】
-- Hashem Eiza, M. et al. (2025). "A Hybrid Zero Trust Deployment Model for Securing O-RAN Architecture in 6G Networks." *Future Internet* 17(8):372.【書目待核對：原文未取得】
+- Hung, C.-F., Chen, Y.-R., Tseng, C.-H., Cheng, S.-M. (2024). "Security Threats to xApps Access Control and E2 Interface in O-RAN." *IEEE Open Journal of the Communications Society.* doi:10.1109/OJCOMS.2024.3364840.（卷期頁碼待補：已取得之檔案為接受版）
+- Hung, C.-F., Tseng, C.-H., Cheng, S.-M. (2025). "Anomaly Detection for Mitigating xApp and E2 Interface Threats in O-RAN Near-RT RIC." *IEEE Open Journal of the Communications Society*, vol. 6. doi:10.1109/OJCOMS.2025.3546760.
+- Hashem Eiza, M., Akwirry, B., Raschella, A., Mackay, M., Maheshwari, M. K. (2025). "A Hybrid Zero Trust Deployment Model for Securing O-RAN Architecture in 6G Networks." *Future Internet* 17(8), 372. doi:10.3390/fi17080372.
 - Aizikovich, E., Mimran, D., Grolman, E., Elovici, Y., Shabtai, A. (2025). "Rogue Cell: Adversarial Attack and Defense in Untrusted O-RAN Setup Exploiting the Traffic Steering xApp." arXiv:2505.01816v1.
 - Ramezanpour, K., Jagannath, J. (2022). "Intelligent Zero Trust Architecture for 5G/6G Networks: Principles, Challenges, and the Role of Machine Learning in the context of O-RAN." arXiv:2105.01478.
 - Alpern, B., Schneider, F. B. (1985). "Defining Liveness." *Information Processing Letters.*
@@ -2377,11 +2378,12 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 
 | Work | 驗證對象 | 方法 | 與本研究缺口 |
 |---|---|---|---|
-| Hung et al. (2024/25) | E2AP 封包/訊令 | 狀態機 + 格式符合性 | 只驗協定合法性，不驗 KPM 數值可信度 |
+| Hung et al. (2024; 2025) | E2 介面訊令與 xApp 存取控制 | 2024：於 OSC H-Release 揭露 xApp 存取控制缺失並設計三種攻擊；2025：以狀態機分析驗證訊令合法性、以符合性檢查驗證封包欄位，並監測流量以偵測 DoS（另以 fuzzer 測試） | 驗證協定／訊令之合法性與存取控制，不驗 KPM 數值是否與場域之獨立觀測一致 |
 | Alimohammadi et al. (FNWF 2024; arXiv 2026) | per-UE KPM 時序 | 監督式時序分類（LSTM） | 需帶標籤訓練資料；評估僅涵蓋放大型注入（×1.2–1.5）；無跨節點參照與守恆驗證；偵測後之處置不在其範圍 |
 | Aizikovich et al.「Rogue Cell」(2025) | 多業者 O-RAN 中惡意 cell 業者上報之 KPI（含吞吐量、PRB、服務 UE 數、新進／離開 UE 數） | 攻擊（APATE）：對流量導向 xApp 之 QoE 預測模型做查詢式規避攻擊。防禦（MARRS）：逐 cell 訓練 LSTM 自編碼器，將其潛在表示與其他 cell 之平均嵌入串接後重建，重建誤差超過門檻即標為 untrusted；僅以良性資料訓練（非監督式），另有以多窗投票之序列版本（S-MARRS） | 其他 cell 以學習所得之平均嵌入進入模型，而非明確約束，硬違反可能被分數吸收；UE 數與新進／離開 UE 數僅作為模型輸入特徵，未與已知母體或轉移規則比對；僅 trusted／untrusted 兩種標籤，無證據不足時之 abstain |
 | Yu et al.「Closing Visibility Gap」(2025) | O-RU 組態/M-Plane | 硬體信任根 + Merkle 樹 | 驗組態狀態，不驗 E2 KPM 數值的物理合理性 |
 | ZT-RIC / OZTrust (2023/24) | 資料隱私 / xApp 存取 | IPFE 加密 / 封包標記 | 保護隱私與存取，不驗資料可信度 |
+| Hashem Eiza et al. (2025) | O-RAN 元件間之存取 | 混合式零信任部署：巨觀之 enclave 分段與微觀之 xApp／rApp 沙箱；集中式 PDP 搭配分散式 PEP，逐 session 最小權限存取；以 Kubernetes／Istio 實作概念驗證 | 管控「誰能存取誰」，不驗已授權節點上報之 KPM 數值是否可信 |
 | O-RAN WG11 ZTA | 介面身分/傳輸 | mTLS/IPsec/OAuth | 身分層，無 runtime 數值可信度 |
 | **本研究** | **E2 KPM 量測資料可信度** | **同窗跨節點共識 + UE 母體守恆 + UE 成員轉移一致性** | — |
 
