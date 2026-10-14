@@ -2379,7 +2379,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 |---|---|---|---|
 | Hung et al. (2024/25) | E2AP 封包/訊令 | 狀態機 + 格式符合性 | 只驗協定合法性，不驗 KPM 數值可信度 |
 | Alimohammadi et al. (FNWF 2024; arXiv 2026) | per-UE KPM 時序 | 監督式時序分類（LSTM） | 需帶標籤訓練資料；評估僅涵蓋放大型注入（×1.2–1.5）；無跨節點參照與守恆驗證；偵測後之處置不在其範圍 |
-| Aizikovich et al.「Rogue Cell」(2025) | 多業者 O-RAN 中惡意 cell 業者上報之 KPI（含吞吐量、PRB、服務 UE 數、新進／離開 UE 數） | 攻擊：對流量導向 xApp 之 QoE 預測模型做查詢式規避攻擊。防禦：逐 cell 訓練 LSTM 自編碼器，將其潛在表示與其他 cell 之平均嵌入串接後重建，重建誤差超過門檻即標為 untrusted；僅以良性資料訓練（非監督式），另有以多窗投票之序列版本 | 其他 cell 以學習所得之平均嵌入進入模型，而非明確約束，硬違反可能被分數吸收；UE 數與新進／離開 UE 數僅作為模型輸入特徵，未與已知母體或轉移規則比對；僅 trusted／untrusted 兩種標籤，無證據不足時之 abstain |
+| Aizikovich et al.「Rogue Cell」(2025) | 多業者 O-RAN 中惡意 cell 業者上報之 KPI（含吞吐量、PRB、服務 UE 數、新進／離開 UE 數） | 攻擊（APATE）：對流量導向 xApp 之 QoE 預測模型做查詢式規避攻擊。防禦（MARRS）：逐 cell 訓練 LSTM 自編碼器，將其潛在表示與其他 cell 之平均嵌入串接後重建，重建誤差超過門檻即標為 untrusted；僅以良性資料訓練（非監督式），另有以多窗投票之序列版本（S-MARRS） | 其他 cell 以學習所得之平均嵌入進入模型，而非明確約束，硬違反可能被分數吸收；UE 數與新進／離開 UE 數僅作為模型輸入特徵，未與已知母體或轉移規則比對；僅 trusted／untrusted 兩種標籤，無證據不足時之 abstain |
 | Yu et al.「Closing Visibility Gap」(2025) | O-RU 組態/M-Plane | 硬體信任根 + Merkle 樹 | 驗組態狀態，不驗 E2 KPM 數值的物理合理性 |
 | ZT-RIC / OZTrust (2023/24) | 資料隱私 / xApp 存取 | IPFE 加密 / 封包標記 | 保護隱私與存取，不驗資料可信度 |
 | O-RAN WG11 ZTA | 介面身分/傳輸 | mTLS/IPsec/OAuth | 身分層，無 runtime 數值可信度 |
