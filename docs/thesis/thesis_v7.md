@@ -2217,6 +2217,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 - Yu, H. et al. (2025). "Closing the Visibility Gap: A Monitoring Framework for Verifiable Open RAN Operations." arXiv:2509.03000.
 - Hung, C.-F., Tseng, C.-H., Cheng, S.-M. (2025). "Anomaly Detection for Mitigating xApp and E2 Interface Threats in O-RAN Near-RT RIC." *IEEE OJCOMS.*【書目待核對：原文未取得】
 - Hashem Eiza, M. et al. (2025). "A Hybrid Zero Trust Deployment Model for Securing O-RAN Architecture in 6G Networks." *Future Internet* 17(8):372.【書目待核對：原文未取得】
+- Aizikovich, E. et al. (2025). "Rogue Cell: Adversarial Attack and Defense in Untrusted O-RAN Setup Exploiting the Traffic Steering xApp." arXiv:2505.01816.【書目待核對：原文未取得，作者全名與版本依簡報 Related Work 2】
 - Ramezanpour, K., Jagannath, J. (2022). "Intelligent Zero Trust Architecture for 5G/6G Networks: Principles, Challenges, and the Role of Machine Learning in the context of O-RAN." arXiv:2105.01478.
 - Alpern, B., Schneider, F. B. (1985). "Defining Liveness." *Information Processing Letters.*
 - Lamport, L. (1977, 1983)；Leucker, M., Schallhart, C. (2009)；Bartocci, E. et al. (2018).（請補完整書目）
@@ -2378,6 +2379,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 |---|---|---|---|
 | Hung et al. (2024/25) | E2AP 封包/訊令 | 狀態機 + 格式符合性 | 只驗協定合法性，不驗 KPM 數值可信度 |
 | Alimohammadi et al. (FNWF 2024; arXiv 2026) | per-UE KPM 時序 | 監督式時序分類（LSTM） | 需帶標籤訓練資料；評估僅涵蓋放大型注入（×1.2–1.5）；無跨節點參照與守恆驗證；偵測後之處置不在其範圍 |
+| Aizikovich et al.「Rogue Cell」(2025) | 多業者 O-RAN 中惡意 cell 業者上報之 KPI | 對流量導向 xApp 之查詢式規避攻擊；防禦以逐 cell LSTM 自編碼器結合其他 cell 之聚合嵌入，依重建誤差標記 trusted／untrusted | 其他 cell 以學習所得之嵌入進入模型，而非明確約束，硬違反可能被分數吸收；無已知 UE 母體、UE 數或成員轉移之檢查；僅兩種標籤，peer 證據缺漏時無 abstain |
 | Yu et al.「Closing Visibility Gap」(2025) | O-RU 組態/M-Plane | 硬體信任根 + Merkle 樹 | 驗組態狀態，不驗 E2 KPM 數值的物理合理性 |
 | ZT-RIC / OZTrust (2023/24) | 資料隱私 / xApp 存取 | IPFE 加密 / 封包標記 | 保護隱私與存取，不驗資料可信度 |
 | O-RAN WG11 ZTA | 介面身分/傳輸 | mTLS/IPsec/OAuth | 身分層，無 runtime 數值可信度 |
