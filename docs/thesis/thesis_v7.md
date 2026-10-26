@@ -637,7 +637,7 @@ Near-RT RIC 現況隱含「認證即可信」之假設：E2 上認證即授權�
 
 #### （二）此選擇對應 criteria-based 信任演算法
 
-NIST SP 800-207 將信任演算法區分為 criteria-based（一組合格條件全數滿足方予放行）與 score-based（加權信賴分數比門檻）。本研究屬前者。以 KPM 為輸入之零信任框架多採 score-based 設計——例如 i-ZTA 之信任評估引擎輸出 0 至 1 之連續信賴度量（Ramezanpour & Jagannath, 2022）。該設計適用於證據性質同質之情形；當證據中同時包含確定性斷言與統計殘差時，分數化會抹除二者在認識論上之差異。
+NIST SP 800-207 將信任演算法區分為 criteria-based（一組合格條件全數滿足方予放行）與 score-based（加權信賴分數比門檻）。本研究屬前者。以 KPM 為輸入之零信任框架多採 score-based 設計——例如 i-ZTA 之信任評估引擎輸出 0 至 1 之連續信賴度量（Ramezanpour & Jagannath, 2022）。該架構以 E2 KPM 與 O1 KPI 作為信任評估與網路安全狀態分析之輸入，但未驗證 KPM 數值本身是否為真，亦未討論身分合法而遭攻陷之 E2 節點偽造資料之情形；其持續多因子認證檢查的是元件身分與軟體完整性，而非數值內容。換言之，此類引擎之信任判定本身即以「KPM 為真」為前提。（該文為概念性架構，未含實作與量化評估。）該設計適用於證據性質同質之情形；當證據中同時包含確定性斷言與統計殘差時，分數化會抹除二者在認識論上之差異。
 
 #### （三）三項行為承諾
 
@@ -2236,7 +2236,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 - Hung, C.-F., Tseng, C.-H., Cheng, S.-M. (2025). "Anomaly Detection for Mitigating xApp and E2 Interface Threats in O-RAN Near-RT RIC." *IEEE Open Journal of the Communications Society*, vol. 6. doi:10.1109/OJCOMS.2025.3546760.
 - Hashem Eiza, M., Akwirry, B., Raschella, A., Mackay, M., Maheshwari, M. K. (2025). "A Hybrid Zero Trust Deployment Model for Securing O-RAN Architecture in 6G Networks." *Future Internet* 17(8), 372. doi:10.3390/fi17080372.
 - Aizikovich, E., Mimran, D., Grolman, E., Elovici, Y., Shabtai, A. (2025). "Rogue Cell: Adversarial Attack and Defense in Untrusted O-RAN Setup Exploiting the Traffic Steering xApp." arXiv:2505.01816v1.
-- Ramezanpour, K., Jagannath, J. (2022). "Intelligent Zero Trust Architecture for 5G/6G Networks: Principles, Challenges, and the Role of Machine Learning in the context of O-RAN." arXiv:2105.01478.
+- Ramezanpour, K., Jagannath, J. (2022). "Intelligent Zero Trust Architecture for 5G/6G Networks: Principles, Challenges, and the Role of Machine Learning in the context of O-RAN." *Computer Networks*（卷期頁碼【待核對】）. arXiv:2105.01478.
 - Alpern, B., Schneider, F. B. (1985). "Defining Liveness." *Information Processing Letters.*
 - Lamport, L. (1977, 1983)；Leucker, M., Schallhart, C. (2009)；Bartocci, E. et al. (2018).（請補完整書目）
 - Hampel, F. R. (1974). "The Influence Curve and Its Role in Robust Estimation." *JASA.*
@@ -2401,6 +2401,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 | Yu et al.「Closing Visibility Gap」(2025) | O-RU 組態/M-Plane | 硬體信任根 + Merkle 樹 | 驗組態狀態，不驗 E2 KPM 數值的物理合理性 |
 | ZT-RIC / OZTrust (2023/24) | 資料隱私 / xApp 存取 | IPFE 加密 / 封包標記 | 保護隱私與存取，不驗資料可信度 |
 | Hashem Eiza et al. (2025) | O-RAN 元件間之存取 | 混合式零信任部署：巨觀之 enclave 分段與微觀之 xApp／rApp 沙箱；集中式 PDP 搭配分散式 PEP，逐 session 最小權限存取；以 Kubernetes／Istio 實作概念驗證 | 管控「誰能存取誰」，不驗已授權節點上報之 KPM 數值是否可信 |
+| Ramezanpour & Jagannath「i-ZTA」(2022) | O-RAN 中主體之存取請求與網路安全狀態 | 以 ML 實作零信任元件：策略引擎（RL；LSTM＋CNN）輸出 0–1 信賴分數與 grant／deny，網路安全狀態分析（遞迴 GNN）給予風險分數；輸入含 E2 KPM 與 O1 KPI；概念性架構，無實作與量化評估 | 以 KPM 為信任評估之輸入，但未驗證 KPM 數值本身；未涵蓋身分合法而遭攻陷之 E2 節點偽造資料 |
 | O-RAN WG11 ZTA | 介面身分/傳輸 | mTLS/IPsec/OAuth | 身分層，無 runtime 數值可信度 |
 | **本研究** | **E2 KPM 量測資料可信度** | **同窗跨節點共識 + UE 母體守恆 + UE 成員轉移一致性** | — |
 
