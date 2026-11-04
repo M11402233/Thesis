@@ -133,7 +133,7 @@ for s in 4200 4201 4202 4203; do cmp data/si_lstm_seeds/ues1_t300_seed$s.txt dat
 - 論文正文：繁體中文。簡報：英文內容 + 中文逐字稿。
 - 每項貢獻附「驗證層級」誠實標記；未評估者明寫未評估。
 - 標準引用只用 Citation Map v2 已核實之條號（TS 33.501 V20.2.0、TR 33.809 V18.1.0、SRCS v15、xApp-TR v07、ZTA-TR v06、E2GAP V4.1.0、E2SM-KPM v08、NIST SP 800-207）。**不引** 舊版 Security-Requirements-Specification、未查證之 T-AIML 威脅編號。MARRS／APATE 僅作為 Rogue Cell（Aizikovich et al., arXiv:2505.01816v1，已核對原文）之方法名稱提及，不當成通用框架引用。
-- Alimohammadi 引 FNWF 2024（攻擊 + LSTM）與 arXiv:2512.01596（2026 多層框架），**不寫 2025**。
+- Alimohammadi 引 FNWF 2024（攻擊 + LSTM）與 IEEE OJCOMS vol. 7, pp. 480–497, 2026（多層框架，doi:10.1109/OJCOMS.2025.3650736；預印本 arXiv:2512.01596），**不寫 2025**。
 - 正文不寫 P_i（已移除）。
 - 自我參照之盲點只能宣稱於「以自身近期觀測為參照者」，不外推至監督式模型。
 
