@@ -162,3 +162,18 @@
 | E2 無授權、最小權限要求明文排除 E2 | **SRCS v16 原文確認**（SEC-CTL-NEAR-RT-2 NOTE、Table 51、REQ-SEC-AUTHZ-1）→ OAuth 層的動機成立 |
 | 不可信 E2 節點之對應要求只有內容攻擊與 IPsec | SRCS v16 Annex D 確認 → 缺口成立 |
 | 界內 KPM 偽造 | El-Hajj 2025 只處理 > 3σ 偽造；仍未見界內偽造之處理 |
+
+## J. 261108_2.zip（2026-11-07）
+
+### J1. Moudoud, Hamhoum, Cherkaoui, "Strengthening Open Radio Access Networks: Advancing Safeguards through ZTA and Deep Learning," GLOBECOM 2023, pp. 80–85（全文已讀）
+- Deep SARSA 學習存取控制政策，輸入為 ZTA 認證資料；以 UNSW-NB15 評估，報 accuracy／F1／precision。
+- MDP：action ∈ {0 正常, 1 惡意}（二元分類）；reward：分類正確 1、錯誤 0（**無誤報成本**）；**state 為資料集中的一列，與 agent 的動作無關**；作者發現折扣因子 0.1 優於 0.99，並說明「immediate rewards are more important」。
+- 全文無 E2、無 KPM／KPI、無門檻調整。
+- **意義**：這篇的「RL」實質上是逐筆分類器（state 不受動作影響、近乎不折扣）。正好說明我們的 MDP 必須讓**動作影響後續狀態**（自身過去判定、升級歷程進入 state），否則 DRL 等同 E9b 之監督式分類器，無法主張序列決策的好處。可作為「O-RAN 零信任＋DRL 已有、但為非序列分類」之引用。
+
+### J2. Hung, Tseng, Cheng, OJCOMS 2025（doi:10.1109/OJCOMS.2025.3546760）
+- 與 `~/Downloads/` 既有檔案逐位相同，正文第 2239 行與比較表第 2402 行已引用，無須更動。
+
+### J3. 仍未取得
+- **Moudoud & Cherkaoui, "Enhancing open RAN security with zero trust and machine learning," GLOBECOM 2023, pp. 2772–2777, doi:10.1109/GLOBECOM54140.2023.10437043**——零信任 O-RAN 綜述 [19] 稱其「DRL agent tunes thresholds … rather than relying on fixed cutoffs」。與 J1 為同年同會議之**不同篇**（頁碼、DOI 不同）。在讀到全文前，引用時只能寫「依 Ali et al. 綜述之描述」。
+- El-Hajj 表 4 之「Zero Trust Security for 6G O-RAN (2024)」：使用者查無書目，**不引用**。
