@@ -143,7 +143,7 @@ DRL 版不是從零開始。下表是 `thesis_v7.md` 已有、且 DRL 版會直�
 
 教授原話可作為動機：零信任無法完全阻止內部攻擊（DU 宣稱自己空閒、要求把使用者都轉給它卻不服務），目標是把影響降到最低。
 
-**引用注意**：RFC 6749 為 IETF 標準。O-RAN 文件中 OAuth 2.0 的已核實出處只有 xApp-TR §6.5（Solution #4，xApp 存取 Near-RT RIC API）與 SRCS §5.1.3。**不得宣稱 O-RAN 規範要求在 E2 或 F1 上使用 OAuth。** 加入此層的理由是 ZTA-TR §7.3.4 NOTE 3：E2 上認證即授權，SCTP 沒有原生授權方法。Hashem Eiza et al. (2025) 的 PDP／PEP 逐 session 授權是最接近的相關工作，需在相關研究中區分。
+**引用注意**：RFC 6749 為 IETF 標準。O-RAN 文件中 OAuth 2.0 的已核實出處只有 xApp-TR §6.5（Solution #4，xApp 存取 Near-RT RIC API）與 SRCS §5.1.3（v16 SEC-CTL-NEAR-RT-3）。**不得宣稱 O-RAN 規範要求在 E2 或 F1 上使用 OAuth。** 加入此層的理由是 SRCS v16 SEC-CTL-NEAR-RT-2 NOTE（「authentication grants authorization and there is no native authorization method for SCTP」，EXAMPLE：E2 屬 time-critical APIs）與 ZTA-TR §7.3.4 NOTE 3：E2 上認證即授權。〔11-07：論文改引 SRCS v16〕Hashem Eiza et al. (2025) 的 PDP／PEP 逐 session 授權是最接近的相關工作，需在相關研究中區分。
 
 ### 3.4 CU 與 RIC 的對應（P2 未定前的寫法）
 

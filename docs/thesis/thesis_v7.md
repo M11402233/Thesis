@@ -606,7 +606,7 @@ RQ2 所問之轉移延遲與恢復延遲之實測見下文 E11，重複短違反
 
 ### 4.4.1 從認證到持續驗證
 
-Near-RT RIC 現況隱含「認證即可信」之假設：E2 上認證即授權（ZTA-TR §7.3.4 NOTE 3），O-RAN 零信任研究亦將經 E2 傳送之資料判定為無缺口（ZTA-TR §7.3.4）。NIST SP 800-207 則明言，不應因主體通過基本認證即假設其後續請求同樣有效；O-RAN WG11 之研究報告亦指出，即使 E2 被視為具備機密性、完整性與雙向認證，RIC 仍不應假設收到之資料有效且可信（xApp-TR §6.17）。
+Near-RT RIC 現況隱含「認證即可信」之假設：E2 上認證即授權，SCTP 無原生授權方法（SRCS SEC-CTL-NEAR-RT-2 NOTE；ZTA-TR §7.3.4 NOTE 3），O-RAN 零信任研究亦將經 E2 傳送之資料判定為無缺口（ZTA-TR §7.3.4）。NIST SP 800-207 則明言，不應因主體通過基本認證即假設其後續請求同樣有效；O-RAN WG11 之研究報告亦指出，即使 E2 被視為具備機密性、完整性與雙向認證，RIC 仍不應假設收到之資料有效且可信（xApp-TR §6.17）。
 
     傳統：  measurement → authenticated? → trust
     本研究：measurement → authenticated? → VERIFY → trust decision
@@ -2212,7 +2212,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 ## 參考文獻
 
 **O-RAN Alliance 規範**
-- O-RAN.WG11.TS.SRCS.0-R005-v15.00 (2026). *Security Requirements and Controls Specifications.*
+- O-RAN.WG11.TS.SRCS.0-R005-v16.00 (2026). *Security Requirements and Controls Specifications.*
 - O-RAN.WG11.TR.Security-Near-RT-RIC-xApps.0-R005-v07.00 (2025-11). *Study on Security for Near Real Time RIC and xApps.*
 - O-RAN.WG11.TR.Threat-Modeling-R005-v09.00 (2026). *Security Threat Modeling and Risk Assessment.*
 - O-RAN.WG11.TR.ZTA-R005-v06.00 (2026). *Study on Zero Trust Architecture for O-RAN.*
