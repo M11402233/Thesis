@@ -100,7 +100,7 @@
 - DU 與 CU／RIC 之間加入 OAuth 2.0（RFC 6749）邏輯層授權；新規則 `R1_AUTHZ`，`R1_STAGE1` 保留（目前 `fuse()` 未實作）。**OAuth 擋不住主要威脅**（被攻陷 DU 持有合法 token），只限制 DU 能要求什麼。
 - 實驗依三階段賽局：穩定情境 → 學習型攻擊者 → 提高變異；每階段先寫規格（E19 起編號）。
 - 規則版以 git tag `rulebased-v1` 凍結，作為 DRL 版的基準線。
-- P1–P11 已於 2026-11-07 決定（見該檔 1.2a）：凍結＋線上都做；RIC xApp；DRL 攻擊者；**合併一篇、投 IEEE OJCOMS、DRL 為主體**；**重跑 ns-O-RAN 收 Stage 3 新資料**；7 gNB 主；O-full＋O-outcome；**token 與信任連動（P10=B，須量測洩漏）**；V-escalate 主。
+- P1–P11 已於 2026-11-07 決定（見該檔 1.2a）：凍結＋線上都做；RIC xApp；DRL 攻擊者；**合併一篇、投 IEEE OJCOMS、DRL 為主體**；**重跑 ns-O-RAN 收 Stage 3 新資料**；7 gNB 主；O-full＋O-outcome；**token 與信任連動（P10=B，須量測洩漏）**；V-escalate 主。**碩士論文包含 DRL 賽局**（11-07）；投稿日期待使用者與老師確認。
 - 簡報主版：`~/Downloads/Cindy_Thesis_v0.9.pptx`（advisor_v2 + v0.8 Analysis，2026-11-07）。
 
 ## 目前狀態與待辦
