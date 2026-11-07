@@ -88,6 +88,21 @@
 | `run_fusion_replay.py` | 4.11 規則回放 |
 | `make_fig_Hi_D1_grading.py` | D1 證據強度分級圖 |
 
+## 華沙回饋後的新方向（2026-11）
+
+詳見 `docs/thesis/WUT_feedback_DRL_ZT_plan.md`（含 11-07 審閱修正）。摘要：
+- 主資料集為 D-30（`data/ues30_seeds/`，30 UE × 8 seed × 300 秒），唯讀。
+- Trust Assessment 的 L2（S_i、H_i-D1 的決策）改為 DRL，**放在規則下限之內（只能更嚴、不能比規則寬鬆）**；C_i、H_i-D2 維持 L1 規則式硬否決（「無可試探之界線」僅限攻擊者只改 delay）。
+- 融合遮蔽缺陷（`R1_CI_PENDING` 提前返回）之修正規格：`docs/thesis/fusion_severity_order_spec.md`（草案，待使用者確認；須先於 E19）。
+- 標籤 = 「(節點, 窗) 這筆報告是否被竄改」；主報 TPR 與乾淨誤拒率。
+- 攻擊端為學習型代理人，不得取得同秒的 peer 中位數；觀測層級 O-full（含判定）／O-outcome（只有 steering 結果）兩種都做。
+- Q4 的 23.6% 是「未被 S_i 偵測」口徑之對照點，不是「未被 rejected」之上界，也不是證明過的上界。
+- DU 與 CU／RIC 之間加入 OAuth 2.0（RFC 6749）邏輯層授權；新規則 `R1_AUTHZ`，`R1_STAGE1` 保留（目前 `fuse()` 未實作）。**OAuth 擋不住主要威脅**（被攻陷 DU 持有合法 token），只限制 DU 能要求什麼。
+- 實驗依三階段賽局：穩定情境 → 學習型攻擊者 → 提高變異；每階段先寫規格（E19 起編號）。
+- 規則版以 git tag `rulebased-v1` 凍結，作為 DRL 版的基準線。
+- 待定事項 P1–P11 見該檔 1.2 節，遇到時停下來問。
+- 簡報主版：`~/Downloads/Cindy_Thesis_v0.9.pptx`（advisor_v2 + v0.8 Analysis，2026-11-07）。
+
 ## 目前狀態與待辦
 
 **2026-10-13：D-30 收齊、全流程跑完、正文第四章已全部換成 D-30。** 以 `scripts/run_d30_pipeline.sh` 重跑（`setsid nohup`；任一檢查失敗即停）。融合維持 C_i／S_i／H_i 三類（依簡報 v0.6 之流程圖）；P_i 已自論文移除；C-ZT 稱為四個 xApp（簡報第 27 頁標題仍寫 Three-xApp，待使用者改）。
