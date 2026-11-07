@@ -177,3 +177,21 @@
 ### J3. 仍未取得
 - **Moudoud & Cherkaoui, "Enhancing open RAN security with zero trust and machine learning," GLOBECOM 2023, pp. 2772–2777, doi:10.1109/GLOBECOM54140.2023.10437043**——零信任 O-RAN 綜述 [19] 稱其「DRL agent tunes thresholds … rather than relying on fixed cutoffs」。與 J1 為同年同會議之**不同篇**（頁碼、DOI 不同）。在讀到全文前，引用時只能寫「依 Ali et al. 綜述之描述」。
 - El-Hajj 表 4 之「Zero Trust Security for 6G O-RAN (2024)」：使用者查無書目，**不引用**。
+
+## K. Moudoud & Cherkaoui, "Enhancing Open RAN Security with Zero Trust and Machine Learning," GLOBECOM 2023（全文已讀，2026-11-07）
+
+- 內容：概念性 ZTA 架構（3GPP 介面側：RL 風險評估模組＋智慧存取控制代理；O-RAN 介面側：ZTPF（PDP／PEP）＋ZTE（SIACE 以 Q-learning 最佳化存取控制政策、ISA 以 RL 偵測異常））；裝置信任分數由他裝置推薦值之偏離計算（Eq. 3–5，與其 OJCOMS 2023 同一套）。
+- 評估：UNSW-NB15，accuracy 99.3%、precision／recall／F1／AUC 約 98.5–0.99；與 SSL、Random Forest、HMM 等比較 accuracy。
+- **未定義 state、action、reward**（只寫 Q-learning 一般更新式）；全文 "threshold" 僅出現在 ROC 定義；**無 E2、無 KPM／KPI、無攻擊者模型、無對抗或自適應攻擊**。
+- **更正 H3**：Ali et al. 綜述稱此篇「DRL agent that tunes thresholds and policy parameters … rather than relying on fixed cutoffs」，**原文找不到門檻調整的內容**；原文只在動機中說「static policies」難以實施。→ 引用時以原文為準，**不得沿用綜述的描述**；也因此「以 DRL 取代固定門檻、防止被試探」在 O-RAN 文獻中**沒有被實際實作與評估**（就目前讀到的範圍）。
+- 可引用之處：作為「O-RAN 零信任＋RL 信任／存取控制」的先行工作（概念性、通用入侵資料集、逐筆分類）。
+
+## L. 最終定位（K 之後）
+
+| 主張 | 狀態 |
+|---|---|
+| 攻防 RL 賽局、以後果定義偵測 | 已有（電網 F1、交通 F2）→ 評估方法，須引用 |
+| O-RAN 零信任中以 RL 做信任／存取控制 | 已有，但皆為概念架構或通用入侵資料集上的逐筆分類（K、J1、H4、i-ZTA）；無 E2 KPM、無自適應攻擊者 |
+| 以 DRL 取代固定門檻以防試探 | 綜述有此描述，**原文無**；未見實作 |
+| 跨節點交叉驗證 telemetry | 已被提出為方向（F7），未見實作 |
+| 界內 KPM 偽造、參照不交給學習、規則下限、准入代價、自適應攻擊下之邊界 | 未見 |
