@@ -116,6 +116,21 @@ RULE = {
 #   bound  : 僅 d1 == strong,且 D1 證據 UE 須掛在 S_i 受測節點上
 FUSION_MODE = "bound"
 
+# 融合順序(由 --fusion-order 或環境變數 ZT_FUSION_ORDER 設定;規格 docs/thesis/fusion_severity_order_spec.md)
+#   first-match : 原始實作,第一條符合即決定(逐位重現既有輸出與回歸基準)
+#   severity    : 事後修正。評估全部規則,取嚴重度最高者;同嚴重度依 RULE 表順序(L1≺L2≺L3)。
+#                 修正 R1_CI_PENDING 提前返回而遮蔽同窗 R1_D2_VETO / R2_SI_D1_BOUND 之缺陷(4.4.0(三))
+FUSION_ORDER = os.environ.get("ZT_FUSION_ORDER", "first-match")
+if FUSION_ORDER not in ("first-match", "severity"):
+    raise SystemExit(f"ZT_FUSION_ORDER={FUSION_ORDER!r} 不合法(first-match|severity)")
+SEVERITY = {"trusted": 0, "abstain": 1, "low-trust": 2, "rejected": 3}
+_RULE_ORDER = {k: i for i, k in enumerate(RULE)}
+# severity 與 first-match 之差異只允許出現在此組合(規格 §3 C4);其餘差異 → 立即停止
+EXPECTED_SEVERITY_DIFF = {("R1_CI_PENDING", "R1_D2_VETO"),
+                          ("R1_CI_PENDING", "R2_SI_D1_BOUND"),
+                          ("R1_CI_PENDING", "R2_SI_D1_LEGACY")}
+SEVERITY_DIFFS = collections.Counter()   # (first-match rule, severity rule) → 次數(本行程累計)
+
 # D1 證據之節點歸屬政策(由 --d1-binding 設定,對齊 4.9.6.5)
 #   uebound : 定案。D1 證據僅歸屬於該 UE「消失前之 serving mmWave cell」
 #   window  : 對照組。場域內任一 UE 之 D1 證據及於該窗全部節點(須重現 742/2335/83/0)
@@ -355,7 +370,60 @@ def _r(rule_id):
 
 
 def fuse(ci, ci_run, si, d2, d1, d1_ev=None, target=None):
-    """階層式規則融合。decision 一律由 RULE 表反查,確保 code 與 4.4.3 對齊。"""
+    """階層式規則融合,回傳 (decision, rule_id);依 FUSION_ORDER 選擇順序。"""
+    if FUSION_ORDER == "severity":
+        dec, rid, _ = fuse_detail(ci, ci_run, si, d2, d1, d1_ev, target)
+        return dec, rid
+    return fuse_first_match(ci, ci_run, si, d2, d1, d1_ev, target)
+
+
+def matched_rules(ci, ci_run, si, d2, d1, d1_ev=None, target=None):
+    """評估全部規則(各自獨立之謂詞),回傳符合集合 M(依 RULE 表順序,不含 R0_CLEAN)。"""
+    m = []
+    if ci == "violated":
+        m.append("R1_CI_VETO" if ci_run >= L_C else "R1_CI_PENDING")
+    if d2 == "violated":
+        m.append("R1_D2_VETO")
+    if si == "violated":
+        if FUSION_MODE == "legacy":
+            m.append("R2_SI_D1_LEGACY" if d1 in ("strong", "weak") else "R2_SI_ALONE")
+        elif d1 == "strong":
+            bound = (target is not None and d1_ev is not None
+                     and target in d1_ev.get("cells", []))
+            m.append("R2_SI_D1_BOUND" if bound else "R2_SI_D1_UNBOUND")
+        else:
+            m.append("R2_SI_ALONE")
+    if d1 == "strong":
+        m.append("R2_D1_STRONG")
+    if d1 == "weak":
+        m.append("R2_D1_WEAK")
+    if si == "unavailable":
+        m.append("R3_ABSTAIN")
+    return sorted(m, key=_RULE_ORDER.__getitem__)
+
+
+def fuse_detail(ci, ci_run, si, d2, d1, d1_ev=None, target=None):
+    """severity 模式:回傳 (decision, rule_id, also_matched)。
+
+    內建檢查:與 first-match 結果相異時,(first-match 規則, severity 規則) 必須屬於
+    EXPECTED_SEVERITY_DIFF,否則立即停止(硬性規則 5,不調整規則)。"""
+    m = matched_rules(ci, ci_run, si, d2, d1, d1_ev, target)
+    if m:
+        rid = min(m, key=lambda r: (-SEVERITY[RULE[r][0]], _RULE_ORDER[r]))
+    else:
+        rid = "R0_CLEAN"
+    also = [r for r in m if r != rid]
+    _, fm = fuse_first_match(ci, ci_run, si, d2, d1, d1_ev, target)
+    if fm != rid:
+        if (fm, rid) not in EXPECTED_SEVERITY_DIFF:
+            raise SystemExit(f"[fusion-order] 預期外之差異:first-match={fm} severity={rid} "
+                             f"M={m}。停止,請回報。")
+        SEVERITY_DIFFS[(fm, rid)] += 1
+    return RULE[rid][0], rid, also
+
+
+def fuse_first_match(ci, ci_run, si, d2, d1, d1_ev=None, target=None):
+    """原始階層式規則融合(第一條符合即決定)。decision 一律由 RULE 表反查,確保 code 與 4.4.3 對齊。"""
     # ---- 第一層:硬否決 ----
     if ci == "violated":
         return _r("R1_CI_VETO" if ci_run >= L_C else "R1_CI_PENDING")
@@ -495,7 +563,10 @@ def run_xapp(source, anchor, eval_mode="all", node_of_interest=None, collect=Tru
                 d1, d1_ev = d1_win, d1_ev_win
             else:
                 d1, d1_ev = verify_hi_d1_uebound(levels, dwell_runs, last_serving, target)
-            decision, rule_id = fuse(ci, ci_run, si, d2, d1, d1_ev, target)
+            if FUSION_ORDER == "severity":
+                decision, rule_id, also = fuse_detail(ci, ci_run, si, d2, d1, d1_ev, target)
+            else:
+                decision, rule_id = fuse_first_match(ci, ci_run, si, d2, d1, d1_ev, target)
             win_ann.append({
                 "window": w, "node": target,
                 "decision": decision, "rule_id": rule_id,
@@ -510,6 +581,8 @@ def run_xapp(source, anchor, eval_mode="all", node_of_interest=None, collect=Tru
                 "evidence": {k: v for k, v in
                              (("C_i", ci_ev), ("D2", d2_ev), ("D1", d1_ev)) if v},
             })
+            if FUSION_ORDER == "severity":          # first-match 輸出格式不變(逐位回歸)
+                win_ann[-1]["also_matched"] = also
 
         # ---- P3 政策執行 ----
         view, rec = enforce(win_ann, cells, w, admission)
@@ -559,7 +632,7 @@ def runtime_environment(warmup, repeat, gc_disabled, global_warmup=0):
 # 8. main
 # ==========================================================================
 def main():
-    global FUSION_MODE, OUT_DIR, D1_BINDING, ADMISSION_POLICY, N_KNOWN
+    global FUSION_MODE, FUSION_ORDER, OUT_DIR, D1_BINDING, ADMISSION_POLICY, N_KNOWN
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", choices=sorted(DS.REGISTRY), default=DS.NAME)
     ap.add_argument("--n-known", type=int, default=None, help="覆寫 N_known(預設依資料集)")
@@ -567,6 +640,9 @@ def main():
     ap.add_argument("--out-dir", default=None, help="覆寫輸出目錄")
     ap.add_argument("--fusion", choices=["legacy", "bound"], default="bound",
                     help="legacy=原始規則(復現 27 筆 rejected);bound=須同節點綁定且僅 strong")
+    ap.add_argument("--fusion-order", choices=["first-match", "severity"], default=FUSION_ORDER,
+                    help="first-match=原始(預設,逐位重現);severity=最嚴重符合規則決定(事後修正,"
+                         "規格 fusion_severity_order_spec.md)。預設取環境變數 ZT_FUSION_ORDER")
     ap.add_argument("--eval-mode", choices=["single", "all"], default="all",
                     help="single=每窗僅評估編號最小之活躍節點(復現舊 runtime);all=逐節點")
     ap.add_argument("--d1-binding", choices=["uebound", "window"], default="uebound",
@@ -584,6 +660,7 @@ def main():
     args = ap.parse_args()
 
     FUSION_MODE = args.fusion
+    FUSION_ORDER = args.fusion_order
     D1_BINDING = args.d1_binding
     ADMISSION_POLICY = args.admission
     if args.out_dir:
@@ -609,7 +686,7 @@ def main():
 
     print(f"=== 零信任 KPM 驗證 xApp(trace replay,{len(files)} seed,資料集 {args.dataset},N_known={N_KNOWN})===")
     print(f"    fusion={FUSION_MODE}  eval-mode={args.eval_mode}  "
-          f"d1-binding={D1_BINDING}  admission={ADMISSION_POLICY}  "
+          f"d1-binding={D1_BINDING}  admission={ADMISSION_POLICY}  fusion-order={FUSION_ORDER}  "
           f"warmup={args.warmup}  repeat={args.repeat}")
 
     gc_disabled = not args.keep_gc
@@ -813,6 +890,10 @@ def main():
     # ---------------- 寫檔 ----------------
     # tag 含 binding 與 admission,不覆蓋前版 xapp_*_{fusion}_{eval} 之輸出
     tag = f"{args.fusion}_{args.eval_mode}_{D1_BINDING}_{ADMISSION_POLICY}"
+    if FUSION_ORDER == "severity":       # 不覆寫 first-match 之輸出
+        tag += "_severity"
+        print(f"\n--- fusion-order=severity:與 first-match 相異之註記 "
+              f"{sum(SEVERITY_DIFFS.values())} 筆 {dict(SEVERITY_DIFFS)}(含暖身/重複回合之累計)---")
     out_bd = os.path.join(OUT_DIR, f"xapp_rule_breakdown_{tag}.json")
     with open(out_bd, "w", encoding="utf-8") as fh:
         json.dump({

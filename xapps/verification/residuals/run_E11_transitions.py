@@ -169,8 +169,28 @@ def trace(windows, anchor, n_known):
                 si = "violated" if z > X.TAU_S else "normal"
             mine = {i: lv for i, lv in lev.items() if last_srv.get(i) == j}
             d1 = {0: "none", 1: "weak", 2: "strong"}[max(mine.values())] if mine else "none"
+            if X.FUSION_ORDER == "severity":
+                # 〔事後修正 2026-11-08，使用者同意〕規則順序規格 fusion_severity_order_spec.md：
+                # 獨立重寫（不呼叫 xApp 之 fuse）——列出全部符合規則，取最嚴重者，同嚴重度依表序
+                m = []
+                if ci_v:
+                    m.append(("rejected", "R1_CI_VETO") if ci_run >= X.L_C else ("low-trust", "R1_CI_PENDING"))
+                if d2_v:
+                    m.append(("rejected", "R1_D2_VETO"))
+                if si == "violated":
+                    m.append(("rejected", "R2_SI_D1_BOUND") if d1 == "strong" else ("low-trust", "R2_SI_ALONE"))
+                if d1 == "strong":
+                    m.append(("low-trust", "R2_D1_STRONG"))
+                if d1 == "weak":
+                    m.append(("low-trust", "R2_D1_WEAK"))
+                if si == "unavailable":
+                    m.append(("abstain", "R3_ABSTAIN"))
+                order = ["R1_CI_VETO", "R1_D2_VETO", "R2_SI_D1_BOUND",                    # rejected
+                         "R1_CI_PENDING", "R2_SI_ALONE", "R2_D1_STRONG", "R2_D1_WEAK",    # low-trust
+                         "R3_ABSTAIN"]                                                    # abstain
+                dec, rid = min(m, key=lambda x: order.index(x[1])) if m else ("trusted", "R0_CLEAN")
             # 4.4.0 規則表（依序，先符合者生效）
-            if ci_v:
+            elif ci_v:
                 dec, rid = (("rejected", "R1_CI_VETO") if ci_run >= X.L_C else ("low-trust", "R1_CI_PENDING"))
             elif d2_v:
                 dec, rid = "rejected", "R1_D2_VETO"

@@ -7,13 +7,21 @@ ORDER=$1; [ "$ORDER" = first-match ] || [ "$ORDER" = severity ] || { echo "usage
 REPO=~/oran-zt-kpm-verification
 cd $REPO/xapps/verification/residuals || exit 1
 OUT=$REPO/data/results/d30_fusion_order/$ORDER
-[ -e "$OUT" ] && { echo "$OUT 已存在，不覆寫"; exit 2; }
-mkdir -p "$OUT"
-rsync -a --exclude _pipeline_logs $REPO/data/results/d30/ "$OUT"/
+# RESUME_FROM=<步驟名>：於既有輸出目錄自該步驟接續（2026-11-08，E11 檢查隨規格更新後接續 severity）
+if [ -n "${RESUME_FROM:-}" ]; then
+  [ -d "$OUT" ] || { echo "$OUT 不存在，無法接續"; exit 2; }
+else
+  [ -e "$OUT" ] && { echo "$OUT 已存在，不覆寫"; exit 2; }
+  mkdir -p "$OUT"
+  rsync -a --exclude _pipeline_logs $REPO/data/results/d30/ "$OUT"/
+fi
+SKIP=${RESUME_FROM:+1}
 export ZT_DATASET=d30 ZT_RESULTS_DIR="$OUT" ZT_FUSION_ORDER=$ORDER MPLBACKEND=Agg
 L=$OUT/_logs; mkdir -p $L; ST=$L/status.txt
-echo "# 開始 $(date -u '+%F %T') UTC  commit $(git -C $REPO rev-parse --short HEAD)  order=$ORDER" > $ST
-run() { n=$1; shift; s=$(date +%s); nice -n 10 python3 "$@" > $L/$n.log 2>&1; rc=$?
+echo "# 開始 $(date -u '+%F %T') UTC  commit $(git -C $REPO rev-parse --short HEAD)  order=$ORDER${RESUME_FROM:+  resume_from=$RESUME_FROM}" >> $ST
+run() { n=$1; shift
+        if [ -n "$SKIP" ]; then [ "$n" = "$RESUME_FROM" ] && SKIP= || return 0; fi
+        s=$(date +%s); nice -n 10 python3 "$@" > $L/$n.log 2>&1; rc=$?
         echo "$n exit=$rc $(( $(date +%s)-s ))s" >> $ST
         if [ $rc -ne 0 ]; then echo "STOPPED at $n $(date -u '+%F %T') UTC" >> $ST; exit 1; fi; }
 run 03_xapp         zt_kpm_xapp.py --fusion bound --eval-mode all --fusion-order $ORDER
