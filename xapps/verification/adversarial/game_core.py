@@ -1,0 +1,270 @@
+# -*- coding: utf-8 -*-
+"""game_core.py — E19 賽局之共用核心（規格 docs/thesis/E19_DRL_game_spec.md v2 §2）。
+
+只呼叫既有函式，不複製改寫判定邏輯：
+  - 成員關係證據（C_i、H_i-D2、H_i-D1 uebound）取自 zt_kpm_xapp.run_xapp 於乾淨資料之輸出；
+  - S_i 每步以 zt_kpm_xapp.verify_si 於（被竄改後之）上報重算；
+  - 判定下限以 zt_kpm_xapp.fuse_detail（severity）求得；
+  - 導向決策以 run_RQ3_decision_replay.decide（選回報延遲最低者），真值代價同 RQ3。
+
+【為何成員關係證據可預先計算】攻擊者第一步只控制被攻陷 cell 之 delay（§4），不改 UE 之出現與歸屬；
+C_i、D2、D1 只依成員關係，故與乾淨資料相同。此不變性由 check_env.py 之 G2a 以完整 run_xapp
+於注入後資料逐筆驗證（任何差異即停）。
+
+【實作上之定義（規格未明定處，2026-11-08 記錄於 E19 §2a）】
+  - 竄改標籤：該 (節點, 秒) 之任一 UE 上報值與真值不同。
+  - 偵測端 reward 之 steering 成本（竄改且判 trusted）：其他節點取其規則下限之判定，
+    依 C_strict 准入（僅 trusted），以 RQ3 之相對 regret（(真值[所選]−真值[最佳])/真值[最佳]）計；
+    真值候選 < 2 或無可選時為 0。
+  - 評估指標（誘導率等）則以當窗實際之全部判定計算，與 RQ3 同口徑。
+"""
+import os
+import sys
+import collections
+import numpy as np
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "residuals"))
+if os.environ.get("ZT_DATASET") != "d30" or os.environ.get("ZT_FUSION_ORDER") != "severity":
+    raise SystemExit("E19 環境須在 ZT_DATASET=d30 與 ZT_FUSION_ORDER=severity 下執行")
+import zt_kpm_xapp as X                                   # noqa: E402
+import datasets as DS                                     # noqa: E402
+from run_E10_D1_policy_ablation import load_windows       # noqa: E402
+from run_RQ3_decision_replay import ListSource, decide    # noqa: E402
+
+X.FUSION_MODE = "bound"
+assert X.FUSION_ORDER == "severity" and X.D1_BINDING == "uebound"
+
+LTE = X.LTE_CELL
+DEC = ["trusted", "low-trust", "rejected", "abstain"]
+DI = {d: i for i, d in enumerate(DEC)}
+K_HIST = 5                                                # Q-b
+# 偵測端 reward（Q-c）
+LAM, ALPHA, BETA, MU = 0.3, 1.0, 5.0, 0.05
+# 攻擊者（Q-e、Q-f）
+A_MIN, A_MAX, DELTA = 0.5, 1.5, 0.05
+C_L, C_R = 0.1, 1.0
+
+
+def seed_files():
+    f = DS.files()
+    assert len(f) == 8, f
+    return f
+
+
+# ----------------------------------------------------------------------------
+class SeedData:
+    """一個 seed 於一個信任根（anchor）下之乾淨資料與預先計算之成員關係證據。"""
+
+    def __init__(self, path, anchor_files):
+        self.path = path
+        self.seed = DS.seed_of(path)
+        self.anchor = X.TrustAnchor(list(anchor_files))
+        self.windows = load_windows(path)
+        assert [w for w, _ in self.windows] == list(range(len(self.windows)))
+        self.n = len(self.windows)
+        ann = X.run_xapp(ListSource(self.windows), self.anchor, "all", binding="uebound",
+                         admission="strict")[0]
+        # ci_run 不在註記中：以 verify_ci 依序重算，並核對 C_i 與註記一致
+        ci_run, ci_of = 0, {}
+        for k, (w, cells) in enumerate(self.windows):
+            ci, ci_run, _ = X.verify_ci(cells, ci_run)
+            ci_of[k] = (ci, ci_run)
+        self.ev = {}                                      # (k, node) → (ci, ci_run, d2, d1, d1_ev)
+        self.clean_ann = {}
+        for a in ann:
+            k, j = a["window"], a["node"]
+            ci, run = ci_of[k]
+            assert a["C_i"] == ci
+            self.ev[(k, j)] = (ci, run, a["H_i_D2"], a["H_i_D1"], a["evidence"].get("D1"))
+            self.clean_ann[(k, j)] = (a["decision"], a["rule_id"])
+        self.nodes = {k: sorted(c for c in cells if c != LTE) for k, (w, cells) in enumerate(self.windows)}
+        self.truth = [{c: float(np.mean(list(v.values()))) for c, v in cells.items() if c != LTE and v}
+                      for _, cells in self.windows]
+        self.cells_all = sorted({c for d in self.truth for c in d})
+        self.t0 = self.n // 2                             # 與 RQ3 相同之注入起點
+
+
+class DataStore:
+    """依 (seed, anchor 排除集合) 快取 SeedData。
+    評估：anchor = 其餘 7 seed（重現第四章）；訓練：anchor 另排除該 fold 之測試 seed（避免測試資料進入信任根）。"""
+
+    def __init__(self):
+        self.files = seed_files()
+        self._c = {}
+
+    def get(self, seed_path, test_path=None):
+        excl = frozenset({seed_path} | ({test_path} if test_path else set()))
+        if excl not in self._c:
+            self._c[excl] = SeedData(seed_path, [f for f in self.files if f not in excl])
+        return self._c[excl]
+
+
+# ----------------------------------------------------------------------------
+class Episode:
+    """一個 episode：一個 seed、一個被攻陷 cell、0–299 窗。
+    攻擊以 modifier(k, cells_of_atk_cell) 表示：就地修改受攻擊 cell 之 {imsi: delay}；None 表示不修改。"""
+
+    def __init__(self, sd, atk_cell):
+        self.sd, self.atk = sd, atk_cell
+        self.k = 0
+        self.hist = collections.defaultdict(dict)        # node → {k: feature tuple}
+        self.final = {}                                   # (k, node) → (decision, rule_id, source)
+        self.atk_log = []                                 # 攻擊者觀測所需之逐窗紀錄
+
+    # ---- 一窗之開始：套用竄改、求每個節點之規則下限 ----
+    def begin(self, multiplier=None, modifier=None):
+        sd, k = self.sd, self.k
+        w, cells = sd.windows[k]
+        mod = dict(cells)
+        tampered = False
+        if self.atk in cells and (multiplier is not None or modifier is not None):
+            ues = dict(cells[self.atk])
+            if modifier is not None:
+                modifier(k, w, ues)
+            else:
+                for i in list(ues):
+                    ues[i] *= multiplier
+            tampered = any(ues[i] != cells[self.atk][i] for i in ues)
+            mod[self.atk] = ues
+        self.cells = mod
+        self.tampered = tampered
+        self.reported = {c: float(np.mean(list(v.values()))) for c, v in mod.items() if c != LTE and v}
+        self.floor, self.info, self.pending = {}, {}, []
+        for j in sd.nodes[k]:
+            ci, run, d2, d1, d1_ev = sd.ev[(k, j)]
+            si, z, peer = X.verify_si(mod, j, sd.anchor.scale)
+            dec, rid, also = X.fuse_detail(ci, run, si, d2, d1, d1_ev, j)
+            self.floor[j] = (dec, rid)
+            self.info[j] = {"si": si, "z": z, "peer": peer, "ci_pending": ci == "violated" and run < X.L_C,
+                            "d1": d1, "d1_z": (d1_ev or {}).get("z", 0.0) if d1 in ("weak", "strong") else 0.0,
+                            "rid": rid, "also": also}
+            if dec in ("trusted", "low-trust"):
+                self.pending.append(j)
+            else:
+                self.final[(k, j)] = (dec, rid, "rule")
+        return self.pending
+
+    def is_tampered(self, j):
+        return j == self.atk and self.tampered
+
+    def mask(self, j):
+        f = self.floor[j][0]
+        return np.array([f == "trusted", True, True], dtype=bool)  # trusted／low-trust／rejected
+
+    def decide_node(self, j, action):
+        """action ∈ {0,1,2} = trusted／low-trust／rejected；須滿足下限（只能更嚴）"""
+        assert self.mask(j)[action], (j, action, self.floor[j])
+        dec = DEC[action]
+        rid = self.floor[j][1] if dec == self.floor[j][0] else "DRL_ESCALATE"
+        self.final[(self.k, j)] = (dec, rid, "rule" if rid != "DRL_ESCALATE" else "drl")
+        return dec
+
+    # ---- steering ----
+    def steer(self, decisions):
+        """decisions: {node: decision}；C_strict 准入（僅 trusted）。回傳 (所選, 最佳, 相對 regret, 候選數)"""
+        truth = self.sd.truth[self.k]
+        if len(truth) < 2:
+            return None, None, 0.0, len(truth)
+        opt = min(truth, key=lambda c: truth[c])
+        adm = {j for j, d in decisions.items() if d == "trusted"}
+        ch = decide(self.reported, adm)
+        if ch is None:
+            return None, opt, 0.0, len(truth)
+        reg = (truth.get(ch, np.nan) - truth[opt]) / truth[opt] if truth[opt] > 0 else 0.0
+        return ch, opt, float(reg), len(truth)
+
+    def det_reward(self, j, dec):
+        if self.is_tampered(j):
+            if dec == "rejected":
+                return 1.0
+            if dec == "low-trust":
+                return LAM
+            others = {i: self.floor[i][0] for i in self.floor}
+            others[j] = "trusted"
+            _, _, reg, _ = self.steer(others)
+            return -ALPHA * (0.0 if np.isnan(reg) else reg)
+        return {"rejected": -BETA, "low-trust": -MU, "trusted": MU}[dec]
+
+    # ---- 一窗之結束：記錄歷史 ----
+    def end(self):
+        k = self.k
+        decs = {}
+        for j in self.sd.nodes[k]:
+            dec = self.final[(k, j)][0]
+            decs[j] = dec
+            inf = self.info[j]
+            self.hist[j][k] = (inf["si"] != "unavailable", min(inf["z"] or 0.0, 4 * X.TAU_S) / X.TAU_S,
+                               (inf["peer"] or 0) / 6.0, min(inf["d1_z"], 10.0) / 10.0,
+                               {"weak": 0.5, "strong": 1.0}.get(inf["d1"], 0.0), float(inf["ci_pending"]), DI[dec])
+        ch, opt, reg, ncand = self.steer(decs)
+        self.last_steer = (ch, opt, reg, ncand, decs)
+        a = self.atk
+        peers = [v for c, v in self.reported.items() if c != a]
+        self.atk_log.append({"k": k, "present": a in self.reported, "reported": self.reported.get(a),
+                             "true": self.sd.truth[k].get(a), "decision": decs.get(a),
+                             "selected": ch == a and ch is not None, "lured": ch == a and ch != opt and ch is not None,
+                             "peer_med": float(np.median(peers)) if peers else None, "ncand": ncand})
+        self.k += 1
+        return decs
+
+    # ---- 偵測端之觀測（不含 peer 中位數與尺度 s）----
+    OBS_DIM = (K_HIST + 1) * (1 + 6 + 4)
+
+    def det_obs(self, j):
+        k, h, v = self.k, self.hist[j], []
+        inf = self.info[j]
+        cur = (inf["si"] != "unavailable", min(inf["z"] or 0.0, 4 * X.TAU_S) / X.TAU_S, (inf["peer"] or 0) / 6.0,
+               min(inf["d1_z"], 10.0) / 10.0, {"weak": 0.5, "strong": 1.0}.get(inf["d1"], 0.0),
+               float(inf["ci_pending"]), None)
+        for t, rec in [(k, cur)] + [(k - i, h.get(k - i)) for i in range(1, K_HIST + 1)]:
+            if rec is None:
+                v += [0.0] * 11
+                continue
+            onehot = [0.0] * 4
+            if rec[6] is not None:
+                onehot[rec[6]] = 1.0
+            v += [1.0, float(rec[0]), rec[1], rec[2], rec[3], rec[4], rec[5]] + onehot
+        return np.asarray(v, dtype=np.float32)
+
+
+# ----------------------------------------------------------------------------
+# 偵測端策略：D0 = 規則版（恆選下限）
+def det_floor_policy(ep, j):
+    return 0 if ep.floor[j][0] == "trusted" else 1
+
+
+def run_episode(ep, det_policy, attacker=None):
+    """以給定之偵測端策略與攻擊者跑完整個 episode。
+    det_policy(ep, j) → action；attacker：具 .multiplier(ep) 或 .modifier 之物件，或 None。"""
+    while ep.k < ep.sd.n:
+        if attacker is None:
+            ep.begin()
+        elif getattr(attacker, "modifier", None) is not None:
+            ep.begin(modifier=attacker.modifier if ep.k >= attacker.t0(ep) else None)
+        else:
+            ep.begin(multiplier=attacker.multiplier(ep))
+        for j in list(ep.pending):
+            ep.decide_node(j, det_policy(ep, j))
+        ep.end()
+    return ep
+
+
+# ----------------------------------------------------------------------------
+# A0：第四章之腳本攻擊（RQ3 之 apply_attack，逐 UE 相乘）
+class ScriptedAttack:
+    def __init__(self, kind, param):
+        self.kind, self.param = kind, param
+        self.name = f"{kind}_{param}"
+
+    def t0(self, ep):
+        return ep.sd.t0
+
+    def multiplier(self, ep):
+        k, t0 = ep.k, ep.sd.t0
+        if k < t0:
+            return None
+        return self.param if self.kind == "step" else max(0.05, 1.0 - self.param * (k - t0))
+
+
+A0 = [ScriptedAttack("step", 0.60), ScriptedAttack("step", 0.80), ScriptedAttack("drift", 0.01)]   # R-a

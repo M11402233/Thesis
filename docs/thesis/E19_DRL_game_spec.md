@@ -30,6 +30,23 @@
   - G2：既有注入（E11 之轉移、RQ3 之 ×0.6／×0.8／漂移）→ 重現 E11 轉移統計與 RQ3 誘導率。
   - G3：決定性：同一 seed、同一 policy 重跑逐位相同。
 
+## 2a. 環境之實作定義（2026-11-08，先於任何訓練；規格未明定處）
+
+實作：`xapps/verification/adversarial/game_core.py`（核心）、`env_kpm_game.py`（`DetectorEnv`、`AttackerEnv`）、`check_env.py`（G1–G3）。
+
+1. **成員關係證據預先計算**：攻擊者第一步只改 delay，不改 UE 之出現與歸屬，故 C_i、H_i-D2、H_i-D1 取自乾淨資料之 `run_xapp` 輸出；每步只以 `verify_si` 重算 S_i，再以 `fuse_detail`（severity）求下限。此不變性由 G2a 以完整 `run_xapp` 於注入後資料逐筆驗證。
+2. **竄改標籤**：該 (節點, 秒) 之任一 UE 上報值與真值不同（漂移於 t0 當秒乘數為 1，不算竄改）。
+3. **注入起點**：t0 = 窗數 // 2（與 RQ3 相同）；學習型攻擊者自 t0 起行動，$a_{t_0-1}=1$；被攻陷 cell 無上報之秒不構成攻擊者之一步，乘數保持。
+4. **偵測端之一步**：僅限下限為 trusted 或 low-trust 之 (節點, 秒)；下限為 rejected（含 `R2_SI_D1_BOUND`）或 abstain 者由規則決定（呼應 §3 決策單位）。同窗節點依 cell 編號順序。
+5. **偵測端 reward 之 steering 成本**（竄改且判 trusted）：其他節點取其規則下限，依 C_strict（僅 trusted 准入）以 `decide` 選 cell，取 RQ3 之相對 regret；真值候選 < 2 時為 0。評估指標（誘導率等）則以當窗實際之全部判定計算，與 RQ3 同口徑。
+6. **攻擊者 reward**：「被選中且非最佳」以當窗實際判定、C_strict 計；真值候選 < 2 時不可能誘導。
+7. **觀測之正規化**：偵測端 z 除以 τ_S 並截於 4、peer 數除以 6、D1 z 除以 10 並截於 1（僅 level ≥ weak 之 UE；否則 0）；歷史以實際秒對齊，缺報之秒為全 0 並有存在旗標。攻擊者之延遲以自身 t0 前乾淨平均延遲正規化（DU 知道自身真值）；含自身過去乘數。
+8. **信任根（anchor）**：評估（測試 seed）用其餘 7 seed，重現第四章；訓練 episode 之 anchor 另排除該 fold 之測試 seed，避免測試資料進入信任根。
+9. **PSRO 之混合**：每個 episode 開始時依混合機率抽一個純策略。每個池成員為 8 個 fold 各一之模型（R-b），報酬取 8 fold 測試 seed × 7 cell 之平均；3 個訓練 seed 為 3 次獨立之 PSRO，報平均與範圍。
+10. **G2 之範圍**：E11 之 C_i／D1／D2 類注入改變成員關係，不在攻擊者第一步之動作空間內，故 G2 只重現其 S_i 類 224 列（另與 E11 之獨立實作逐筆比對）。
+
+**G1–G3 結果（2026-11-08，`data/results/d30/drl/env_checks/env_checks.json`）**：G1 15,534 筆逐筆相同；G2a 434,952 筆相同；G2b RQ3 之 4 攻擊 × 4 准入政策 × 8 指標最大差 0；G2c E11 之 S_i 類 224 列逐列相同；G3 重跑逐位相同。G4 於 PSRO 驅動程式完成後執行。
+
 ## 3. DRL 偵測端（Phase 3；P1、P11）
 
 | 元素 | 定義 |
