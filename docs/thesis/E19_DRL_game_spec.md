@@ -1,13 +1,14 @@
 # 規格 E19：DRL 偵測端 × 學習型攻擊者 × OAuth 授權層（總規格）
 
-> 狀態：**v1（2026-11-07）**：§10 之 Q-a～Q-g 已由使用者確認採建議值（原標【待確認】處，以下以〔已確認〕標示）。§0 之前置條件仍須完成才產生結果。
+> 狀態：**v2 草案（2026-11-08）**：訓練流程由「分階段單次訓練」改為 **PSRO**（依使用者之簡報 v1.5 第 42 頁）；新增之 §3a 與 §10b 之 R-a～R-f 為【待確認】，確認前不得開始任何訓練。v1（2026-11-07）之 Q-a～Q-g 已確認，於 v2 不變（以〔已確認〕標示）。v1 全文見 git 歷史（commit 34a6c26 之前）。
 > 依據：`WUT_feedback_DRL_ZT_plan.md`（含 1.2a 之 P1–P11 決定）、`fusion_severity_order_spec.md`。
 > 投稿：合併一篇、IEEE OJCOMS、DRL 為主體（P4、P5）；規則版（git tag `rulebased-v1`）為同篇之基線。
 
 ## 0. 前置條件（未完成不得開始 Phase 3）
 
-1. 融合順序修正（severity）通過 C1–C4 並採用（`fusion_severity_order_spec.md` §4）。
-2. 打 git tag `rulebased-v1`（含 severity 修正後之規則版）。
+1. ~~融合順序修正（severity）通過 C1–C4 並採用~~（2026-11-08 完成，`fusion_severity_order_spec.md` §7）。
+2. ~~打 git tag `rulebased-v1`~~（2026-11-08 完成，本機）。
+4. **v2 之【待確認】項目（§10b）經使用者確認**。
 3. ~~本規格之【待確認】項目經使用者確認~~（2026-11-07 完成）。
 
 ## 1. 資料與切分
@@ -38,10 +39,34 @@
 | action | {trusted, low-trust, rejected}，以 action mask 限於 severity(a) ≥ severity(floor)；abstain 只由 L3 產生 |
 | state | $z_j(t)$、peer 數、歸屬 j 之 D1 $z_d$ 最大值與證據強度、C_i pending 旗標；過去 k 秒之上述值與本 agent 過去 action。k = 5〔已確認〕。**不含** peer 中位數與尺度 s 本身 |
 | reward | 竄改且判 rejected：+1；竄改且判 low-trust：+λ；竄改且判 trusted：−α·(該秒 steering 錯誤成本，RQ3 regret 正規化)；未竄改且判 rejected：−β；未竄改且判 low-trust：−μ；未竄改且判 trusted：+μ。λ=0.3、α=1、β=5、μ=0.05〔已確認〕 |
-| 演算法 | MaskablePPO（sb3-contrib 2.6.0）〔已確認〕；訓練 seed 0、1、2（≥3），報平均與範圍 |
+| 演算法 | MaskablePPO（sb3-contrib 2.6.0）〔已確認〕；於 PSRO 中作為偵測端之最佳回應訓練器（§3a）；訓練 seed 0、1、2（≥3），報平均與範圍 |
 | 部署 | 凍結（frozen）與線上（online，Phase 5）兩者皆做（P1） |
 
 標籤：(節點, 秒) 之報告是否被竄改；被攻陷節點於注入起點前標為未竄改。
+
+## 3a. 訓練流程：PSRO（v2 新增；【待確認】處見 §10b）
+
+**理由**：兩個學習者若只輪流訓練一次，可能互相追逐（偵測端學會新攻擊、忘記舊攻擊）。改採 PSRO（policy-space response oracles；Lanctot et al., NeurIPS 2017, arXiv:1711.00832）；以 DRL 作最佳回應之 double oracle 於安全賽局之先例見 Eghtesad, Vorobeychik, Laszka, GameSec 2020（LNCS 12513, pp. 58–79）。
+
+**策略池**：
+- 偵測端池 $\mathcal{D}$：$D_0$ = 規則版 L2（基線 B1；即 V-escalate 恆選下限）。
+- 攻擊者池 $\mathcal{A}$：$A_0$ = 第四章之腳本攻擊（R-a）。
+
+**每一輪**：
+1. **報酬表**：池中每對 $(D_i, A_j)$ 於評估 seed 上對戰，填入雙方之平均每步報酬（偵測端：§3 之 reward；攻擊者：§4 之 reward）（R-b）。
+2. **meta-solver**：一般和雙矩陣賽局，以 Lemke–Howson 求一個 Nash 均衡（初始 label 固定以確保決定性；R-c），得雙方之混合 $\sigma_D, \sigma_A$。
+3. **最佳回應**：偵測端以 MaskablePPO 對 $\sigma_A$ 訓練新策略；攻擊者以 PPO 對 $\sigma_D$ 訓練新策略。
+4. 新策略加入各自之池，回到 1。
+
+**停止**：NashConv（各方最佳回應相對目前混合之報酬增益之和；即 exploitability）< ε，或達最大輪數（R-d）。
+
+**主張**：僅為**受限賽局（目前之策略池）之近似均衡**，以 NashConv 衡量並報告其隨輪數之曲線；**不是**全域均衡保證。每輪之 $D_i$ 皆受規則下限約束（只能更嚴），故任何混合仍為 fail-closed。
+
+**與 v1 之階段對應**：Round 0 = 第四章（$D_0$ vs $A_0$）；Round 1 之偵測端最佳回應 = Stage 1（v1 之 Phase 3）；其後輪次 = Stage 2（Phase 4）；凍結 vs 線上（Phase 5）：以最終混合 $\sigma_D$ 為凍結版，另以線上更新版對最終 $\sigma_A$ 比較；Stage 3（Phase 6）：最終池於 Stage 3 資料上評估，不再訓練。
+
+**觀測層級與 token**（R-e）：PSRO 分別於 O-full 與 O-outcome 各跑一次（P9）；token 洩漏（P10）於最終輪以 O-outcome+token 訓練攻擊者最佳回應，對最終 $\sigma_D$，連動 vs 不連動比較（§5 之 (i)–(iii)），不另跑完整 PSRO。
+
+**新增一致性檢查**：G4——Round 0 之 $(D_0, A_0)$ 報酬表所對應之 TPR／乾淨誤拒／誘導率，須重現第四章（4.9.6、4.12）之數字；失敗即停。
 
 ## 4. 學習型攻擊者（Phase 4；P3、P9）
 
@@ -54,7 +79,7 @@
 | 觀測 O-outcome+token | O-outcome ＋ token 續發／撤銷事件（僅 P10 連動版，見 §5） |
 | 禁止 | 同秒 peer 中位數（Q4 oracle，僅作對照點） |
 | reward | 被 steering 選中且非最佳：+1；判 low-trust：−c_l；判 rejected：−c_rc_l=0.1、c_r=1〔已確認〕 |
-| 演算法 | PPO（連續 action）；訓練 seed 0、1、2 |
+| 演算法 | PPO（連續 action）；於 PSRO 中作為攻擊者之最佳回應訓練器（§3a）；訓練 seed 0、1、2 |
 
 ## 5. OAuth 授權層（Phase 2；P10 = B）
 
@@ -96,3 +121,21 @@
 | Q-e | 攻擊者每秒變化上限 δ | 0.05 |
 | Q-f | 攻擊者 reward c_l、c_r | 0.1、1 |
 | Q-g | token 撤銷 N、延遲 D、冷卻 T | 3、5、30 |
+
+## 10b. v2 待確認項目（2026-11-08 草案；確認前不得訓練）
+
+| # | 項目 | 建議值 | 理由 |
+|---|---|---|---|
+| R-a | $A_0$ 之內容 | ×0.6 階躍、×0.8 階躍、漂移 1 %/秒（3 個池成員，各自為純策略） | 皆為第四章／RQ3 已有之腳本，G4 可直接對帳 |
+| R-b | 報酬表之評估資料 | 每對於 LOSO 之測試 seed（8 fold）上評估，取平均；被攻陷 cell 依 Q-a 輪替 | 與第四章同口徑，避免以訓練 seed 評估 |
+| R-c | meta-solver | Lemke–Howson（`nashpy`，須安裝於 `~/venvs/drl`，記錄版本），初始 label 0；若退化則改 support enumeration 並記錄 | 一般和雙矩陣；固定 label 以確保 G3 決定性 |
+| R-d | ε 與最大輪數 | ε = 0.01（每步報酬單位）；最多 6 輪 | 偵測端每步報酬範圍 [−5, +1]，0.01 約為其 0.2 %；輪數上限依運算預算（每輪 2 個最佳回應 × 3 訓練 seed） |
+| R-e | 觀測層級與 token 之安排 | 見 §3a（O-full、O-outcome 各一次 PSRO；token 洩漏只於最終輪量測） | 控制運算量；P9、P10 之要求仍滿足 |
+| R-f | 每個最佳回應之訓練步數 | 先以 Round 1 之偵測端做學習曲線，取報酬平穩處（記錄後凍結於後續所有輪） | 事先無可靠數值；以「先量測、再凍結」代替猜測，並標記於結果 |
+
+## 11. v1 → v2 變更紀錄
+
+- 訓練流程：分階段單次訓練 → PSRO（§3a）；主張由「不宣稱均衡」改為「受限賽局之近似均衡，以 NashConv 衡量，非全域保證」。
+- 新增 G4（Round 0 重現第四章）。
+- §0 前置條件 1、2 已完成；新增 4。
+- 參考：Lanctot et al. (2017)；Eghtesad et al. (2020)；規則下限之安全性與 shielding 之關係：Alshiekh et al., AAAI 2018, pp. 2669–2678。
