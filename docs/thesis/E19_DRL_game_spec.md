@@ -128,7 +128,7 @@
 |---|---|---|---|
 | R-a | $A_0$ 之內容 | ×0.6 階躍、×0.8 階躍、漂移 1 %/秒（3 個池成員，各自為純策略） | 皆為第四章／RQ3 已有之腳本，G4 可直接對帳 |
 | R-b | 報酬表之評估資料 | 每對於 LOSO 之測試 seed（8 fold）上評估，取平均；被攻陷 cell 依 Q-a 輪替 | 與第四章同口徑，避免以訓練 seed 評估 |
-| R-c | meta-solver | Lemke–Howson（`nashpy`，須安裝於 `~/venvs/drl`，記錄版本），初始 label 0；若退化則改 support enumeration 並記錄 | 一般和雙矩陣；固定 label 以確保 G3 決定性 |
+| R-c | meta-solver | Lemke–Howson（`nashpy` 0.0.43，2026-11-08 安裝於 `~/venvs/drl`；numpy 2.2.6、scipy 1.15.3），初始 label 0；若退化則改 support enumeration 並記錄 | 一般和雙矩陣；固定 label 以確保 G3 決定性 |
 | R-d | ε 與最大輪數 | ε = 0.01（每步報酬單位）；最多 6 輪 | 偵測端每步報酬範圍 [−5, +1]，0.01 約為其 0.2 %；輪數上限依運算預算（每輪 2 個最佳回應 × 3 訓練 seed） |
 | R-e | 觀測層級與 token 之安排 | 見 §3a（O-full、O-outcome 各一次 PSRO；token 洩漏只於最終輪量測） | 控制運算量；P9、P10 之要求仍滿足 |
 | R-f | 每個最佳回應之訓練步數 | 先以 Round 1 之偵測端做學習曲線，取報酬平穩處（記錄後凍結於後續所有輪） | 事先無可靠數值；以「先量測、再凍結」代替猜測，並標記於結果 |
