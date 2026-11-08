@@ -101,7 +101,7 @@
 - 實驗依三階段賽局：穩定情境 → 學習型攻擊者 → 提高變異；每階段先寫規格（E19 起編號）。
 - 規則版以 git tag `rulebased-v1` 凍結，作為 DRL 版的基準線。
 - P1–P11 已於 2026-11-07 決定（見該檔 1.2a）：凍結＋線上都做；RIC xApp；DRL 攻擊者；**合併一篇、投 IEEE OJCOMS、DRL 為主體**；**重跑 ns-O-RAN 收 Stage 3 新資料**；7 gNB 主；O-full＋O-outcome；**token 與信任連動（P10=B，須量測洩漏）**；V-escalate 主。**碩士論文包含 DRL 賽局**（11-07）；投稿日期待使用者與老師確認。
-- 簡報主版：`~/Downloads/Cindy_Thesis_v1.6.pptx`（2026-11-08；由使用者之 v1.5_draft 改：4 RQ、C1–C4、PSRO、嚴重度序定案）。正文 v9：`docs/thesis/thesis_v9.md`（4 RQ，RQ4 = 4a／4b／4c；C1–C4）。E19 v2（PSRO）已定案（2026-11-08，R-a～R-f 依建議值確認）。
+- 簡報主版：`~/Downloads/Cindy_Thesis_v1.7.pptx`（2026-11-08；由使用者之 v1.5_draft 改：4 RQ、C1–C4、PSRO、嚴重度序定案、E19 v2 確認）。正文 v9：`docs/thesis/thesis_v9.md`（4 RQ，RQ4 = 4a／4b／4c；C1–C4）。E19 v2（PSRO）已定案（2026-11-08，R-a～R-f 依建議值確認）。
 
 ## 目前狀態與待辦
 
