@@ -235,3 +235,23 @@
 1. 結論不變：未見同時具備「E2 KPM 界內偽造＋攻擊者控制不到之場域參照＋規則下限之學習決策＋准入代價＋學習型攻擊者」者。
 2. 新增可強化之點：威脅之實在性（WOOT 2024 攻破 O-RAN RU；USENIX Sec 2026 之捏造量測實例）；「證明軟體／組態」與「驗證數值」之區分現有兩篇佐證（Yu 2025、Alimohammadi 2026 attestation）。
 3. 新增須避免之說法：「首次以 OAuth 保護 O-RAN」（XRF 已有）；「首次跨來源一致性驗證」（他領域已有，如 VTC 2026 跨 cell 警報驗證）——本研究之新意限於 E2 KPM 數值與場域參照。
+
+## O. Paper A（規則版 C-ZT）撞題檢查：三類證據之概念先例（2026-11-09 晚）
+
+前兩輪（M、N）以「O-RAN／E2／KPM」為關鍵字，未見撞題。本輪改問：**C_i、S_i、H_i 之「概念」在其他領域是否已有人做過**——審稿人最可能由此質疑新穎性。結論：**三者各自都有明確先例，正文目前一篇都沒引，必須補**；新穎性只能宣稱在「把三者組合用於 E2 KPM、以 NPN 已知母體為前提、接到零信任准入與可用資源評估」。
+
+| 本研究 | 先例 | 已核對之書目 | 相同處 | 不同處／本研究應如何寫 |
+|---|---|---|---|---|
+| **C_i 母體守恆** | **WATCHERS**：以「流量守恆」（進入節點而非給它之流量須流出）偵測丟包／錯誤轉送之惡意路由器 | Bradley, Cheung, Puketza, Mukherjee, Olsson, "Detecting disruptive routers: a distributed network monitoring approach," *IEEE Network* 12(5):50–60, 1998, doi:10.1109/65.730751（會議版 IEEE S&P 1998, pp. 115–124）（dblp／書目頁） | 以守恆律檢驗節點之自我回報、偵測身分合法之內部惡意節點 | 守恆對象為封包流 vs 本研究為已登記 UE 母體；**WATCHERS 之守恆可被繞過**（下列） |
+| C_i 之盲點 | **Hughes, Aura, Bishop**：WATCHERS 使用守恆律而未充分驗證其前提，因此可被攻擊者擊敗；並提出修正 | "Using Conservation of Flow as a Security Mechanism in Network Protocols," *Proc. IEEE S&P 2000*, pp. 132–141（作者頁摘要） | 「守恆檢查可被滿足守恆之攻擊繞過」 | **與本研究之 k 換 k 盲點（0／1,200）同一性質**；正文 4.6.6 應與 Xiao & Weng 並列引用，說明此盲點為守恆類檢查之已知性質，而非本研究之疏漏 |
+| **S_i 同窗跨節點共識** | **WSN 內部攻擊者偵測**：以鄰近感測器活動之空間相關判定離群節點；明言持有合法金鑰之內部節點可偽造事件報告 | Liu, Cheng, Chen, "Insider Attacker Detection in Wireless Sensor Networks," *Proc. IEEE INFOCOM 2007*, pp. 1937–1945, doi:10.1109/INFCOM.2007.225（書目；全文 PDF 因憑證問題未讀） | 威脅（持合法金鑰之內部節點偽造報告）與方法（鄰居空間相關）皆與 S_i 高度相似 | 本研究為 E2 KPM、以 MAD 尺度之穩健 z、凍結校準、與守恆／移動證據階層融合；**S_i 之核心概念不能宣稱為新**，須明寫此先例 |
+| S_i（良性故障版） | **Sleeping cell 偵測之 inter-cell 法**：將一個 cell 之 KPI 與鄰 cell 比較，可抓到只看自身歷史（intra-cell）抓不到之故障 | Asghar, Nieminen, Hämäläinen, Ristaniemi, Imran, Hämäläinen, "Cell Degradation Detection based on an Inter-Cell Approach," *Int. J. Digital Content Technology and its Applications* 11(1):25–33, 2017（書目頁）；同組另有 Chernov, Cochez, Ristaniemi, VTC-Spring 2015, doi:10.1109/VTCSpring.2015.7145707（全文首頁已讀；以 UE 事件序列偵測 RACH 故障，非 inter-cell） | 「跨 cell 參照優於自我歷史參照」——**與本研究 4.7.4 之主結論（空間 vs 時間參照）同方向** | 其為良性故障、無對手；本研究之貢獻在於對抗設定下量化此差異（漂移 0.65–0.91 vs 0.03–0.04）與串謀界線（m*）。正文應引為先例，並把 4.7.4 之主張限縮為「在對抗、界內偽造下之量化」 |
+| **H_i 成員轉移（瞬移、消失）** | **VANET 位置驗證之合理性檢查**：最大速度、突然出現（sudden appearance）、移動距離等 | Leinmüller, Schoch, Kargl, "Position verification approaches for vehicular ad hoc networks," *IEEE Wireless Communications* 13(5), 2006（頁碼未核）；van der Heijden, Lukaseder, Kargl, "VeReMi," SecureComm 2018, arXiv:1804.06701（摘要頁） | 以物理移動之可能性檢驗回報（D2 瞬移 ≈ 最大速度／突然出現檢查） | 對象為 UE 在 cell 間之成員轉移、由 RIC 以多節點報告交叉檢查，非車輛自報位置；**另 KTH 之車隊研究指出合理性檢查擋不住「範圍內緩慢變化」**——與本研究 D1 之限制同類，可一併引 |
+| 已登記 ID 檢查（未來工作） | **Murat**：檢查 UE 回報之鄰 PCI／RAT 是否為該區域已設定者，以偵測偽基地台 | arXiv:2102.08780（搜尋摘錄，未讀） | 以營運者已知之名冊檢驗回報 | 對象為偽基地台；與本研究「以已登記 UE ID 補 k 換 k 盲點」之未來工作同類，寫未來工作時可引 |
+
+**Paper A 新穎性之可辯護說法（建議）**：
+1. 不宣稱「守恆檢查」「鄰居共識」「移動合理性」任一項為新——三者皆有 1998–2018 之先例。
+2. 可宣稱：(a) 首見於 O-RAN E2 KPM 之**界內偽造**；(b) 三類證據以**攻擊者單點無法控制**為共同設計原則，並以 NPN 之已知母體使守恆可用；(c) 階層式融合為四種信任狀態並接**准入政策與可用資源代價**（RQ3），此為上述先例皆無者；(d) 誠實量化各自之盲點（k 換 k、串謀 m*、D1 規模效應、Q4）。「首見」僅限搜尋範圍內，正文用「據我們所知」。
+3. 4.7.4「空間參照勝過時間參照」須改寫為：此方向已見於良性故障偵測（inter-cell sleeping cell），本研究之貢獻是在對抗設定下之量化與其界線。
+
+**仍未查證／待讀全文**：Liu et al. INFOCOM 2007 全文（憑證問題，需使用者下載）；Leinmüller 2006 頁碼；Tanachaiwiwat & Helmy（中位數不足以抵擋大量資料插入攻擊，與串謀分析相關，書目未核）。
