@@ -111,6 +111,7 @@ class Episode:
         self.hist = collections.defaultdict(dict)        # node → {k: feature tuple}
         self.final = {}                                   # (k, node) → (decision, rule_id, source)
         self.atk_log = []                                 # 攻擊者觀測所需之逐窗紀錄
+        self.stats = collections.Counter()                # 評估用之累計（end() 更新；見 STATS_DOC）
 
     # ---- 一窗之開始：套用竄改、求每個節點之規則下限 ----
     def begin(self, multiplier=None, modifier=None):
@@ -199,7 +200,25 @@ class Episode:
                                {"weak": 0.5, "strong": 1.0}.get(inf["d1"], 0.0), float(inf["ci_pending"]), DI[dec])
         ch, opt, reg, ncand = self.steer(decs)
         self.last_steer = (ch, opt, reg, ncand, decs)
+        # ---- 評估累計 ----
+        s = self.stats
+        for j in self.sd.nodes[k]:
+            dec = decs[j]
+            if j in self.pending:                         # 偵測端之一步（下限為 trusted／low-trust）
+                s["det_R"] += self.det_reward(j, dec); s["det_n"] += 1
+            if self.is_tampered(j):
+                s["tam_n"] += 1; s["tam_rej"] += dec == "rejected"; s["tam_nontrust"] += dec != "trusted"
+            else:
+                s["clean_n"] += 1; s["clean_rej"] += dec == "rejected"
         a = self.atk
+        if a is not None and k >= self.sd.t0 and a in self.reported:   # 攻擊者之一步
+            truth = self.sd.truth[k]
+            lured = ch is not None and ch == a and ch != opt
+            s["atk_R"] += (1.0 if lured else 0.0) - {"low-trust": C_L, "rejected": C_R}.get(decs.get(a), 0.0)
+            s["atk_n"] += 1
+            # RQ3 口徑之誘導率（C_strict；真值候選 ≥ 2、可作決策、攻擊者 cell 非真值最佳）
+            if ncand >= 2 and ch is not None and a in truth and a != opt:
+                s["lure_opp"] += 1; s["lure"] += ch == a
         peers = [v for c, v in self.reported.items() if c != a]
         self.atk_log.append({"k": k, "present": a in self.reported, "reported": self.reported.get(a),
                              "true": self.sd.truth[k].get(a), "decision": decs.get(a),
@@ -234,9 +253,31 @@ def det_floor_policy(ep, j):
     return 0 if ep.floor[j][0] == "trusted" else 1
 
 
+def decide_pending(ep, det_policy):
+    """決定當窗全部待決節點。偵測端若提供 batch(obs, masks)，同窗節點以一次前向推論決定
+    （同窗各節點之觀測只依過去窗與本窗證據，不依同窗其他節點之判定，故與逐一決定等價；
+    此等價由 check_speedup.py 逐位驗證）。"""
+    pend = list(ep.pending)
+    if not pend:
+        return
+    if hasattr(det_policy, "batch"):
+        acts = det_policy.batch(np.stack([ep.det_obs(j) for j in pend]), np.stack([ep.mask(j) for j in pend]))
+        for j, a in zip(pend, acts):
+            ep.decide_node(j, int(a))
+    else:
+        for j in pend:
+            ep.decide_node(j, det_policy(ep, j))
+
+
+def step_window(ep, det_policy, multiplier=None):
+    ep.begin(multiplier=multiplier)
+    decide_pending(ep, det_policy)
+    ep.end()
+
+
 def run_episode(ep, det_policy, attacker=None):
     """以給定之偵測端策略與攻擊者跑完整個 episode。
-    det_policy(ep, j) → action；attacker：具 .multiplier(ep) 或 .modifier 之物件，或 None。"""
+    det_policy(ep, j) → action（可另有 batch）；attacker：具 .multiplier(ep) 或 .modifier 之物件，或 None。"""
     while ep.k < ep.sd.n:
         if attacker is None:
             ep.begin()
@@ -244,10 +285,31 @@ def run_episode(ep, det_policy, attacker=None):
             ep.begin(modifier=attacker.modifier if ep.k >= attacker.t0(ep) else None)
         else:
             ep.begin(multiplier=attacker.multiplier(ep))
-        for j in list(ep.pending):
-            ep.decide_node(j, det_policy(ep, j))
+        decide_pending(ep, det_policy)
         ep.end()
     return ep
+
+
+class T0Cache:
+    """注入起點前之窗與攻擊者無關：依 (seed 資料, 被攻陷 cell, 偵測端) 快取 k = t0 時之 episode 狀態。
+    取用時深複製（共用唯讀之 SeedData）。等價由 check_speedup.py 驗證。"""
+
+    def __init__(self, maxsize=4096):
+        self._c, self.maxsize = {}, maxsize
+
+    def get(self, sd, cell, det, make):
+        key = (id(sd), cell, det.name)
+        if key not in self._c:
+            ep = make(sd, cell)
+            while ep.k < sd.t0:
+                step_window(ep, det)
+            if len(self._c) < self.maxsize:
+                self._c[key] = ep
+            else:
+                return ep
+        import copy
+        src = self._c[key]
+        return copy.deepcopy(src, memo={id(sd): sd})
 
 
 # ----------------------------------------------------------------------------

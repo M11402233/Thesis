@@ -84,8 +84,11 @@ class LearnedDetector:
         self.model, self.name = model, name
 
     def __call__(self, ep, j):
-        act, _ = self.model.predict(ep.det_obs(j), action_masks=ep.mask(j), deterministic=True)
-        return int(act)
+        return int(self.batch(ep.det_obs(j)[None, :], ep.mask(j)[None, :])[0])
+
+    def batch(self, obs, masks):
+        act, _ = self.model.predict(obs, action_masks=masks, deterministic=True)
+        return np.asarray(act).reshape(-1)
 
 
 class FloorDetector:
@@ -171,12 +174,10 @@ class AttackerEnv(_Base):
         self.observation_space = spaces.Box(-10, 10, (attacker_obs_dim(level),), np.float32)
         self.action_space = spaces.Box(-1.0, 1.0, (1,), np.float32)
 
+    t0_cache = None                                       # 由外部指定 G.T0Cache() 以加速（等價已驗證）
+
     def _run_window(self, a):
-        ep = self.ep
-        ep.begin(multiplier=a)
-        for j in list(ep.pending):
-            ep.decide_node(j, self.det(ep, j))
-        ep.end()
+        G.step_window(self.ep, self.det, a)
 
     def _to_next_present(self):
         ep = self.ep
@@ -188,7 +189,8 @@ class AttackerEnv(_Base):
         super().reset(seed=seed)
         while True:
             sd, cell, self.det = self._pick()
-            self.ep = new_episode(sd, cell)
+            self.ep = (self.t0_cache.get(sd, cell, self.det, new_episode) if self.t0_cache is not None
+                       else new_episode(sd, cell))
             if self._to_next_present():
                 break
         return attacker_obs(self.ep, self.level), {"seed": sd.seed, "cell": cell, "detector": self.det.name}
