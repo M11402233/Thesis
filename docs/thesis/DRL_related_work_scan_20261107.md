@@ -211,3 +211,27 @@
 | 2603.21211（O-RAN 6G 安全綜述）、2610.38146（零信任 HRL 事件回應，企業網路）、2609.06855、2611.08658（ISAC 數位分身驗證） | 僅搜尋摘錄 | 相鄰領域，未讀全文；不據以宣稱 |
 
 **結論（不變，措辭收緊）**：至 2026-11-09 之搜尋範圍內，**未見**同時具備下列之研究：O-RAN E2 KPM 之界內偽造、攻擊者控制不到之場域參照（守恆、同窗跨節點、移動規則）、學習決策受規則下限約束並接准入政策（量測可用率代價）、學習型攻擊者下之評估。**已有**：攻防 RL／PSRO 求均衡（Eghtesad 2026，交通；Chen，電網）、含誤報成本之 RL 偵測（Eghtesad 2026）、O-RAN KPM 中毒之序列學習偵測（Alimohammadi）。搜尋非窮舉；投稿前須再掃一次。2509.03000 已讀全文（互補，見上表）。
+
+## N. 大範圍補掃 arXiv＋IEEE（2026-11-09 晚；WebSearch extended × 14、WebFetch 摘要 × 6、USENIX PDF 全文 × 1）
+
+查詢主題：KPM 偽造與被攻陷 E2 節點（含 IEEE Xplore 限定）；近即時 RIC 遙測完整性；零信任信任分數；跨 cell 一致性驗證；shield／規則下限＋攻擊者賽局；O-RAN 對抗式攻擊與賽局防禦；PSRO＋FDI；數位分身交叉驗證；NPN 中被攻陷 gNB；學習型規避攻擊；OAuth 與 E2；Byzantine 聚合；ICC／GLOBECOM。**IEEE Xplore 本身無法直接檢索**（搜尋引擎幾乎只回 arXiv／作者 PDF），IEEE 期刊論文僅能經作者版或 doi 間接確認。
+
+| 文獻 | 讀取深度 | 與本研究之關係 |
+|---|---|---|
+| **Yang, Ranjbar, Tan, Hussain (Penn State), "Invariant-Guided Logical Testing of Open RAN Controllers"（INVARAN），USENIX Security 2026**（prepub PDF） | **全文（PDF 文字）** | 威脅模型含「misbehaving RAN nodes」，並引 xApp-TR 原意：Near-RT RIC 不得假設 RAN 送來之資料有效。舉例：惡意 RAN 對其不控制之 cell 捏造量測（RSRP 排序），xApp 因缺 **cell 歸屬驗證** 而接受。但 INVARAN 是**離線測試框架**（自執行軌跡推論程式不變量以找 xApp／平台之邏輯漏洞），**不是**執行期之 KPM 數值驗證；其建議之緩解（驗 cell 歸屬）為結構性檢查，對「自己 cell 之界內偽造」無效。→ **互補、可引為威脅實例**；其「不變量」為程式不變量，與本研究之場域不變量（守恆、跨節點、移動）不同，正文用詞須區分 |
+| Janzen, Becker, Wiesenäcker, Hollick (TU Darmstadt), "Oh No, My RAN! Breaking Into an O-RAN 5G Indoor Base Station," USENIX WOOT 2024, pp. 101–115 | 官方頁與搜尋摘錄 | 商用 O-RAN RU 之 4 個新漏洞、可遠端執行程式碼。→ **「身分合法之節點被攻陷」為實測可行之威脅**，可補強第一章威脅模型（目前正文未引）。引用前須讀 PDF 確認是 RU（非 DU） |
+| Yang, Rashid, Ranjbar, Tan, Hussain, "ORANalyst," USENIX Security 2024 | INVARAN 之引文 | 以 misbehaving RAN node 為威脅之 O-RAN 測試框架（主要找記憶體錯誤）。未讀 |
+| Alimohammadi, Şahin, Akman, Foh, Chatzimisios, Shojafar, "rApp/xApp Attestation: A New Security Use Case for O-RAN," arXiv:2609.24296（2026-09，投 IEEE） | 摘要頁 | 同一作者群（KPI Poisoning／多層框架）之續作：xApp／rApp 執行期軟體證明（雜湊式，< 40 ms）。**不涉 E2 節點或 KPM 數值** → 與 Yu 2025 同屬「證明軟體／組態未被改」，不證數值為真 |
+| Gajjar, Khoja et al., "Black-Box Evasion Attacks on Data-Driven Open RAN Apps," Proc. ACM Netw. 3(CoNEXT4), Art. 53, 2025, doi:10.1145/3769000（arXiv:2510.18160） | 搜尋摘錄 | 惡意 xApp 經 SDL 截取／擾動 KPI 規避 ML xApp；作者列 SDL 執行期資料完整性監測為未來工作。威脅來源為 xApp，非 E2 節點 |
+| Khowaja et al., "CLIC," arXiv:2610.40744（2026-10） | 摘要頁 | LLM 控制之 intent→E2 動作一致性檢查；**不涉遙測偽造** |
+| Abou Hasna, Chendeb, El Falou, "From Spoofing to Trust: Emergency Alerts Spoofing Testbed and Cross-Cell Verification," arXiv:2604.24404，IEEE VTC-Spring 2026（已接受） | 摘要頁 | **跨 cell 交叉驗證**（UE 端比對鄰 cell 是否廣播同一警報；單一來源即標未驗證）。概念上與 S_i 同類（同時段多來源一致），但對象為廣播警報、驗證端在 UE、無數值偽造。→ 可作「跨來源一致性」之他領域先例；其假設「攻擊者無法同時偽造多個 cell」與本研究 MIN_PEER／串謀分析相對應 |
+| Domico, Noirot Ferrand, McDaniel, "The Role of Learning in Attacking ML-based NIDS," arXiv:2602.10299（v3 2026-09） | 摘要頁 | 學習型攻擊者之價值在規模（攤提查詢成本），非單次效果。→ 可支持「學習型攻擊者值得評估」之動機 |
+| Barker et al., "AI-Native Open RAN: A Roadmap…," arXiv:2609.15704 | 摘要頁 | 搜尋摘錄稱其主張「以可獨立觀測之證據評估回報狀態、證據不一致時限縮政策權限」，**但摘要頁未見此句**；未讀全文，**不得引用該句**，待讀全文核對 |
+| OpenTwin arXiv:2605.24662 | 搜尋摘錄 | 數位分身驗證 xApp 政策；實例：E2 控制回報成功但基地台未套用。屬控制狀態不一致，非 KPM 偽造 |
+| Eghtesad 博士論文（Penn State，2026-02，搜尋摘錄稱含 PSRO 偵測隱匿 FDI） | 未找到原文 | 與 arXiv:2603.11433 同一工作；不另引 |
+| Atalay et al., XRF（arXiv:2212.11465，xApp 之 OAuth 2.0 授權，摘錄稱 INFOCOM 2023 但 arXiv 頁未列 venue）；Q-RAN arXiv:2510.19968（PQ-OAuth） | 摘要頁／摘錄 | **OAuth 用於 xApp 已有先例**；E2 節點之 OAuth 授權仍未見 → 正文 R1_AUTHZ 不得宣稱「首次將 OAuth 引入 O-RAN」，只能說用於 DU 向 CU／RIC 之請求範圍 |
+
+**對定位之影響**：
+1. 結論不變：未見同時具備「E2 KPM 界內偽造＋攻擊者控制不到之場域參照＋規則下限之學習決策＋准入代價＋學習型攻擊者」者。
+2. 新增可強化之點：威脅之實在性（WOOT 2024 攻破 O-RAN RU；USENIX Sec 2026 之捏造量測實例）；「證明軟體／組態」與「驗證數值」之區分現有兩篇佐證（Yu 2025、Alimohammadi 2026 attestation）。
+3. 新增須避免之說法：「首次以 OAuth 保護 O-RAN」（XRF 已有）；「首次跨來源一致性驗證」（他領域已有，如 VTC 2026 跨 cell 警報驗證）——本研究之新意限於 E2 KPM 數值與場域參照。
