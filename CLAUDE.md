@@ -102,6 +102,7 @@
 - 規則版以 git tag `rulebased-v1` 凍結，作為 DRL 版的基準線。
 - P1–P11 已於 2026-11-07 決定（見該檔 1.2a）：凍結＋線上都做；RIC xApp；DRL 攻擊者；**合併一篇、投 IEEE OJCOMS、DRL 為主體**；**重跑 ns-O-RAN 收 Stage 3 新資料**；7 gNB 主；O-full＋O-outcome；**token 與信任連動（P10=B，須量測洩漏）**；V-escalate 主。**碩士論文包含 DRL 賽局**（11-07）；投稿日期待使用者與老師確認。
 - 簡報主版：`~/Downloads/Cindy_Thesis_v1.7.pptx`（2026-11-08；由使用者之 v1.5_draft 改：4 RQ、C1–C4、PSRO、嚴重度序定案、E19 v2 確認）。正文 v9：`docs/thesis/thesis_v9.md`（4 RQ，RQ4 = 4a／4b／4c；C1–C4）。E19 v2（PSRO）已定案（2026-11-08，R-a～R-f 依建議值確認）。
+- **DRL 賽局狀態（2026-11-09）：環境與 G1–G4 已完成；正式 PSRO 移至新機器（i7-14700）執行。新工作階段先讀 `docs/thesis/HANDOFF_DRL_20261109.md`。** R-d 改為相對門檻（NashConv ≤ 5 % × 第 1 輪）；R-f 事後修正為「至多 300k 步、每 50k 步以訓練 seed 驗證保留最佳」。
 
 ## 目前狀態與待辦
 
