@@ -16,7 +16,7 @@
 
 Near-RT RIC 透過 E2SM-KPM 收集 E2 節點（O-DU）的量測資料，並以此驅動排程、負載平衡、流量導向。整個閉迴路有一個從未被挑戰的前提：經 IKEv2／IPsec 認證並完成 E2 Setup 的節點，它上報的 KPM 數值是可信的。（節點之身分認證由 IKEv2 憑證與 IPsec 提供；E2 Setup 僅宣告該節點支援之 RAN function，本身不是身分認證。）
 
-在 NPN 場域（工廠、醫院、校園），這個前提不成立。邊緣節點實體可達、缺乏機房級保護，易遭物理入侵或供應鏈底層竄改。被滲透的節點可在不破壞 IPsec 保護、完全符合 E2AP 格式下，持續上報微幅偏移的假 KPM——虛報低負載吸引流量造成壅塞，或虛報高負載驅離流量。RIC 照單全收，因為它信任所有通過認證的 E2 連線。本研究驗證的是 **E2 量測資料的可信度**（KPM 數值是否與物理世界相容），而非 RU 的真實無線數據——後者超出一般模擬與設備能處理的範圍。
+在 NPN 場域（工廠、醫院、校園），這個前提不成立。邊緣節點實體可達、缺乏機房級保護，易遭物理入侵或供應鏈底層竄改（商用 O-RAN 室內基地台之 RU 已被實證可遠端執行程式碼，Janzen et al., 2024；見第二章）。被滲透的節點可在不破壞 IPsec 保護、完全符合 E2AP 格式下，持續上報微幅偏移的假 KPM——虛報低負載吸引流量造成壅塞，或虛報高負載驅離流量。RIC 照單全收，因為它信任所有通過認證的 E2 連線。本研究驗證的是 **E2 量測資料的可信度**（KPM 數值是否與物理世界相容），而非 RU 的真實無線數據——後者超出一般模擬與設備能處理的範圍。
 
 ### 1.2 為什麼現有 ZTA 與既有偵測機制擋不住
 
@@ -139,6 +139,7 @@ Near-RT RIC 透過 E2SM-KPM 收集 E2 節點（O-DU）的量測資料，並以�
 | Work | 驗證對象 | 方法 | 與本研究缺口 |
 |---|---|---|---|
 | Hung et al. (2024; 2025) | E2 介面訊令與 xApp 存取控制 | 2024：於 OSC H-Release 揭露 xApp 存取控制缺失並設計三種攻擊；2025：以狀態機分析驗證訊令合法性、以符合性檢查驗證封包欄位，並監測流量以偵測 DoS（另以 fuzzer 測試） | 驗證協定／訊令之合法性與存取控制，不驗 KPM 數值是否與場域之獨立觀測一致 |
+| Yang et al.「INVARAN」(USENIX Security 2026) | O-RAN 控制器（平台元件與 xApp）之程式邏輯 | 自執行軌跡推論程式不變量，以違反不變量找出邏輯漏洞（開發階段之離線測試）；發現 xApp 未驗證 cell 歸屬，惡意 RAN 節點可替不屬於自己之 cell 捏造量測 | 為測試工具而非執行期驗證；其建議之 cell 歸屬檢查為結構性檢查，擋不住節點對自身 cell 之界內偽造；其「不變量」為程式不變量，與本研究之場域不變量（守恆、跨節點一致、移動規則）不同 |
 | Alimohammadi et al. (FNWF 2024; IEEE OJCOMS 2026) | per-UE KPM 時序 | 監督式時序分類（LSTM） | 需帶標籤訓練資料；評估僅涵蓋放大型注入（×1.2–1.5）；無跨節點參照與守恆驗證；偵測後之處置不在其範圍 |
 | Aizikovich et al.「Rogue Cell」(2025) | 多業者 O-RAN 中惡意 cell 業者上報之 KPI（含吞吐量、PRB、服務 UE 數、新進／離開 UE 數） | 攻擊（APATE）：對流量導向 xApp 之 QoE 預測模型做查詢式規避攻擊。防禦（MARRS）：逐 cell 訓練 LSTM 自編碼器，將其潛在表示與其他 cell 之平均嵌入串接後重建，重建誤差超過門檻即標為 untrusted；僅以良性資料訓練（非監督式），另有以多窗投票之序列版本（S-MARRS） | 其他 cell 以學習所得之平均嵌入進入模型，而非明確約束，硬違反可能被分數吸收；UE 數與新進／離開 UE 數僅作為模型輸入特徵，未與已知母體或轉移規則比對；僅 trusted／untrusted 兩種標籤，無證據不足時之 abstain |
 | Yu et al.「Closing Visibility Gap」(2025) | O-RU 之組態與執行期設定（含 o-ran-kpm 之量測物件與報表週期） | O-RU 控制器內之報告者以 TPM 簽章、Merkle 樹回報組態雜湊，由 SMO 之 rApp 保存供租戶比對基準 | 證明組態未被竄改，不驗 KPM 數值（僅雜湊 KPM 之設定與訂閱）；E2 不在其威脅模型；作者自述執行期偏離須以異常偵測補足——與本研究互補 |
@@ -166,6 +167,8 @@ Near-RT RIC 透過 E2SM-KPM 收集 E2 節點（O-DU）的量測資料，並以�
 | LTE 錨點作為信任根 | 存在一個涵蓋全場域、攻擊者無法控制之節點 | 單一營運者管理全場域，可將錨點置於受保護之位置 | 多營運者、多廠商共用時，難以保證特定節點可信 |
 
 威脅本身亦與 NPN 之部署特性相關：3GPP TS 33.501 V20.2.0 要求 gNB 處理明文金鑰、使用者面與控制面資料之部分須受實體保護，或置於實體安全之環境（§§5.3.5–5.3.8），並於節點位於實體安全環境時，將 F1／E1 之加密保護交由營運者決定（§9.8.2、§9.8.3 NOTE 2）。NPN 之邊緣節點常裝設於廠區、病房或走廊等可實體接觸之位置，實體保護較機房為弱；「身分合法但已被入侵之節點」於此類部署中最為現實。SNPN 之定義見 3GPP TS 23.501 V20.2.0 §3.1。
+
+**威脅之實證依據與其界線**：Janzen 等人（2024）以實體可接觸為前提分析一款商用 O-RAN 室內基地台之 RU，發現四項漏洞，皆可導致於 RU 上遠端執行程式碼，並指出室內基地台難以實體保護、且與 RAN 其他元件高度互連。該研究攻破者為 **RU**；自 RU 橫向移動至 DU 或 SMO 僅列為攻擊者可能之後續步驟，**不在其範圍、亦未實證**。故本研究僅以之佐證「NPN 邊緣之 O-RAN 元件可被攻陷」為現實威脅，**不據以宣稱 O-DU 已被實證攻陷**。另，Yang 等人（2026）之 O-RAN 控制器測試研究亦將行為異常之 RAN 節點納入威脅模型，並發現受測 xApp 未驗證回報之 cell 是否屬於該節點，使惡意 RAN 節點可替其不控制之 cell 捏造量測；該文並轉述 O-RAN 之 xApp 安全研究報告之要求：Near-RT RIC 不得假設 RAN 送來之資料有效（此為轉引，本研究未自該報告核對條號）。本研究處理的是此類結構檢查之後仍留下之情形：節點對**自己** cell 之界內偽造。
 
 **此限定之兩項界定**：
 
@@ -2457,6 +2460,8 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 - Yu, H., Al Barat, M. M., Xiao, Y., Hou, Y. T., Lou, W. (2025). "Closing the Visibility Gap: A Monitoring Framework for Verifiable Open RAN Operations." arXiv:2509.03000.
 - Hung, C.-F., Chen, Y.-R., Tseng, C.-H., Cheng, S.-M. (2024). "Security Threats to xApps Access Control and E2 Interface in O-RAN." *IEEE Open Journal of the Communications Society.* doi:10.1109/OJCOMS.2024.3364840.（卷期頁碼待補：已取得之檔案為接受版）
 - Hung, C.-F., Tseng, C.-H., Cheng, S.-M. (2025). "Anomaly Detection for Mitigating xApp and E2 Interface Threats in O-RAN Near-RT RIC." *IEEE Open Journal of the Communications Society*, vol. 6. doi:10.1109/OJCOMS.2025.3546760.
+- Janzen, L., Becker, L., Wiesenäcker, C., Hollick, M. (2024). "Oh No, My RAN! Breaking Into an O-RAN 5G Indoor Base Station." *Proc. 18th USENIX WOOT Conference on Offensive Technologies*, pp. 101–115.
+- Yang, T., Ranjbar, A., Tan, G., Hussain, S. R. (2026). "Invariant-Guided Logical Testing of Open RAN Controllers." *Proc. 35th USENIX Security Symposium*（prepublication 版）.
 - Hashem Eiza, M., Akwirry, B., Raschella, A., Mackay, M., Maheshwari, M. K. (2025). "A Hybrid Zero Trust Deployment Model for Securing O-RAN Architecture in 6G Networks." *Future Internet* 17(8), 372. doi:10.3390/fi17080372.
 - Aizikovich, E., Mimran, D., Grolman, E., Elovici, Y., Shabtai, A. (2025). "Rogue Cell: Adversarial Attack and Defense in Untrusted O-RAN Setup Exploiting the Traffic Steering xApp." arXiv:2505.01816v1.
 - Ramezanpour, K., Jagannath, J. (2022). "Intelligent Zero Trust Architecture for 5G/6G Networks: Principles, Challenges, and the Role of Machine Learning in the context of O-RAN." *Computer Networks*（卷期頁碼【待核對】）. arXiv:2105.01478.
