@@ -110,7 +110,7 @@ def _train_job(args):
 def summarize(tot):
     g = lambda a, b: (tot.get(a, 0) / tot[b]) if tot.get(b) else None
     return {"u_det": g("det_R", "det_n"), "u_atk": g("atk_R", "atk_n"), "TPR_rejected": g("tam_rej", "tam_n"),
-            "TPR_nontrusted": g("tam_nontrust", "tam_n"), "clean_false_reject": g("clean_rej", "clean_n"),
+            "TPR_nontrusted": g("tam_nontrust", "tam_n"), "clean_false_reject": g("clean_rej", "clean_n"), "clean_nontrusted": g("clean_nontrust", "clean_n"),
             "lure_rate_C_strict": g("lure", "lure_opp"), "counts": tot}
 
 

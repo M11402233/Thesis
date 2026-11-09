@@ -209,7 +209,7 @@ class Episode:
             if self.is_tampered(j):
                 s["tam_n"] += 1; s["tam_rej"] += dec == "rejected"; s["tam_nontrust"] += dec != "trusted"
             else:
-                s["clean_n"] += 1; s["clean_rej"] += dec == "rejected"
+                s["clean_n"] += 1; s["clean_rej"] += dec == "rejected"; s["clean_nontrust"] += dec != "trusted"
         a = self.atk
         if a is not None and k >= self.sd.t0 and a in self.reported:   # 攻擊者之一步
             truth = self.sd.truth[k]
