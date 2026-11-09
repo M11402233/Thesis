@@ -13,20 +13,68 @@
 | 舊機器上之 O-full t0 PSRO | 2026-11-09 起以 1 核心試跑；**移機後視為試跑，不引用**（兩機 CPU 指令集不同，結果不會逐位相同） |
 | 簡報 | v1.7 第 42 頁仍寫 ε = 0.01（待使用者決定是否出 v1.8） |
 
-## 2. 新機器之安裝與檢查（全部通過才可訓練）
+## 2. 新機器之安裝與檢查（裸機；全部通過才可訓練）
 
-1. 取得 repo（`git clone` 或 scp），路徑 `~/oran-zt-kpm-verification`（程式以 `~` 解析，不需改路徑）。
-2. 自舊機器複製（唯讀資料，路徑相同）：
-   - `data/ues30_seeds/analysis/`（D-30 分析檔，7.4 MB）
-   - `data/results/d30_fusion_order/severity/`（G1、G2、G4 之比對基準，25 MB）
-   - 選擇性：`data/results/d30/drl/lcurve/`（R-f 紀錄）
-3. venv `~/venvs/drl`，版本須與舊機器相同：torch 2.5.1+cpu、gymnasium 1.1.1、stable-baselines3 2.6.0、sb3-contrib 2.6.0、numpy 2.2.6、scipy 1.15.3、nashpy 0.0.43。
-4. 依序執行（`export ZT_DATASET=d30 ZT_FUSION_ORDER=severity`；於 `xapps/verification/adversarial/`）：
-   - `python check_env.py`（G1–G3，約 10 分鐘）
-   - `python check_speedup.py`（S1–S2）
-   - `python psro.py --level O-full --train-seed 0 --workers 1 --g4-only`（G4；完成後將該目錄改名保存，正式執行重新開始）
-   - 任一失敗即停，回報使用者，**不調參數**。
-5. 記錄新機器之 CPU、核心數與 `pip freeze` 於 `data/results/d30/drl/machine.txt`。
+以下在**新機器**執行（舊機器 `cindy1@10.10.10.136`；新機器假設為 Ubuntu 22.04、Python 3.10.12，與舊機器相同）。
+
+### 2.1 系統套件
+```bash
+sudo apt update
+sudo apt install -y python3-venv python3-pip git curl tar openssh-client
+python3 --version          # 須為 3.10.x（舊機器 3.10.12）
+```
+
+### 2.2 程式（含 git 歷史，不含 data；約 12 MB，不需先 push）
+```bash
+ssh cindy1@10.10.10.136 "cd ~ && tar czf - --exclude=oran-zt-kpm-verification/data oran-zt-kpm-verification" | tar xzf - -C ~
+cd ~/oran-zt-kpm-verification && git log --oneline -3      # 確認與舊機器最新 commit 相同
+git config --global user.name "M11402233"
+git config --global user.email "M11402233@mail.ntust.edu.tw"
+```
+
+### 2.3 唯讀資料（約 35 MB）
+```bash
+R=cindy1@10.10.10.136:/home/cindy1/oran-zt-kpm-verification/data
+D=~/oran-zt-kpm-verification/data
+mkdir -p $D/ues30_seeds $D/results/d30_fusion_order $D/results/d30/drl
+scp -r $R/ues30_seeds/analysis $D/ues30_seeds/
+scp -r $R/results/d30_fusion_order/severity $D/results/d30_fusion_order/
+scp -r $R/results/d30/drl/lcurve $D/results/d30/drl/          # R-f 紀錄（選擇性）
+ls $D/ues30_seeds/analysis | wc -l                           # 應為 9（8 個 seed 檔 + manifest.json）
+```
+
+### 2.4 Python 環境（版本須與舊機器相同）
+```bash
+python3 -m venv ~/venvs/drl
+~/venvs/drl/bin/python -m pip install --upgrade pip
+~/venvs/drl/bin/pip install torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+~/venvs/drl/bin/pip install -r ~/oran-zt-kpm-verification/xapps/verification/adversarial/requirements_drl.txt
+~/venvs/drl/bin/python ~/oran-zt-kpm-verification/xapps/verification/adversarial/check_versions.py   # 須顯示 ✓
+```
+
+### 2.5 Claude Code 與記憶檔
+```bash
+curl -fsSL https://claude.ai/install.sh | bash               # 安裝 Claude Code（依畫面指示登入）
+# 記憶檔：資料夾名稱 = repo 絕對路徑之 / 換成 -（新機器 /home/cindy/oran-zt-kpm-verification）
+mkdir -p ~/.claude/projects/-home-cindy-oran-zt-kpm-verification
+scp -r cindy1@10.10.10.136:/home/cindy1/.claude/projects/-home-cindy1-oran-zt-kpm-verification/memory \
+       ~/.claude/projects/-home-cindy-oran-zt-kpm-verification/
+cd ~/oran-zt-kpm-verification && claude
+```
+開啟後第一句：「讀 `docs/thesis/HANDOFF_DRL_20261109.md`，從 2.6 開始做。」
+
+### 2.6 記錄機器與一致性檢查（Claude 執行；任一失敗即停，回報使用者，**不調參數**）
+```bash
+cd ~/oran-zt-kpm-verification
+(date -u; lscpu; nproc; taskset -cp $$; free -g; ~/venvs/drl/bin/pip freeze) > data/results/d30/drl/machine.txt
+cd xapps/verification/adversarial
+export ZT_DATASET=d30 ZT_FUSION_ORDER=severity PYTHONWARNINGS=ignore
+~/venvs/drl/bin/python check_env.py        # G1–G3（舊機器約 10 分鐘）
+~/venvs/drl/bin/python check_speedup.py    # S1–S2
+~/venvs/drl/bin/python psro.py --level O-full --train-seed 0 --workers 1 --g4-only   # G4
+mv ../../../data/results/d30/drl/psro/O-full/t0 ../../../data/results/d30/drl/psro/O-full/t0_g4only_newmachine
+```
+注意：`nproc` 於新機器曾回報 14（28 執行緒中可用 14），正式執行之 worker 總數以 `nproc` 與當時另一組實驗之負載為準。
 
 ## 3. 正式執行（6 組 PSRO）
 

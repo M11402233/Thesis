@@ -1,0 +1,16 @@
+# E19 DRL 環境之套件版本（與舊機器 ~/venvs/drl 相同；2026-11-09）
+# torch 須另以 CPU 版索引安裝：pip install torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+numpy==2.2.6
+scipy==1.15.3
+gymnasium==1.1.1
+stable-baselines3==2.6.0
+sb3-contrib==2.6.0
+nashpy==0.0.43
+cloudpickle==3.1.2
+pandas==2.3.3
+matplotlib==3.10.9
+Farama-Notifications==0.0.6
+sympy==1.13.1
+networkx==3.4.2
+filelock==3.29.7
+typing_extensions==4.16.0
