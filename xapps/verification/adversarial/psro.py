@@ -33,6 +33,7 @@ A0_SPEC = [("step", 0.60), ("step", 0.80), ("drift", 0.01)]
 RQ3_NAME = {("step", 0.60): "step_x0.6", ("step", 0.80): "step_x0.8", ("drift", 0.01): "drift_1pct"}
 
 _W = {}                                                      # 每個工作行程之快取
+FOLDS = list(range(8))
 
 
 def _init_worker():
@@ -77,9 +78,32 @@ def _eval_job(args):
     return tot
 
 
+BR_MAX, BR_EVERY = 300_000, 50_000                          # R-f 事後修正（2026-11-09，E19 §2b）
+
+
+def _val_score(role, model, train, test, opps, probs):
+    """決定性策略於該 fold 之訓練 seed（全部 cell）對對手混合之期望每步 reward（依機率加權，不抽樣）"""
+    G, E, ds = _W["G"], _W["E"], _W["ds"]
+    total = 0.0
+    for opp, p in zip(opps, probs):
+        R = n = 0.0
+        for f in train:
+            sd = ds.get(f, test)
+            for cell in sd.cells_all:
+                if role == "det":
+                    ep = G.run_episode(E.new_episode(sd, cell), E.LearnedDetector(model, "val"), opp)
+                    R += ep.stats["det_R"]; n += ep.stats["det_n"]
+                else:
+                    ep = _W["cache"].get(sd, cell, opp, E.new_episode)
+                    G.run_episode(ep, opp, E.LearnedAttacker(model, model._zt_level, "val"))
+                    R += ep.stats["atk_R"]; n += ep.stats["atk_n"]
+        total += p * (R / n if n else 0.0)
+    return total
+
+
 def _train_job(args):
-    """一個最佳回應之一個 fold：對另一方之混合訓練並存檔"""
-    role, fold, opp_pool, sigma, level, steps, seed, path = args
+    """一個最佳回應之一個 fold：對另一方之混合訓練至多 BR_MAX 步，每 BR_EVERY 步以訓練 seed 驗證，保留最佳存檔"""
+    role, fold, opp_pool, sigma, level, br_max, br_every, seed, path = args
     if os.path.exists(path + ".zip"):
         return path
     E, ds = _W["E"], _W["ds"]
@@ -100,9 +124,20 @@ def _train_job(args):
         algo = PPO
     hp = {k: v for k, v in HP.items() if k != "policy"}
     m = algo("MlpPolicy", env, seed=seed, verbose=0, device="cpu", **hp)
-    m.learn(steps)
+    m._zt_level = level
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    m.save(path)
+    curve, best = [], (-np.inf, None)
+    while m.num_timesteps < br_max:
+        m.learn(br_every, reset_num_timesteps=False)
+        sc = _val_score(role, m, train, test, opps, probs)
+        curve.append([int(m.num_timesteps), sc])
+        if sc > best[0]:                                     # 同分取較早者
+            best = (sc, int(m.num_timesteps))
+            m.save(path + "_best_tmp")
+    os.replace(path + "_best_tmp.zip", path + ".zip")
+    json.dump({"role": role, "fold": fold, "seed": seed, "curve": curve, "best_step": best[1], "best_score": best[0],
+               "opponents": [s["name"] for s in opp_pool], "sigma": sigma},
+              open(path + "_curve.json", "w"), indent=1)
     return path
 
 
@@ -159,12 +194,12 @@ class PSRO:
 
     def fill_payoff(self):
         todo = [(d, a) for d in self.st["D"] for a in self.st["A"] if f"{d['name']}|{a['name']}" not in self.st["payoff"]]
-        jobs = [(d, a, f) for d, a in todo for f in range(8)]
+        jobs = [(d, a, f) for d, a in todo for f in FOLDS]
         t = time.time()
         res = self.pool.map(_eval_job, jobs, chunksize=1)
         for i, (d, a) in enumerate(todo):
             tot = {}
-            for r in res[i * 8:(i + 1) * 8]:
+            for r in res[i * len(FOLDS):(i + 1) * len(FOLDS)]:
                 for k, v in r.items():
                     tot[k] = tot.get(k, 0) + v
             self.st["payoff"][f"{d['name']}|{a['name']}"] = summarize(tot)
@@ -178,6 +213,9 @@ class PSRO:
         return A, B
 
     def g4(self):
+        if self.a.smoke:
+            print("  （冒煙測試：只有 fold 0，G4 不適用，略過）")
+            return
         rq3 = json.load(open(os.path.join(SEV, "RQ3_decision_replay.json"), encoding="utf-8"))
         bad = []
         for a in self.st["A"][:3]:
@@ -214,23 +252,21 @@ class PSRO:
             print(f"Round 0：σ_D={np.round(s, 3).tolist()} σ_A={np.round(t, 3).tolist()}（{how}）")
         if a.g4_only:
             return
-        if not (a.det_steps and a.atk_steps):
-            raise SystemExit("需指定 --det-steps 與 --atk-steps（R-f 定案之值）")
         while st["round"] <= MAX_ROUNDS:
             r = st["round"]
             sig = st["sigma"]
             mdir = os.path.join(self.dir, "models", f"r{r}")
             dname, aname = f"D{r}", f"A{r}"
-            dpaths = {str(f): os.path.join(mdir, f"{dname}_f{f}") for f in range(8)}
-            apaths = {str(f): os.path.join(mdir, f"{aname}_f{f}") for f in range(8)}
+            dpaths = {str(f): os.path.join(mdir, f"{dname}_f{f}") for f in FOLDS}
+            apaths = {str(f): os.path.join(mdir, f"{aname}_f{f}") for f in FOLDS}
             seed_of = lambda role, f: 100000 * a.train_seed + 1000 * r + 10 * f + (0 if role == "det" else 1)
-            jobs = ([("det", f, st["A"], sig["A"], a.level, a.det_steps, seed_of("det", f), dpaths[str(f)]) for f in range(8)]
-                    + [("atk", f, st["D"], sig["D"], a.level, a.atk_steps, seed_of("atk", f), apaths[str(f)]) for f in range(8)])
+            jobs = ([("det", f, st["A"], sig["A"], a.level, a.br_max, a.br_every, seed_of("det", f), dpaths[str(f)]) for f in FOLDS]
+                    + [("atk", f, st["D"], sig["D"], a.level, a.br_max, a.br_every, seed_of("atk", f), apaths[str(f)]) for f in FOLDS])
             t = time.time()
             self.pool.map(_train_job, jobs, chunksize=1)
             print(f"Round {r}：最佳回應訓練完成（{time.time() - t:.0f} s）")
-            newD = {"name": dname, "kind": "maskppo", "paths": dpaths, "steps": a.det_steps}
-            newA = {"name": aname, "kind": "ppo", "level": a.level, "paths": apaths, "steps": a.atk_steps}
+            newD = {"name": dname, "kind": "maskppo", "paths": dpaths, "br_max": a.br_max, "br_every": a.br_every}
+            newA = {"name": aname, "kind": "ppo", "level": a.level, "paths": apaths, "br_max": a.br_max, "br_every": a.br_every}
             if not any(d["name"] == dname for d in st["D"]):
                 st["D"].append(newD); st["A"].append(newA)
             self.save()
@@ -253,6 +289,10 @@ class PSRO:
                   f"新 σ_D={np.round(s, 3).tolist()} σ_A={np.round(t, 3).tolist()}")
             st.setdefault("nashconv_round1", nashconv)
             thr = REL_STOP * st["nashconv_round1"]
+            if self.a.smoke:                                 # 冒煙測試：固定跑 2 輪以測試學過之對手，不套停止規則
+                if r >= 2:
+                    st["stop"] = "smoke: 2 rounds"; self.save(); break
+                continue
             if st["nashconv_round1"] == 0 or (r > 1 and nashconv <= thr):
                 st["stop"] = f"NashConv {nashconv:.4f} ≤ {REL_STOP} × 第 1 輪 {st['nashconv_round1']:.4f}（round {r}）"
                 self.save()
@@ -275,8 +315,9 @@ def main():
     ap.add_argument("--level", choices=["O-full", "O-outcome"], required=True)
     ap.add_argument("--train-seed", type=int, choices=[0, 1, 2], required=True)
     ap.add_argument("--workers", type=int, default=1)
-    ap.add_argument("--det-steps", type=int)
-    ap.add_argument("--atk-steps", type=int)
+    ap.add_argument("--br-max", type=int, default=BR_MAX)
+    ap.add_argument("--br-every", type=int, default=BR_EVERY)
+    ap.add_argument("--smoke", action="store_true", help="冒煙測試：只用 fold 0、輸出至 psro_smoke/；結果不得引用")
     ap.add_argument("--g4-only", action="store_true")
     args = ap.parse_args()
     if os.environ.get("ZT_DATASET") != "d30" or os.environ.get("ZT_FUSION_ORDER") != "severity":
@@ -284,7 +325,12 @@ def main():
     import importlib.metadata as md
     meta = {"git_commit": subprocess.run(["git", "-C", ROOT, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip(),
             "packages": {p: md.version(p) for p in ("torch", "gymnasium", "stable-baselines3", "sb3-contrib", "numpy", "nashpy")},
-            "hyperparameters": HP, "stop_rule": f"NashConv <= {REL_STOP} x round-1 NashConv", "max_rounds": MAX_ROUNDS}
+            "hyperparameters": HP, "br_max": args.br_max, "br_every": args.br_every, "smoke": args.smoke, "stop_rule": f"NashConv <= {REL_STOP} x round-1 NashConv", "max_rounds": MAX_ROUNDS}
+    global FOLDS, OUT_BASE
+    if args.smoke:
+        FOLDS, OUT_BASE = [0], OUT_BASE + "_smoke"
+    else:
+        assert args.br_max == BR_MAX and args.br_every == BR_EVERY, "正式執行須用定案之 BR_MAX／BR_EVERY"
     p = PSRO(args)
     p.st.setdefault("meta_runs", []).append(dict(meta, argv=sys.argv[1:], started=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
     p.save()
