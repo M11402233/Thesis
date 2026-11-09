@@ -93,7 +93,7 @@ Near-RT RIC 透過 E2SM-KPM 收集 E2 節點（O-DU）的量測資料，並以�
 
 #### C1（對應 RQ1）：以場域為參照之違反檢查
 
-本研究以三類受測節點無法單方面設定之參照檢驗其上報：已登記之 UE 母體、同窗 peer 之共識，以及以錨點為中介之移動規則，並以具真值之攻擊注入評估之。
+本研究以三類受測節點無法單方面設定之參照檢驗其上報：已登記之 UE 母體、同窗 peer 之共識，以及以錨點為中介之移動規則，並以具真值之攻擊注入評估之。三類參照之概念各有他領域之先例（守恆、鄰居空間相關、移動合理性；3.3.0），本項之貢獻不在概念本身，而在其於 O-RAN E2 KPM 界內偽造之組合、以 NPN 已知母體使守恆可用，以及各自盲點之量化。
 
 - 基數守恆於 2,400 個乾淨窗（8 seed）中無反例；守恆式替換可繞過之，攻擊者之配平容錯空間為 0。
 - 同時態跨節點參照於 0.5–2 %/秒之漂移下偵測率為 0.65–0.91，時間自我參照為 0.03–0.04（受控消融，僅變動參照中心；實際秒、共同集合）。
@@ -140,6 +140,10 @@ Near-RT RIC 透過 E2SM-KPM 收集 E2 節點（O-DU）的量測資料，並以�
 |---|---|---|---|
 | Hung et al. (2024; 2025) | E2 介面訊令與 xApp 存取控制 | 2024：於 OSC H-Release 揭露 xApp 存取控制缺失並設計三種攻擊；2025：以狀態機分析驗證訊令合法性、以符合性檢查驗證封包欄位，並監測流量以偵測 DoS（另以 fuzzer 測試） | 驗證協定／訊令之合法性與存取控制，不驗 KPM 數值是否與場域之獨立觀測一致 |
 | Yang et al.「INVARAN」(USENIX Security 2026) | O-RAN 控制器（平台元件與 xApp）之程式邏輯 | 自執行軌跡推論程式不變量，以違反不變量找出邏輯漏洞（開發階段之離線測試）；發現 xApp 未驗證 cell 歸屬，惡意 RAN 節點可替不屬於自己之 cell 捏造量測 | 為測試工具而非執行期驗證；其建議之 cell 歸屬檢查為結構性檢查，擋不住節點對自身 cell 之界內偽造；其「不變量」為程式不變量，與本研究之場域不變量（守恆、跨節點一致、移動規則）不同 |
+| Bradley et al.「WATCHERS」(1998)；Hughes, Aura, Bishop (2000) | 路由器之封包轉送 | 以流量守恆（進入節點而非給它之流量須流出）偵測丟包／錯誤轉送之惡意路由器；Hughes 等人指出 WATCHERS 未充分驗證守恆之前提，可被攻擊者擊敗 | **守恆檢驗之先例**；本研究之守恆對象為已登記之 UE 母體。其「守恆可被繞過」與本研究守恆式替換之盲點（4.6.6）同一性質 |
+| Liu, Cheng, Chen (INFOCOM 2007) | 無線感測網路節點之行為與讀值 | 每個感測器監測鄰居之多項屬性，以穩健估計（OGK，以 median／MAD 為基礎）計算 Mahalanobis 距離判定離群，再經鄰居多數決；明言持合法金鑰之內部攻擊者可偽造事件報告 | **鄰居空間參照偵測內部攻擊者之先例**，威脅與 $S_i$ 相近。差異：其模擬之攻擊者偏離正常值約 20 個標準差、攻擊固定不調整，未評估界內或緩慢偽造；無守恆、移動證據與准入 |
+| Asghar et al. (2017) | LTE cell 之 KPI（良性故障） | sleeping cell 偵測之 inter-cell 法：與鄰 cell 之 KPI 比較，可抓到只看自身歷史抓不到之劣化 | 「跨 cell 參照優於自身歷史」之方向已見於良性故障；本研究於對抗、界內偽造下量化此差異（4.7.4） |
+| Leinmüller, Schoch, Kargl (2006)；van der Heijden et al.「VeReMi」(2018) | VANET 車輛自報之位置 | 合理性檢查：最大速度、突然出現、移動距離等 | **移動合理性之先例**，與 $H_i$-D2 同類；本研究之對象為 UE 於 cell 間之成員轉移，由 RIC 以多節點報告交叉檢查 |
 | Alimohammadi et al. (FNWF 2024; IEEE OJCOMS 2026) | per-UE KPM 時序 | 監督式時序分類（LSTM） | 需帶標籤訓練資料；評估僅涵蓋放大型注入（×1.2–1.5）；無跨節點參照與守恆驗證；偵測後之處置不在其範圍 |
 | Aizikovich et al.「Rogue Cell」(2025) | 多業者 O-RAN 中惡意 cell 業者上報之 KPI（含吞吐量、PRB、服務 UE 數、新進／離開 UE 數） | 攻擊（APATE）：對流量導向 xApp 之 QoE 預測模型做查詢式規避攻擊。防禦（MARRS）：逐 cell 訓練 LSTM 自編碼器，將其潛在表示與其他 cell 之平均嵌入串接後重建，重建誤差超過門檻即標為 untrusted；僅以良性資料訓練（非監督式），另有以多窗投票之序列版本（S-MARRS） | 其他 cell 以學習所得之平均嵌入進入模型，而非明確約束，硬違反可能被分數吸收；UE 數與新進／離開 UE 數僅作為模型輸入特徵，未與已知母體或轉移規則比對；僅 trusted／untrusted 兩種標籤，無證據不足時之 abstain |
 | Yu et al.「Closing Visibility Gap」(2025) | O-RU 之組態與執行期設定（含 o-ran-kpm 之量測物件與報表週期） | O-RU 控制器內之報告者以 TPM 簽章、Merkle 樹回報組態雜湊，由 SMO 之 rApp 保存供租戶比對基準 | 證明組態未被竄改，不驗 KPM 數值（僅雜湊 KPM 之設定與訂閱）；E2 不在其威脅模型；作者自述執行期偏離須以異常偵測補足——與本研究互補 |
@@ -227,6 +231,8 @@ Near-RT RIC 透過 E2SM-KPM 收集 E2 節點（O-DU）的量測資料，並以�
 | **S_i** 跨節點佐證 | 其他節點是否支持此節點觀測？ | delay 符合場域即時共識 | robust 統計殘差 |
 | **H_i** 成員轉移 | UE 移動歷史是否符合物理？ | 成員轉移時空連續 | 非參數檢定 + 確定性斷言 |
 
+**概念先例與本研究之界定**：三類證據之概念皆非本研究首創。以守恆律檢驗節點之自我回報見於偵測惡意路由器之 WATCHERS（Bradley et al., 1998），其可被繞過之性質亦已被指出（Hughes et al., 2000）；以鄰近節點之空間相關偵測持合法金鑰之內部攻擊者見於無線感測網路（Liu et al., 2007），跨 cell 之 KPI 比較亦用於 sleeping cell 偵測（Asghar et al., 2017）；以移動之物理可能性檢驗回報見於 VANET 之位置驗證（Leinmüller et al., 2006；van der Heijden et al., 2018）。本研究之貢獻因此界定為：(1) 將三者用於 O-RAN E2 KPM 之**界內**偽造，並以「受測節點無法單方面設定」為共同之設計原則；(2) 以 NPN 之已登記母體使守恆檢驗可用；(3) 以階層式融合產生四種信任狀態並接到准入政策與可用資源評估（RQ3），此為上述先例所無；(4) 量化各證據之盲點（守恆式替換、串謀節點數、D1 規模效應）。
+
 #### 3.3.1 觀測基礎：實測 RLC 欄位（取代 PDCP 假設）
 
 先前版本假設 KPM 建立於 PDCP 層四項欄位（`DRB.PdcpSduVolumeDl` 等）。實測發現此假設在 MC
@@ -307,6 +313,8 @@ per-UE 基線的必要性：UE 分「常駐 mmWave」與「結構性訊號差的
 停留以撐大門檻（即 LSTM adaptive baseline 的同一弱點）。
 
 **D2 成員瞬移（情境特定之斷言）**
+
+> 概念先例：以移動之物理可能性（最大速度、突然出現）檢驗回報，見於 VANET 之位置驗證（Leinmüller et al., 2006；van der Heijden et al., 2018）。D2 之差異在於檢驗對象為 UE 於 cell 間之成員轉移，且由 RIC 以多節點之報告交叉檢查，而非單一節點自報之位置。
 
 MC 雙連結架構下，UE 換 mmWave cell **必經 LTE 錨點過渡**。實測（D-30 之 8 seed、240 個 UE-run）「不經
 LTE 的直接 mmWave→mmWave 跳轉」出現 **0 次**（惟經 LTE 之合法換手亦未發生，4.8.4），故：
@@ -899,7 +907,7 @@ C_i violated ⟺ N_total(t) ≠ N_known
 - 被替換 UE 憑空增減 → 無合法成員轉移軌跡 → 破壞 **H_i**（守恆式替換之**主要防線**）。
 - **僅當**替換同時造成被攻擊節點之 delay 偏離同窗共識時，才被 **S_i** 捕捉——S_i 只看 delay，偽造 IMSI 若使用正常 delay 未必破壞 S_i，故 S_i 為條件性佐證（此為 4.11 融合回放中「守恆式替換 S_i = normal」之依據）。
 
-此結構與電力系統狀態估計中之不可觀測偽資料注入（unobservable false data injection）同構：滿足系統約束之注入可繞過殘差檢測。近期分析進一步指出，於交流潮流下，落在量測流形上之偽造量測與正常量測於殘差式偵測下根本無法區分（Xiao & Weng, 2026）；守恆式替換即本研究場域約束下之同類情形，故須以不同性質之證據（成員轉移）補足，而非調整 C_i。圖 4-2 視覺化此盲點。
+此結構與電力系統狀態估計中之不可觀測偽資料注入（unobservable false data injection）同構：滿足系統約束之注入可繞過殘差檢測。網路安全中亦有同類先例：以流量守恆偵測惡意路由器之 WATCHERS（Bradley et al., 1998）被指出未充分驗證守恆之前提，可被攻擊者擊敗（Hughes et al., 2000）。近期分析進一步指出，於交流潮流下，落在量測流形上之偽造量測與正常量測於殘差式偵測下根本無法區分（Xiao & Weng, 2026）；守恆式替換即本研究場域約束下之同類情形，故須以不同性質之證據（成員轉移）補足，而非調整 C_i。圖 4-2 視覺化此盲點。
 
 ### 4.6.7 E6：L_C 持續窗政策之取捨代價
 
@@ -1009,6 +1017,8 @@ $$z_j(t) = \frac{\big|\, \mathrm{delay}_j(t) - c_j(t) \,\big|}{s}, \qquad S_i \t
 > S_i 問：「此節點是否與**此刻其他節點的共識**一致？」
 
 S_i 之貢獻不在 median、MAD 或 τ_S 之選擇，而在**把異常偵測之參照基準，從節點自身之時間歷史換成同一時刻其他節點之空間共識**。
+
+**此轉換之方向並非本研究首創**：無線感測網路已以鄰近節點之空間相關、配合以 median／MAD 為基礎之穩健估計，偵測持合法金鑰之內部攻擊者（Liu et al., 2007）；行動網路之 sleeping cell 偵測亦指出，與鄰 cell 比較可抓到只看自身歷史抓不到之劣化（Asghar et al., 2017）。惟前者模擬之攻擊者偏離正常值約 20 個標準差且攻擊固定，後者為良性故障，皆未評估界內、緩慢之偽造。本節之主張因此限縮為：**在 O-RAN E2 KPM 之界內緩慢偽造下，以受控消融量化此轉換之效益**，並標出其界線（串謀節點數 4.10、校準期中毒 4.7.8 Q6）。
 
 **為何滑動更新之自我參照對緩慢漂移失效**：以自身近期觀測為參照、且參照隨新觀測滑動更新時，足夠緩慢之偏移會被逐步納入參照本身——漂移成為新的局部常態，殘差因而始終落在門檻內。須限定：此論證適用於**隨近期觀測滑動更新之局部自我參照**；採凍結之長期基線、變點偵測（如 CUSUM）或雙時間尺度設計之偵測器不必然受此限，本研究未對其進行評估。
 
@@ -2462,6 +2472,12 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 - Hung, C.-F., Tseng, C.-H., Cheng, S.-M. (2025). "Anomaly Detection for Mitigating xApp and E2 Interface Threats in O-RAN Near-RT RIC." *IEEE Open Journal of the Communications Society*, vol. 6. doi:10.1109/OJCOMS.2025.3546760.
 - Janzen, L., Becker, L., Wiesenäcker, C., Hollick, M. (2024). "Oh No, My RAN! Breaking Into an O-RAN 5G Indoor Base Station." *Proc. 18th USENIX WOOT Conference on Offensive Technologies*, pp. 101–115.
 - Yang, T., Ranjbar, A., Tan, G., Hussain, S. R. (2026). "Invariant-Guided Logical Testing of Open RAN Controllers." *Proc. 35th USENIX Security Symposium*（prepublication 版）.
+- Bradley, K. A., Cheung, S., Puketza, N., Mukherjee, B., Olsson, R. A. (1998). "Detecting Disruptive Routers: A Distributed Network Monitoring Approach." *IEEE Network*, 12(5), 50–60. doi:10.1109/65.730751
+- Hughes, J., Aura, T., Bishop, M. (2000). "Using Conservation of Flow as a Security Mechanism in Network Protocols." *Proc. IEEE Symposium on Security and Privacy*, pp. 132–141.
+- Liu, F., Cheng, X., Chen, D. (2007). "Insider Attacker Detection in Wireless Sensor Networks." *Proc. IEEE INFOCOM 2007*, pp. 1937–1945. doi:10.1109/INFCOM.2007.225
+- Asghar, M., Nieminen, P., Hämäläinen, S., Ristaniemi, T., Imran, M. A., Hämäläinen, T. (2017). "Cell Degradation Detection based on an Inter-Cell Approach." *International Journal of Digital Content Technology and its Applications*, 11(1), 25–33.
+- Leinmüller, T., Schoch, E., Kargl, F. (2006). "Position Verification Approaches for Vehicular Ad Hoc Networks." *IEEE Wireless Communications*, 13(5), 16–21. doi:10.1109/WC-M.2006.250353
+- van der Heijden, R. W., Lukaseder, T., Kargl, F. (2018). "VeReMi: A Dataset for Comparable Evaluation of Misbehavior Detection in VANETs." *Proc. SecureComm 2018*. arXiv:1804.06701
 - Hashem Eiza, M., Akwirry, B., Raschella, A., Mackay, M., Maheshwari, M. K. (2025). "A Hybrid Zero Trust Deployment Model for Securing O-RAN Architecture in 6G Networks." *Future Internet* 17(8), 372. doi:10.3390/fi17080372.
 - Aizikovich, E., Mimran, D., Grolman, E., Elovici, Y., Shabtai, A. (2025). "Rogue Cell: Adversarial Attack and Defense in Untrusted O-RAN Setup Exploiting the Traffic Steering xApp." arXiv:2505.01816v1.
 - Ramezanpour, K., Jagannath, J. (2022). "Intelligent Zero Trust Architecture for 5G/6G Networks: Principles, Challenges, and the Role of Machine Learning in the context of O-RAN." *Computer Networks*（卷期頁碼【待核對】）. arXiv:2105.01478.
