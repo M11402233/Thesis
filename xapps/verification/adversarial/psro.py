@@ -6,7 +6,7 @@
 每一輪：報酬表（池中每對於 8 fold 測試 seed × 7 cell 評估，每步平均報酬，跨 episode 合併計）
        → Lemke–Howson（nashpy，初始 label 0；不合法則改 support enumeration 並記錄；R-c）
        → 各自對另一方之混合訓練最佳回應（偵測端 MaskablePPO、攻擊者 PPO）→ 加入池。
-停止：NashConv < ε（0.01）或達最大輪數（6）（R-d）。主張僅為受限賽局之近似均衡。
+停止：NashConv ≤ 0.05 × 第 1 輪之 NashConv（完成總下降量 95 %）或達最大輪數（6）（R-d，2026-11-09）。主張僅為受限賽局之近似均衡。
 
   --g4-only        只跑 Round 0 之報酬表與 G4（D0 × A0 重現第四章），不訓練
   --det-steps/--atk-steps  每個最佳回應之訓練步數（R-f 學習曲線定案前不得用於正式結果）
@@ -26,7 +26,7 @@ import numpy as np
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 OUT_BASE = os.path.join(ROOT, "data", "results", "d30", "drl", "psro")
 SEV = os.path.join(ROOT, "data", "results", "d30_fusion_order", "severity")
-EPS, MAX_ROUNDS = 0.01, 6                                   # R-d
+REL_STOP, MAX_ROUNDS = 0.05, 6                              # R-d（2026-11-09）：NashConv ≤ 0.05 × 第 1 輪 NashConv
 HP = {"n_steps": 2048, "batch_size": 256, "learning_rate": 3e-4, "n_epochs": 10, "gamma": 0.99,
       "gae_lambda": 0.95, "clip_range": 0.2, "ent_coef": 0.0, "policy": "MlpPolicy (SB3 預設 64×64)"}
 A0_SPEC = [("step", 0.60), ("step", 0.80), ("drift", 0.01)]
@@ -251,8 +251,11 @@ class PSRO:
             self.save()
             print(f"Round {r}：NashConv = {nashconv:.4f}（偵測端增益 {gD:.4f}、攻擊者增益 {gA:.4f}）；"
                   f"新 σ_D={np.round(s, 3).tolist()} σ_A={np.round(t, 3).tolist()}")
-            if nashconv < EPS:
-                st["stop"] = f"NashConv {nashconv:.4f} < ε = {EPS}（round {r}）"
+            st.setdefault("nashconv_round1", nashconv)
+            thr = REL_STOP * st["nashconv_round1"]
+            if st["nashconv_round1"] == 0 or (r > 1 and nashconv <= thr):
+                st["stop"] = f"NashConv {nashconv:.4f} ≤ {REL_STOP} × 第 1 輪 {st['nashconv_round1']:.4f}（round {r}）"
+                self.save()
                 break
         else:
             st["stop"] = f"達最大輪數 {MAX_ROUNDS}"
@@ -281,7 +284,7 @@ def main():
     import importlib.metadata as md
     meta = {"git_commit": subprocess.run(["git", "-C", ROOT, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip(),
             "packages": {p: md.version(p) for p in ("torch", "gymnasium", "stable-baselines3", "sb3-contrib", "numpy", "nashpy")},
-            "hyperparameters": HP, "eps": EPS, "max_rounds": MAX_ROUNDS}
+            "hyperparameters": HP, "stop_rule": f"NashConv <= {REL_STOP} x round-1 NashConv", "max_rounds": MAX_ROUNDS}
     p = PSRO(args)
     p.st.setdefault("meta_runs", []).append(dict(meta, argv=sys.argv[1:], started=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
     p.save()
