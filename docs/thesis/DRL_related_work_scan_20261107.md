@@ -195,3 +195,19 @@
 | 以 DRL 取代固定門檻以防試探 | 綜述有此描述，**原文無**；未見實作 |
 | 跨節點交叉驗證 telemetry | 已被提出為方向（F7），未見實作 |
 | 界內 KPM 偽造、參照不交給學習、規則下限、准入代價、自適應攻擊下之邊界 | 未見 |
+
+## M. 補掃 arXiv（2026-11-09；WebSearch extended × 7、WebFetch 摘要／全文 × 4）
+
+查詢主題：O-RAN KPM 竄改與被攻陷 E2 節點；PSRO／對抗 RL 之 FDI 偵測；零信任 O-RAN 之 DRL 信任評估；shielding／規則下限；跨節點一致性驗證；界內偽造與物理一致性；O-RAN 賽局式攻防與 traffic steering。
+
+| 文獻 | 讀取深度 | 與本研究之關係 |
+|---|---|---|
+| Alimohammadi et al., arXiv:2505.05537（= FNWF 2024，KPI Poisoning） | 摘要頁 | 已引用。威脅明列「compromised E2 nodes」；偵測為 LSTM 序列模型 |
+| Alimohammadi et al., arXiv:2512.01596（= OJCOMS 2026） | 搜尋摘錄 | 已引用。KPM 遙測中毒之序列學習偵測 xApp |
+| Eghtesad, Vorobeychik, Laszka, arXiv:2603.11433 | **全文再核（HTML）** | 確認：以 PSRO（DRL 為最佳回應）求 MSNE；防禦者 reward 含誤報懲罰 −C_f（C_f = 1.0）；觀測僅為被擾動之行車時間，無攻擊者控制不到之參照；未設定訓練 seed（NumPy／PyTorch 預設）。→ **「PSRO＋FDI 偵測＋誤報成本」已有人做，本研究不得宣稱為新** |
+| Xiao & Weng, arXiv:2602.10162（2026-02，電網） | 摘要頁 | 物理一致（落在量測流形上）之 FDI 使殘差式偵測根本性失效；與本研究 $C_i$ 之「守恆式替換」盲點同類，可於限制中引用。未提跨節點或外部參照、未提自適應攻擊者 |
+| Yu et al., arXiv:2509.03000（Verifiable Open RAN Operations） | 摘要頁 | 驗證組態與控制行為是否符合租戶政策；動機提及「authenticated O-RU can … falsify telemetry」，但摘要未見 KPM 數值驗證。重疊低，待讀全文確認 |
+| ORAN-DEFEND arXiv:2607.06647、Rogue Cell arXiv:2505.01816、Habler arXiv:2201.06093 | 既有（F4、正文） | 無新資訊 |
+| 2603.21211（O-RAN 6G 安全綜述）、2610.38146（零信任 HRL 事件回應，企業網路）、2609.06855、2611.08658（ISAC 數位分身驗證） | 僅搜尋摘錄 | 相鄰領域，未讀全文；不據以宣稱 |
+
+**結論（不變，措辭收緊）**：至 2026-11-09 之搜尋範圍內，**未見**同時具備下列之研究：O-RAN E2 KPM 之界內偽造、攻擊者控制不到之場域參照（守恆、同窗跨節點、移動規則）、學習決策受規則下限約束並接准入政策（量測可用率代價）、學習型攻擊者下之評估。**已有**：攻防 RL／PSRO 求均衡（Eghtesad 2026，交通；Chen，電網）、含誤報成本之 RL 偵測（Eghtesad 2026）、O-RAN KPM 中毒之序列學習偵測（Alimohammadi）。搜尋非窮舉；投稿前須再掃一次，並讀 2509.03000 全文。
