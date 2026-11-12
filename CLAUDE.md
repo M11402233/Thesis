@@ -163,5 +163,5 @@ for s in 4200 4201 4202 4203; do cmp data/si_lstm_seeds/ues1_t300_seed$s.txt dat
 - `docs/thesis/route_B_design.md` — P_i 設計與導入計畫
 - `docs/thesis/E9_E10_run_guide.md` — E9／E10 執行與解讀
 - `docs/thesis/eight_questions_answers.md` — 架構層級八問
-- `docs/thesis/main_text_v5.md` — 第一～三、六章正文
+- ~~`docs/thesis/main_text_v5.md`~~ — **不存在於 repo**（2026-11-12 查核）；第一～五章在 `thesis_v11.md`，第六章（結論與限制）尚未撰寫。撰寫時須納入 4.13 與 C2 之限制條目（含 H_i-D1 基線為鏈路劣化持續時間，W12）
 - `docs/thesis/batchB_verification.md` — 章節編號、引用年份等查證
