@@ -31,3 +31,11 @@
 ## F. 2026-11-13 新增
 - [x] E23-pre（節點層級帶符號殘差之時間累積）：**先決條件不成立**（乾淨 FA 0.41–0.43，不隨 L 下降），不做。見 `E23pre_cumulative_residual_precheck_spec.md` §6。
 - [x] E23（逐 UE 外部參照之抽查）：S0 判 Ref-P 不可行、S1 抽查皆無效（規格 §11，2026-11-13）；改列未來工作。Ref-0 之事後觀察已拆解（E24-pre §6）：主要是門檻效應（≈ E21 之 Global(s≈2.5)，S4 已不保持），log 域僅小幅增益。
+- [x] E25（CU-CP 成員對帳 H_i-D4）：D-30 乾淨觸發 0；D3＋D4 關閉 A1–A4（任一准入政策漏放 0）；S3-TM3 有 9 筆 D4b 乾淨誤觸（無流量之已連線 UE）。規格 `E25_cucp_membership_rule_spec.md` §7。
+- [x] E26（C_i 連帶排除）：規則版下誠實節點 strict 准入 0.496 → 0；歸因（V-cand／V-D4s）降為 0。規格 `E26_ci_collateral_spec.md` §7（V-D4s 為事後變體）。
+- [x] 第六章：D1 之定位自未來工作移除、寫成結論（6.1 RQ2）；6.4 重排；新增 6.5「本研究範圍內尚待完成」（凍結 vs 線上、token 洩漏 4c、Stage 3 分布外）。
+- [ ] **本輪題目內、腳本待準備**（使用者 11-13：不放掉）：凍結 vs 線上；token 洩漏（4c）；Stage 3 分布外。
+- [ ] 成員關係之適應性攻擊（學習型、UE-ID 動作）：E25 已完成，可開始寫規格 → 改環境 → 新機器訓練（待使用者說開始）。
+- [ ] 含換手之資料：`--handoverMode=DynamicTtt` 可產生 NR 間換手（7 UE 試跑 22 秒已有 400+ 筆 CellIdStats 事件，乒乓明顯）；split bearer 非此模擬器支援。是否收集、用哪個模式待使用者決定。
+- [ ] 多模擬器：舊機器已有 OAI（nr-softmodem、rfsimulator）與 FlexRIC；可行範圍待與使用者討論。
+- [ ] live E2：使用者 11-13「先不要」。
