@@ -119,7 +119,7 @@ def spearman(x, y):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--phy-seed", type=int, default=4200)
+    ap.add_argument("--phy-seeds", default="all", help="all 或逗號分隔之 seed（Q6 原為一個 seed；v1.1 擴為全部 8 個）")
     ap.add_argument("--no-fig", action="store_true")
     args = ap.parse_args()
     t_start = time.time()
@@ -394,7 +394,17 @@ def main():
     # =====================================================================
     # C. E20-5：PHY 交叉驗證（一個 seed，只報告）
     # =====================================================================
-    phy = phy_check(args.phy_seed, files, mob)
+    phy_seeds = ([DS.seed_of(f) for f in files] if args.phy_seeds == "all"
+                 else [int(x) for x in args.phy_seeds.split(",")])
+    phy = {"per_seed": {str(sd): phy_check(sd, files, mob) for sd in phy_seeds}}
+    ok = [v for v in phy["per_seed"].values() if v.get("status") == "ok"]
+    for st in ("mmw", "lte"):
+        phy[f"range_{st}"] = {k: [min(v["per_rlc_state_phy"][st][k] for v in ok), max(v["per_rlc_state_phy"][st][k] for v in ok)]
+                              for k in ("bytes_per_s_median", "corrupt_share_mean", "sinr_db_mean_of_window_means_median")}
+    phy["rlc_lte_but_phy_mmw_share"] = [v["rlc_lte_but_phy_mmw"] / v["per_rlc_state_phy"]["lte"]["ue_windows"] for v in ok]
+    print(f"── E20-5 PHY（{len(ok)} seed）── LTE-only 窗：SINR {phy['range_lte']['sinr_db_mean_of_window_means_median']} dB、"
+          f"損壞 {phy['range_lte']['corrupt_share_mean']}；mmWave 窗：SINR {phy['range_mmw']['sinr_db_mean_of_window_means_median']} dB、"
+          f"損壞 {phy['range_mmw']['corrupt_share_mean']}")
 
     out = {
         "spec": "docs/thesis/E20_error_rate_spec.md v1",
