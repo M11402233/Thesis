@@ -101,6 +101,7 @@ RULE = {
     "R1_CI_VETO":       ("rejected",  1, "C_i hard veto (run>=L_C)"),
     "R1_CI_PENDING":    ("low-trust", 1, "C_i violated, run<L_C (pending)"),
     "R1_D2_VETO":       ("rejected",  1, "H_i-D2 hard veto (teleport)"),
+    "R1_D3_VETO":       ("rejected",  1, "H_i-D3 hard veto (anchor contradiction; E22, ZT_D3=on only)"),
     "R2_SI_D1_BOUND":   ("rejected",  2, "S_i + D1 cross-corroboration (same node)"),
     "R2_SI_D1_LEGACY":  ("rejected",  2, "S_i + D1 co-occurrence, NO binding check (legacy)"),
     "R2_SI_D1_UNBOUND": ("low-trust", 2, "S_i + D1 co-occurrence (different objects)"),
@@ -127,6 +128,7 @@ SEVERITY = {"trusted": 0, "abstain": 1, "low-trust": 2, "rejected": 3}
 _RULE_ORDER = {k: i for i, k in enumerate(RULE)}
 # severity 與 first-match 之差異只允許出現在此組合(規格 §3 C4);其餘差異 → 立即停止
 EXPECTED_SEVERITY_DIFF = {("R1_CI_PENDING", "R1_D2_VETO"),
+                          ("R1_CI_PENDING", "R1_D3_VETO"),
                           ("R1_CI_PENDING", "R2_SI_D1_BOUND"),
                           ("R1_CI_PENDING", "R2_SI_D1_LEGACY")}
 SEVERITY_DIFFS = collections.Counter()   # (first-match rule, severity rule) → 次數(本行程累計)
@@ -308,6 +310,21 @@ def verify_hi_d2(prev_map, cur_map):
     return "normal", None
 
 
+# H_i-D3(E22,docs/thesis/E22_dual_report_rule_spec.md):預設關閉,關閉時行為與輸出格式逐位不變。
+# 只在「LTE 錨點只回報 anchor-only UE」之設定下成立(乾淨校準期錨點 ∩ mmWave = 0 才可啟用)。
+D3_ENABLED = os.environ.get("ZT_D3", "off") == "on"
+
+
+def verify_hi_d3(cells, target):
+    """H_i-D3:同窗內 UE 同時出現在 LTE 錨點與節點 target 之報表 → violated(歸屬 target)"""
+    if target is None or target == LTE_CELL or target not in cells or LTE_CELL not in cells:
+        return "normal", None
+    both = sorted(set(cells[target]) & set(cells[LTE_CELL]))
+    if both:
+        return "violated", {"imsi": both, "cell": target}
+    return "normal", None
+
+
 def verify_hi_d1(dwell_runs, anchor, cur_map):
     """H_i-D1:LTE-only 停留 robust z(per-UE-index 唯讀基線)
 
@@ -369,21 +386,23 @@ def _r(rule_id):
     return RULE[rule_id][0], rule_id
 
 
-def fuse(ci, ci_run, si, d2, d1, d1_ev=None, target=None):
+def fuse(ci, ci_run, si, d2, d1, d1_ev=None, target=None, d3=None):
     """階層式規則融合,回傳 (decision, rule_id);依 FUSION_ORDER 選擇順序。"""
     if FUSION_ORDER == "severity":
-        dec, rid, _ = fuse_detail(ci, ci_run, si, d2, d1, d1_ev, target)
+        dec, rid, _ = fuse_detail(ci, ci_run, si, d2, d1, d1_ev, target, d3)
         return dec, rid
-    return fuse_first_match(ci, ci_run, si, d2, d1, d1_ev, target)
+    return fuse_first_match(ci, ci_run, si, d2, d1, d1_ev, target, d3)
 
 
-def matched_rules(ci, ci_run, si, d2, d1, d1_ev=None, target=None):
+def matched_rules(ci, ci_run, si, d2, d1, d1_ev=None, target=None, d3=None):
     """評估全部規則(各自獨立之謂詞),回傳符合集合 M(依 RULE 表順序,不含 R0_CLEAN)。"""
     m = []
     if ci == "violated":
         m.append("R1_CI_VETO" if ci_run >= L_C else "R1_CI_PENDING")
     if d2 == "violated":
         m.append("R1_D2_VETO")
+    if d3 == "violated":
+        m.append("R1_D3_VETO")
     if si == "violated":
         if FUSION_MODE == "legacy":
             m.append("R2_SI_D1_LEGACY" if d1 in ("strong", "weak") else "R2_SI_ALONE")
@@ -402,18 +421,18 @@ def matched_rules(ci, ci_run, si, d2, d1, d1_ev=None, target=None):
     return sorted(m, key=_RULE_ORDER.__getitem__)
 
 
-def fuse_detail(ci, ci_run, si, d2, d1, d1_ev=None, target=None):
+def fuse_detail(ci, ci_run, si, d2, d1, d1_ev=None, target=None, d3=None):
     """severity 模式:回傳 (decision, rule_id, also_matched)。
 
     內建檢查:與 first-match 結果相異時,(first-match 規則, severity 規則) 必須屬於
     EXPECTED_SEVERITY_DIFF,否則立即停止(硬性規則 5,不調整規則)。"""
-    m = matched_rules(ci, ci_run, si, d2, d1, d1_ev, target)
+    m = matched_rules(ci, ci_run, si, d2, d1, d1_ev, target, d3)
     if m:
         rid = min(m, key=lambda r: (-SEVERITY[RULE[r][0]], _RULE_ORDER[r]))
     else:
         rid = "R0_CLEAN"
     also = [r for r in m if r != rid]
-    _, fm = fuse_first_match(ci, ci_run, si, d2, d1, d1_ev, target)
+    _, fm = fuse_first_match(ci, ci_run, si, d2, d1, d1_ev, target, d3)
     if fm != rid:
         if (fm, rid) not in EXPECTED_SEVERITY_DIFF:
             raise SystemExit(f"[fusion-order] 預期外之差異:first-match={fm} severity={rid} "
@@ -422,13 +441,15 @@ def fuse_detail(ci, ci_run, si, d2, d1, d1_ev=None, target=None):
     return RULE[rid][0], rid, also
 
 
-def fuse_first_match(ci, ci_run, si, d2, d1, d1_ev=None, target=None):
+def fuse_first_match(ci, ci_run, si, d2, d1, d1_ev=None, target=None, d3=None):
     """原始階層式規則融合(第一條符合即決定)。decision 一律由 RULE 表反查,確保 code 與 4.4.3 對齊。"""
     # ---- 第一層:硬否決 ----
     if ci == "violated":
         return _r("R1_CI_VETO" if ci_run >= L_C else "R1_CI_PENDING")
     if d2 == "violated":
         return _r("R1_D2_VETO")
+    if d3 == "violated":
+        return _r("R1_D3_VETO")
 
     # ---- 第二層:統計證據 ----
     if si == "violated":
@@ -563,10 +584,11 @@ def run_xapp(source, anchor, eval_mode="all", node_of_interest=None, collect=Tru
                 d1, d1_ev = d1_win, d1_ev_win
             else:
                 d1, d1_ev = verify_hi_d1_uebound(levels, dwell_runs, last_serving, target)
+            d3, d3_ev = verify_hi_d3(cells, target) if D3_ENABLED else (None, None)
             if FUSION_ORDER == "severity":
-                decision, rule_id, also = fuse_detail(ci, ci_run, si, d2, d1, d1_ev, target)
+                decision, rule_id, also = fuse_detail(ci, ci_run, si, d2, d1, d1_ev, target, d3)
             else:
-                decision, rule_id = fuse_first_match(ci, ci_run, si, d2, d1, d1_ev, target)
+                decision, rule_id = fuse_first_match(ci, ci_run, si, d2, d1, d1_ev, target, d3)
             win_ann.append({
                 "window": w, "node": target,
                 "decision": decision, "rule_id": rule_id,
@@ -581,6 +603,10 @@ def run_xapp(source, anchor, eval_mode="all", node_of_interest=None, collect=Tru
                 "evidence": {k: v for k, v in
                              (("C_i", ci_ev), ("D2", d2_ev), ("D1", d1_ev)) if v},
             })
+            if D3_ENABLED:                           # E22:僅啟用時加欄位(關閉時格式不變)
+                win_ann[-1]["H_i_D3"] = d3
+                if d3_ev:
+                    win_ann[-1]["evidence"]["D3"] = d3_ev
             if FUSION_ORDER == "severity":          # first-match 輸出格式不變(逐位回歸)
                 win_ann[-1]["also_matched"] = also
 
