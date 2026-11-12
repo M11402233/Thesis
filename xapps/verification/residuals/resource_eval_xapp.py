@@ -163,7 +163,7 @@ def run_attacks(files, out_dir, mw):
     print(f"\n── 檢查：全部（攻擊, 准入政策）皆重現 RQ3_decision_replay.json ✓\n寫入 {p}")
 
 
-def run_benchmark(files, out_dir, mw, admission, warmup=3, repeat=5):
+def run_benchmark(files, out_dir, mw, admission, warmup=3, repeat=5, return_arrays=False):
     """M1：逐窗量測 P1–P3、本 xApp 及其合計之處理時間（每 seed 暖身後取逐窗中位數；量測期間停用 gc）。"""
     p13, p4 = [], []
     for test in files:
@@ -191,6 +191,9 @@ def run_benchmark(files, out_dir, mw, admission, warmup=3, repeat=5):
     st = lambda v: {"mean": float(v.mean()), "p95": float(np.percentile(v, 95)), "p99": float(np.percentile(v, 99)), "max": float(v.max())}
     res = {"P1_P3": st(a), "resource_eval_xapp": st(b), "four_xapps_total": st(a + b), "windows": int(len(a)),
            "warmup": warmup, "repeat": repeat, "admission": admission, "dataset": DS.NAME}
+    if return_arrays:                                   # M2：逐 (seed, 窗) 之陣列供配對加總；預設不輸出（M1 輸出不變）
+        res["_arrays"] = {"seeds": [str(DS.seed_of(f)) for f in files], "P1_P3": [x.tolist() for x in p13],
+                          "resource_eval_xapp": [x.tolist() for x in p4]}
     for k, lab in (("P1_P3", "P1–P3"), ("resource_eval_xapp", "可用資源評估 xApp"), ("four_xapps_total", "四個 xApp 合計")):
         v = res[k]; print(f"  {lab:<16} mean={v['mean']:.3f} ms  P95={v['p95']:.3f}  P99={v['p99']:.3f}  max={v['max']:.3f}")
     return res
