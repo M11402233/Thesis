@@ -39,3 +39,9 @@
 - [ ] 含換手之資料：`--handoverMode=DynamicTtt` 可產生 NR 間換手（7 UE 試跑 22 秒已有 400+ 筆 CellIdStats 事件，乒乓明顯）；split bearer 非此模擬器支援。是否收集、用哪個模式待使用者決定。
 - [ ] 多模擬器：舊機器已有 OAI（nr-softmodem、rfsimulator）與 FlexRIC；可行範圍待與使用者討論。
 - [ ] live E2：使用者 11-13「先不要」。
+
+## G. 2026-11-13（第二批決定）
+- [~] D-30H（含換手，FixedTtt）：規格 `D30H_handover_data_spec.md`、腳本 `scripts/collect_d30h.sh`；probe（seed 4200、6 s）執行中 → 記錄後啟動 2 實例正式收集（`data/ues30_ho_seeds/`）。
+- [ ] E27（成員關係之適應性攻擊）：規格 v0 已寫（`E27_adaptive_membership_attacker_spec.md`），**待使用者確認 Q1–Q7**；之後改環境（舊機器，E27-0 檢查）→ 新機器訓練（Stage 3 收齊後）。
+- [~] 多模擬器：OAI＋FlexRIC 之 E2 鏈路於舊機器可跑（`multisim_OAI_check_20261113.md`）；逐 UE KPM 需核心網 → 需 docker 權限／sudo 或改新機器。範圍待定。
+- [ ] 本輪題目內三項（凍結 vs 線上、token 洩漏 4c、Stage 3 分布外）：使用者 11-13「全部就緒後就可以開始」。先寫規格（Stage 3 分布外優先，資料約 11/15 收齊）。
