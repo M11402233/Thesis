@@ -44,6 +44,9 @@ LAM, ALPHA, BETA, MU = 0.3, 1.0, 5.0, 0.05
 # 攻擊者（Q-e、Q-f）
 A_MIN, A_MAX, DELTA = 0.5, 1.5, 0.05
 C_L, C_R = 0.1, 1.0
+# E21-S4（規格 E21 §8.9）：可選之下限變體掛鉤。FLOOR_FN(dec, rid, also, si, z) → (dec, rid)。
+# 預設 None：行為與 E19 逐位相同（檢查 S4-0）。
+FLOOR_FN = None
 
 
 def seed_files():
@@ -136,6 +139,8 @@ class Episode:
             ci, run, d2, d1, d1_ev = sd.ev[(k, j)]
             si, z, peer = X.verify_si(mod, j, sd.anchor.scale)
             dec, rid, also = X.fuse_detail(ci, run, si, d2, d1, d1_ev, j)
+            if FLOOR_FN is not None:
+                dec, rid = FLOOR_FN(dec, rid, also, si, z)
             self.floor[j] = (dec, rid)
             self.info[j] = {"si": si, "z": z, "peer": peer, "ci_pending": ci == "violated" and run < X.L_C,
                             "d1": d1, "d1_z": (d1_ev or {}).get("z", 0.0) if d1 in ("weak", "strong") else 0.0,
