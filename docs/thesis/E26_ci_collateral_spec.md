@@ -44,3 +44,11 @@
 3. 只有腳本注入；攻擊者同時做延遲竄改之組合未評估。
 4. 誠實節點「若無 C_i」之判定仍可能因 j 之報表改變（S_i 之 peer 中位數）而與乾淨不同；另報其筆數。
 5. 輸出：`data/results/d30_fusion_order/severity/E26/E26_ci_collateral.json`；腳本 `xapps/verification/residuals/run_E26_ci_collateral.py`。
+
+## 6. v1 結果與 v1.1 修正（2026-11-13；事後修正，已看過 v1 結果）
+
+v1 執行（197 s，E26-0～3 通過；輸出保留為 `E26_ci_collateral_v1.json`、`E26_run_v1.log`）顯示：A5（灌水）下 V-cand、V-D4 之連帶排除皆為 0；但 **A1（虛減）下 V-D4 仍有連帶排除**（k = 1：strict 0.114／restrict 0.179；k = 3：0.385／0.657）。原因（由竄改筆數 2,022／590 < 2,604 可見）：節點 j 把自己報表刪到空時，該窗**沒有 j 之註記**，v1 之 V-D4 只對「有註記之節點」計算 D4，故該窗無 D4 violated 之節點而退回 V-field。
+
+**v1.1 新增變體 V-D4s（事後）**：D4b 對 CU-CP 清單中之**全部 cell** 計算，包含當窗未出現於 KPM 報表之 cell（「連線於 j 之 UE 既不在 j 之報表、也不在 anchor 之報表」對沉默之 j 同樣成立）；C_i 規則只套用於 D4 violated 之 cell（沉默之 cell 無註記可套用，其餘節點依 M 移除 `R1_CI_*` 重選）。無任何 cell D4 violated 時同 V-field。
+
+新增檢查 **E26-4**：乾淨 D-30 中，對全部 cell（含沉默者）計算之 D4 觸發為 0；否則停止回報。v1 之三個變體與數字不變、並列報告。
