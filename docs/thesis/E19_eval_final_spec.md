@@ -163,10 +163,45 @@ E9b 是逐窗異常分類器（LSTM，輸入延遲序列），不輸出信任狀
 
 實作：`xapps/verification/adversarial/eval_final_nt.py`（2026-11-12）。重用既有 `mix()`、`frontier_judge()`、`strategies()`、`all_pairs()`；讀取既有 `pairs.json` 快取，**未重跑任何 episode、未重新訓練 A-BR**；「最壞情形」攻擊者依 TPR_nt（而非 TPR_rej）另行選取，其餘規則與 §6.1–§6.3 逐字相同。執行時以程式斷言確認未改動 `eval_final.json` 既有欄位（TPR_rej 判準），輸出以 `judgement_nt`／`summary_nt` 附加於原檔，不覆寫 `judgement`／`summary`。
 
-**結果**：8 組（O-full／O-outcome × A-script／A-pool／A-eq／A-BR）全部 **3/3「優於」**。DRL 之乾淨誤拒率（FRR）與 D0 逐位相同（DRL 對 rejected 無新增判斷），故前緣判定之 FRR 落在 D0 與鄰近基線之間，純粹比較 TPR_nt／d_nt。
+**結果**：8 組（O-full／O-outcome × A-script／A-pool／A-eq／A-BR）全部 **3/3「優於」**。
+
+> **〔2026-11-12 更正註記，見 §13.1〕** 此結果之前緣橫軸沿用 `clean_false_reject`（乾淨判 rejected 率）。TPR_nt 之代價應為乾淨判**非 trusted** 率（`clean_nontrusted`）；改用正確橫軸後結論不同。上列原結果保留不刪，以 §13.1 為準。DRL 之乾淨誤拒率（FRR）與 D0 逐位相同（DRL 對 rejected 無新增判斷），故前緣判定之 FRR 落在 D0 與鄰近基線之間，純粹比較 TPR_nt／d_nt。
 
 ### 12.4 對正文之建議（記錄，非規格變更）
 
 - §6 之判準（TPR_rej 為主）為事先登錄之主判準，其負面結果須如實寫入正文，不得以 12.3 取代。
 - 12.3 之 TPR_nt 結果可作**次要／探索性發現**並列，並明寫其補跑順序（後見之明）與選取邏輯之差異（「最壞情形」依 TPR_nt 另選），不得與 §6 之主判準混為一談或取代其結論。
 - 12.2 之延遲判準退化應在正文方法論限制中說明：rejected 之發生率過低使延遲統計不具區分力，是本次攻擊者最佳回應之系統性結果，非實作缺陷。
+
+## 13. 事後補充（2026-11-12，使用者決定；先於本節之任何執行訂定）
+
+> 本節皆為**事後**分析：訂定時已看過 §12 之結果與 DRL 之乾淨非 trusted 率（0.503–0.509）。不修改 §6 之主判準與 §12.1 之主結論。
+
+### 13.1 TPR_nt 前緣之橫軸更正
+
+- §6 之「另以 TPR_nt、d_nt 報同樣之比較」，其前緣橫軸應為與 TPR_nt 對應之代價——**乾淨 (節點, 秒) 判非 trusted 之比例**（`clean_nontrusted`），不是判 rejected 之比例。§12.3 之實作沿用 `clean_false_reject`；DRL 不新增 rejected，故 FRR 與 D0 逐位相同，橫軸失去作用。
+- 更正：以 `clean_nontrusted` 為橫軸，其餘規則（§6.1–6.3、§6.2 之範圍外規則、最壞情形依 TPR_nt 選取）與 §12.3 相同，重算全部 8 組。§12.3 之原結果保留。
+- 預期（訂定時已知）：DRL 之橫軸值高於 B1／B2（0.497）與 B3（0.288–0.424），落在原基線範圍外，依 §6.2 只有支配最近端點才判優於。
+
+### 13.2 事後新增基線 B3s：較嚴之 D1 門檻
+
+- 目的：原基線（B1、B2、B3）之乾淨非 trusted 率皆 ≤ 0.497，無法在 DRL 之操作點（0.503–0.509）比較。B3s 把 D1 門檻調**低**（更嚴），延伸基線前緣至更高之乾淨非 trusted 率。
+- 格點（訂定後不改）：(τ_H^warn, τ_H^reject) ∈ {(1.75, 2.75), (1.5, 2.5), (1.0, 2.0)}，L_H = 1；實作與 B3 相同（覆寫門檻後重算下限，偵測端恆選下限）。
+- **檢查 B3s-1**：無攻擊時各門檻之逐 seed (n, trusted, rejected) 須與獨立實作 `run_E10_D1_policy_ablation.run_policy`（E14 所用）在同門檻下之結果相同。失敗即停。
+- 判定：TPR_nt 前緣（13.1 之橫軸）以 B1、B2、B3、B3s 構成；另報 TPR_rej 前緣加入 B3s 之結果。兩者皆標「事後新增基線」，**不取代 §12.1 之主結論**。
+- 格點之選擇是在已知 DRL 操作點後所定，具後見之明；正文須明寫。
+
+### 13.3 TPR_rej 無區分力之原因驗證
+
+先登錄四個假說與量測，再執行；只做量測，不改任何偵測端或攻擊者。
+
+| # | 假說 | 量測 | 支持假說之條件 |
+|---|---|---|---|
+| H1 | DRL 學到幾乎不升級到 rejected（β = 5 之乾淨誤拒罰則） | DRL 升級決策中選 rejected 之比例，分竄改／乾淨 | DRL 選 rejected 之次數相對升級總數 < 1 % |
+| H2 | 竄改 (節點, 秒) 被判 rejected 幾乎全來自規則下限，與偵測端無關 | 竄改 (節點, 秒) 之 rejected 依來源拆分（規則／DRL）；並列規則下限之規則編號分布 | 規則來源 ≥ 99 % |
+| H3 | 學習型攻擊者把 S_i 維持在門檻下 | 竄改 (節點, 秒) 中 S_i violated 之比例、實際乘數分布；學習型 vs 腳本 | 學習型之 S_i violated 比例明顯低於腳本（並報數字，不設門檻） |
+| H4 | 即使偵測端盡量用 S_i 證據升級到 rejected，也抓不到學習型攻擊（rejected 受證據限制，而非偵測端選擇） | 反事實策略 MaxEsc-SI：待決節點只要 S_i violated 即判 rejected（不限 R2_SI_ALONE），量 TPR_rej 與乾淨誤拒 | 對學習型攻擊者，MaxEsc-SI 之 TPR_rej 仍低（並報數字）；若 MaxEsc-SI 之 TPR_rej 高，則 H4 不成立，原因在 DRL 之選擇（H1） |
+
+- 偵測端：D0、各組 σ_D 支撐集、MaxEsc-SI。攻擊者：A-script（3）、各組 A-BR、§12.1 之 A-pool 最壞攻擊者。
+- MaxEsc-SI 是診斷用之反事實策略，**不是**候選偵測端，不進任何判準。
+- 輸出：`data/results/d30/drl/eval_final/posthoc/`（`posthoc.json`、`checks.json`、log）；腳本 `xapps/verification/adversarial/eval_posthoc.py`。既有 `eval_final.json`、`pairs.json` 不修改。
