@@ -27,3 +27,7 @@
 ## 進行中（不需決定）
 - Stage 3 收集（新機器，核心 16／18／20；TM3 4206–4207、U20 4200–4207）；完成後與舊機器 TM3 4200–4205 合併。
 - E21-S4（新機器，10 核心；log `data/results/d30_fusion_order/severity/E21_S4_run.log`）。
+
+## F. 2026-11-13 新增
+- [x] E23-pre（節點層級帶符號殘差之時間累積）：**先決條件不成立**（乾淨 FA 0.41–0.43，不隨 L 下降），不做。見 `E23pre_cumulative_residual_precheck_spec.md` §6。
+- [ ] E23（逐 UE 外部參照之抽查）：規格 v0＋腳本已寫（`E23_external_reference_spec.md`、`run_E23_reference.py`），只跑過 `--stage checks`。**待使用者確認 Q1–Q6 後跑 S0（約數秒）、S1（約數分鐘）**；R11 之標準條號待查證。
