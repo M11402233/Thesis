@@ -30,4 +30,4 @@
 
 ## F. 2026-11-13 新增
 - [x] E23-pre（節點層級帶符號殘差之時間累積）：**先決條件不成立**（乾淨 FA 0.41–0.43，不隨 L 下降），不做。見 `E23pre_cumulative_residual_precheck_spec.md` §6。
-- [ ] E23（逐 UE 外部參照之抽查）：規格 v0＋腳本已寫（`E23_external_reference_spec.md`、`run_E23_reference.py`），只跑過 `--stage checks`。**待使用者確認 Q1–Q6 後跑 S0（約數秒）、S1（約數分鐘）**；R11 之標準條號待查證。
+- [x] E23（逐 UE 外部參照之抽查）：S0 判 Ref-P 不可行、S1 抽查皆無效（規格 §11，2026-11-13）；改列未來工作。Ref-0 之事後觀察是否追查待使用者決定。
