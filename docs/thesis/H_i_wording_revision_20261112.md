@@ -1,4 +1,4 @@
-# H_i 措辭修訂提案（2026-11-12，待使用者逐條確認後套用至正文）
+# H_i 措辭修訂（2026-11-12；使用者確認 V1–V3，已套用至 thesis_v11.md）
 
 > 依據：E20-5 PHY 交叉驗證（`run_E20_error_rates.py` v1.1，輸出 `data/results/d30_fusion_order/severity/E20/E20_error_rates.json` → `phy_check`），D-30 全部 8 個 seed。
 > 使用者已同意修改措辭（2026-11-12）；本檔列出逐條原文與建議文字，確認後才改正文（另存新版，不覆寫 v10）。
