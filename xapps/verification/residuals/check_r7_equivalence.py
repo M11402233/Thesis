@@ -3,6 +3,7 @@
 比對 <run> 與 <ref> 共同之輸出檔：
   - 一般 trace 檔：逐位相同（ref 若較長，只比 run 之完整行數前綴；最後一行可能不完整故不比）。
   - E2 報表（du-cell-*、cu-cp-cell-*、cu-up-cell-*）：首欄為實際時間（CLAUDE.md），去掉首欄後逐行比較。
+  - bsState.txt：第 2 欄為 UNIX 實際時間，去掉後逐行比較。
   - 跳過：meta.txt、mem.tsv、run.log、*_exact.txt、*_percell.txt（R-5 加裝輸出，ref 可能沒有）。
 用法：check_r7_equivalence.py <run_dir> <ref_dir> [--json out]；任何差異 exit 1。
 """
@@ -20,6 +21,9 @@ for fn in sorted(set(os.listdir(a.run)) & set(os.listdir(a.ref))):
     if fn.startswith(E2):
         A = [l.split(b",", 1)[-1] if b"," in l else l.split(b"\t", 1)[-1] for l in A]
         B = [l.split(b",", 1)[-1] if b"," in l else l.split(b"\t", 1)[-1] for l in B]
+    if fn == "bsState.txt":
+        drop = lambda l: b" ".join(x for i, x in enumerate(l.split(b" ")) if i != 1)
+        A = [drop(l) for l in A]; B = [drop(l) for l in B]
     n = min(len(A), len(B)); diff = next((i for i in range(n) if A[i] != B[i]), None)
     res[fn] = {"lines_run": len(A), "lines_ref": len(B), "compared": n, "first_diff_line": diff}
     if diff is not None or n == 0: bad += 1
