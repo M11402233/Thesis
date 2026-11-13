@@ -19,8 +19,10 @@
   - `data/si_lstm_seeds_aux/` = 舊 aux 腳本之輸出目錄，**已棄用**（空目錄）
   - `data/results/` = 所有實驗輸出
   - **`data/ues30_seeds/` = D-30（2026-10-06 定案之主資料，收集中）**：30 UE（`--totalUes=30`）＋ E2 NR 報表（`--e2nrEnabled=true`，cell 2–8 之 `du-cell-*.txt` 含原生 `RRU.PrbUsedDl`）× **8 seed（4200–4207）** × 301 s（分析取 0–299 窗）。**收齊並通過檢查後，第四章全部實驗（含 C_i、P_i、RQ3 之 PRB）統一改用 D-30**，取代 D-C 與 D-SH；舊資料保留唯讀，僅供附錄對照
-  - **`data/ues30_ho_seeds/` = D-30H（含合法 NR 間換手；D-30 參數＋`--handoverMode=FixedTtt`）**：2026-11-12 19:12 UTC 起於舊機器收集，2 實例（A：4200/4202/4204/4206；B：4201/4203/4205/4207），每 seed 約 40 小時；規格 `docs/thesis/D30H_handover_data_spec.md`，腳本 `scripts/collect_d30h.sh`，log `data/ues30_ho_seeds/collect_{A,B}.log`。**不得終止**；加開第 3 個實例須問使用者。**2026-11-13：4200／4201 於模擬約 46 秒被記憶體防護中止（約 330 MB／模擬秒）；RLC 報表把窗內換手之 UE 全歸一個 cell。見規格 §7，是否停佇列待使用者決定**
+  - **`data/ues30_ho_seeds/` = D-30H（含合法 NR 間換手；D-30 參數＋`--handoverMode=FixedTtt`）**：2026-11-12 19:12 UTC 起於舊機器收集，2 實例（A：4200/4202/4204/4206；B：4201/4203/4205/4207），每 seed 約 40 小時；規格 `docs/thesis/D30H_handover_data_spec.md`，腳本 `scripts/collect_d30h.sh`，log `data/ues30_ho_seeds/collect_{A,B}.log`。**不得終止**；加開第 3 個實例須問使用者。**2026-11-13 03:32 UTC 依使用者決定停止佇列；全部輸出僅供診斷（`README_DIAGNOSTIC_ONLY.md`），不得併入正式資料**
   - `data/ues28_seeds/` = 28 UE 校準紀錄（已被 D-30 取代，僅保留校準證據）
+
+> **⚠️ 2026-11-13 稽核（未決）**：`DlE2RlcStats`（D-30／D-SH 主檔）之計數與 delay 為**自 t=0 起累計／累計平均**，cell = 最後一筆 PDU 所在 cell（ns-3 E2 RLC 計算器從未重置）。詳見 `docs/thesis/ns3_report_semantics_audit_20261113.md`。使用者決定前不得據此改任何結果或正文。
 
 ## ⚠️ 硬性規則（違反會毀掉論文資料）
 
