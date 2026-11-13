@@ -122,6 +122,27 @@ ns-O-RAN `DlE2RlcStats` 之 delay 樣本（RLC AM；scenario 預設 `rlcAmEnable
 - `check_R5_R6.py`：原版只印數字、永遠 exit 0；只迭代舊檔之鍵；前一窗缺列時靜默略過；未比對 cell 欄 → 加 `R5_pass`／`R6_pass`、`extra_exact_row`、`gap_prev_missing`、`cell_mismatch`，失敗 exit 1。
 - 修正後於 R-5 窗 0–9 重跑：R-5 結構檢查 0 失敗、反推誤差 max 0.0004 ms；R-6 前 9 窗逐位相同（271 行）；Q2 `functional_pass = True`、`Q2_pass = False`（短跑，依定義）。
 
+### 5.8 R-7：換手情境之記憶體與時間戳標籤（2026-11-13）
+**heaptrack 結果（H0 NoAuto vs H1 FixedTtt，seed 4200，4 秒；`data/d30h_memdiag/HT/`）**：峰值 heap 1.27 GB vs 2.33 GB；結束時未釋放 41.6 MB vs 42.1 MB（**不是傳統洩漏**）；封包本體 `Buffer::Create` 之峰值差 −1.8 MB（**不是封包積壓**）。H1 − H0 之峰值差 1.06 GB 幾乎全部來自 `ns3::ByteTagList::Add`：經 `EpcX2::RecvFromX2uSocket` 595 MB、經 `McEnbPdcp::DoTransmitPdcpSduLTE` 421 MB（後者呼叫次數只差 −5，卻多出 421 MB，代表每次配置的尺寸變大，而不是配置次數變多）。
+
+**機制（程式閱讀；R-7b 之計數器尚未實測）**：
+1. 換手轉送時只清 packet tag，不清 byte tag：`lte-enb-rrc.cc:1190` `rlcSdu->RemoveAllPacketTags(); // this does not remove byte tags`；清除 byte tag 之程式碼被註解掉（`:1193–1198`）。
+2. 轉送之 SDU 保留舊的 PdcpTag／RlcTag；目標端 RLC 送出時再加 RlcTag（`lte-rlc-am.cc:1146`）。來回換手（A→B→A < 1 s 占 34 %）使同一 SDU 之標籤累積。
+3. ns-3 `ByteTagList` 之 free list 每次配置 `max(size, g_maxSize)`，而 `g_maxSize` 為全域最大值、只增不減（`byte-tag-list.cc:372, 388`）→ 任一封包之標籤串創新高後，**所有**新封包之標籤空間都依此配置。
+4. 間接佐證（M0／M2 RSS 依實際時間對齊，只能看形狀）：多出之 RSS 隨換手數呈「持平—跳升」，而非等比例（換手 64→96 持平 350–430 MB；98→114 跳至約 770 MB），與第 3 點之「破紀錄才上升」一致。
+
+**對延遲量測之可能影響（待驗證）**：UE 端 RLC 以 `FindFirstMatchingByteTag(RlcTag)` 取**第一個** RlcTag（`lte-rlc-am.cc:1880`），UE 端 PDCP 取第一個 PdcpTag（`mc-ue-pdcp.cc:247`、`lte-pdcp.cc:215`）。轉送過之封包，第一個標籤可能是在來源 cell 加的，所以量到的延遲包含轉送前之時間。D-30 無 NR 間換手，預期不受此影響；D-30H 受影響。
+
+**改善（使用者決定 2026-11-13：先第 1 項，再第 2 項）**：
+- **第 1 項（記憶體，不改行為）**：`~/ns-3-mmwave-oran-r7`（R-5 複本＋`byte-tag-list.cc:27` 關閉 `USE_FREE_LIST`，改為按實際尺寸配置）。已確認編譯後之物件檔不含 `g_freeList`／`ByteTagListDataFreeList`。驗收：V1 NoAuto 8 s 與 D-30 seed 4200 前綴、R-5 run 逐位相同；V2 FixedTtt 8 s 與 M1 共同輸出檔逐位相同（E2 報表去掉實際時間欄）；並記錄 RSS（`scripts/run_r7_validate.sh`、`check_r7_equivalence.py`）。
+- **第 2 項（清除舊標籤，會改變換手情境之延遲語意，須先決定）**：
+  | 選項 | 轉送時之處理 | RLC 延遲（論文主檔用） | PDCP 延遲 |
+  |---|---|---|---|
+  | S1 全部重新起算 | 清除所有 byte tag | 目標 cell 送出 → UE 收到（與無換手之定義相同） | 從目標端重新起算（不含轉送前之時間） |
+  | **S2 保留 PDCP 起點（建議）** | 讀出第一個 PdcpTag → 清除所有 byte tag → 只把該 PdcpTag 加回 | 同 S1（與無換手之定義相同） | 從原始 PDCP 起點起算（含轉送時間），每個封包至多保留固定數量之標籤 |
+  | S0 不清（原版） | — | 可能從來源 cell 之舊送出時間起算 | 從原始起點起算 |
+  建議 S2：論文用之 RLC 延遲在有、無換手時定義一致；PDCP 延遲保留端到端之意義；標籤數有上限。實作後須以 R-7b 計數器（每個 Rx PDU 之 RlcTag／PdcpTag 數）確認，並於無換手之 NoAuto 案例確認輸出逐位不變。
+
 ## 6. 第一階段重跑（S_i 乾淨校準／評估與 E9）
 
 兩種用途不同之評估：
