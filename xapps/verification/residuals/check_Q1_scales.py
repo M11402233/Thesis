@@ -74,7 +74,7 @@ for c in ("C1", "C2"):
         "flag": (ex < min(v) * (1 - FLAG)) or (ex > max(v) * (1 + FLAG))}
 if a.freeze_ei:
     git = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip()
-    dirty = subprocess.run(["git", "status", "--porcelain", "--", "."], capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip() != ""
+    dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no", "--", "."], capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip() != ""
     md5 = {os.path.basename(f): hashlib.md5(open(f, "rb").read()).hexdigest() for f in files}
     ei = {"definition": "s_old^(-k)：其餘七 seed 之原累計輸入（ZT_DELAY_SOURCE=cumulative）、原公式；C-1=TrustAnchor（UE 層級）、C-2=global_scale（cell 平均層級）",
           "folds": folds["cumulative"], "data_md5": md5, "code_git_head": git, "code_dirty": dirty}
