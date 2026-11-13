@@ -1,0 +1,114 @@
+--- ns-3-mmwave-oran/src/lte/helper/mmwave-bearer-stats-calculator.h	2026-06-29 10:57:36.018049699 +0000
++++ ns-3-mmwave-oran-r5/src/lte/helper/mmwave-bearer-stats-calculator.h	2026-11-13 04:17:51.654445231 +0000
+@@ -398,6 +398,11 @@
+     Uint64Map m_dlTxData;       //!< Amount of DL TX Data by (IMSI, LCID) pair
+     Uint64Map m_dlRxData;       //!< Amount of DL RX Data by (IMSI, LCID) pair
+     Uint64StatsMap m_dlDelay;   //!< DL delay by (IMSI, LCID) pair
++    Uint64Map m_dlDelaySumNs;   //!< R-5 (2026-11-13): exact cumulative DL delay sum (ns), additive output only
++    struct R5CellKey { uint16_t cell; uint64_t imsi; uint8_t lcid;
++        bool operator<(const R5CellKey& o) const { return cell != o.cell ? cell < o.cell : (imsi != o.imsi ? imsi < o.imsi : lcid < o.lcid); } };
++    struct R5CellAcc { uint64_t nTx{0}, txBytes{0}, nRx{0}, rxBytes{0}, delaySumNs{0}; };
++    std::map<R5CellKey, R5CellAcc> m_r5DlPerCell; //!< R-5 side channel: DL counters keyed by the event's own cellId (cumulative)
+     Uint32StatsMap m_dlPduSize; //!< DL PDU Size by (IMSI, LCID) pair
+ 
+     Uint32Map m_ulCellId;       //!< List of UL CellIds by (IMSI, LCID) pair
+@@ -422,6 +427,8 @@
+      * true if output files have not been opened yet
+      */
+     bool m_firstWrite;
++    bool m_firstExactWrite{true}; //!< R-5 additive
++    bool m_firstPerCellWrite{true}; //!< R-5 additive
+ 
+     /**
+      * true if any output is pending
+--- ns-3-mmwave-oran/src/lte/helper/mmwave-bearer-stats-calculator.cc	2026-06-29 10:57:36.018049699 +0000
++++ ns-3-mmwave-oran-r5/src/lte/helper/mmwave-bearer-stats-calculator.cc	2026-11-13 04:17:51.626444004 +0000
+@@ -216,6 +216,7 @@
+             m_flowId[p] = LteFlowId_t(rnti, lcid);
+             m_dlTxPackets[p]++;
+             m_dlTxData[p] += packetSize;
++            { R5CellAcc& r5 = m_r5DlPerCell[R5CellKey{cellId, imsi, lcid}]; r5.nTx++; r5.txBytes += packetSize; } // R-5 additive
+         }
+         m_pendingOutput = true;
+     }
+@@ -311,6 +312,8 @@
+             }
+             m_dlDelay[p]->Update(delay);
+             m_dlPduSize[p]->Update(packetSize);
++            m_dlDelaySumNs[p] += delay; // R-5 additive
++            { R5CellAcc& r5 = m_r5DlPerCell[R5CellKey{cellId, imsi, lcid}]; r5.nRx++; r5.rxBytes += packetSize; r5.delaySumNs += delay; } // R-5 additive
+         }
+         m_pendingOutput = true;
+     }
+@@ -478,6 +481,55 @@
+     }
+ 
+     outFile.close();
++
++    // R-5 (2026-11-13): additive exact output; existing file and columns unchanged
++    if (m_protocolType.compare(0, 2, "E2") == 0)
++    {
++        std::string fn = GetDlOutputFilename();
++        std::string::size_type dot = fn.rfind(".txt");
++        fn = (dot == std::string::npos ? fn : fn.substr(0, dot)) + "_exact.txt";
++        std::ofstream ex;
++        if (m_firstExactWrite)
++        {
++            ex.open(fn.c_str());
++            ex << "% start\tend\tCellId\tIMSI\tLCID\tnTxPDUs\tTxBytes\tnRxPDUs\tRxBytes\tdelaySumNs" << std::endl;
++            m_firstExactWrite = false;
++        }
++        else
++        {
++            ex.open(fn.c_str(), std::ios_base::app);
++        }
++        for (std::vector<ImsiLcidPair_t>::iterator pair = pairVector.begin(); pair != pairVector.end(); ++pair)
++        {
++            ImsiLcidPair_t p = *pair;
++            ex << m_startTime.GetNanoSeconds() << "\t" << endTime.GetNanoSeconds() << "\t"
++               << GetDlCellId(p.m_imsi, p.m_lcId) << "\t" << p.m_imsi << "\t" << (uint32_t)p.m_lcId << "\t"
++               << GetDlTxPackets(p.m_imsi, p.m_lcId) << "\t" << GetDlTxData(p.m_imsi, p.m_lcId) << "\t"
++               << GetDlRxPackets(p.m_imsi, p.m_lcId) << "\t" << GetDlRxData(p.m_imsi, p.m_lcId) << "\t"
++               << (m_dlDelaySumNs.count(p) ? m_dlDelaySumNs[p] : 0) << std::endl;
++        }
++        ex.close();
++
++        std::string fn2 = (dot == std::string::npos ? GetDlOutputFilename() : GetDlOutputFilename().substr(0, dot)) + "_percell.txt";
++        std::ofstream pc;
++        if (m_firstPerCellWrite)
++        {
++            pc.open(fn2.c_str());
++            pc << "% start\tend\tEventCellId\tIMSI\tLCID\tnTxPDUs\tTxBytes\tnRxPDUs\tRxBytes\tdelaySumNs" << std::endl;
++            m_firstPerCellWrite = false;
++        }
++        else
++        {
++            pc.open(fn2.c_str(), std::ios_base::app);
++        }
++        for (auto& kv : m_r5DlPerCell)
++        {
++            pc << m_startTime.GetNanoSeconds() << "\t" << endTime.GetNanoSeconds() << "\t" << kv.first.cell << "\t"
++               << kv.first.imsi << "\t" << (uint32_t)kv.first.lcid << "\t" << kv.second.nTx << "\t" << kv.second.txBytes
++               << "\t" << kv.second.nRx << "\t" << kv.second.rxBytes << "\t" << kv.second.delaySumNs << std::endl;
++        }
++        pc.close();
++    }
+ }
+ 
+ void
+@@ -497,6 +549,7 @@
+     m_dlRxData.erase(m_dlRxData.begin(), m_dlRxData.end());
+     m_dlTxData.erase(m_dlTxData.begin(), m_dlTxData.end());
+     m_dlDelay.erase(m_dlDelay.begin(), m_dlDelay.end());
++    m_dlDelaySumNs.clear(); // R-5 additive
+     m_dlPduSize.erase(m_dlPduSize.begin(), m_dlPduSize.end());
+ }
+ 
+@@ -504,6 +557,7 @@
+ MmWaveBearerStatsCalculator::ResetResultsForImsiLcid(uint64_t imsi, uint16_t lcid)
+ {
+     NS_LOG_FUNCTION(this);
++    m_dlDelaySumNs.erase(ImsiLcidPair_t(imsi, lcid)); // R-5 additive
+ 
+     auto ulTxPacketsEntry = m_ulTxPackets.find(ImsiLcidPair_t(imsi, lcid));
+     if (ulTxPacketsEntry != m_ulTxPackets.end())

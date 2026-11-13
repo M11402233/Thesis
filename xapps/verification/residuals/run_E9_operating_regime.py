@@ -69,6 +69,9 @@ PUBLISHED_474 = {
 # 資料載入與尺度（逐字沿用 run_Si_reference_ablation.py）
 # ==========================================================================
 def load_cell_delay(path):
+    import interval_source as _IS                    # 語意規格 v0.1：非預設延遲來源（預設不經此路徑）
+    if _IS.mode() != "cumulative":
+        return _IS.cell_delay_means(path)
     dly = collections.defaultdict(lambda: collections.defaultdict(list))
     with open(path) as fh:
         fh.readline()

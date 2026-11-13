@@ -184,6 +184,9 @@ class TraceReplaySource(IndicationSource):
             self._cache = self._parse()   # 預載:使 runtime 量測不含檔案 I/O
 
     def _parse(self):
+        if os.environ.get("ZT_DELAY_SOURCE", "cumulative") != "cumulative":
+            import interval_source                      # 語意規格 v0.1：區間延遲；預設不經此路徑
+            return interval_source.parse_interval(self.path)
         buf = collections.defaultdict(lambda: collections.defaultdict(dict))
         with open(self.path) as fh:
             fh.readline()

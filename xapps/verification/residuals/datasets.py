@@ -51,6 +51,9 @@ def is_reference():
 
 def results_dir():
     d = os.environ.get("ZT_RESULTS_DIR") or CFG["results"]
+    _m = os.environ.get("ZT_DELAY_SOURCE", "cumulative")   # 語意規格 v0.1：非預設來源寫入另一目錄，不覆寫舊結果
+    if _m != "cumulative":
+        d = d.rstrip("/") + "_delay_" + _m
     os.makedirs(d, exist_ok=True)
     return d
 
