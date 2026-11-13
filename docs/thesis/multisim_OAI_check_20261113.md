@@ -37,3 +37,7 @@ Implications (to be weighed, not yet decided):
 1. Neither simulator gives "per-window mean delay over the 1 s window": ns-3 = since t=0, OAI = last 100 ms. The semantics spec v0.1 D-b definition (interval mean per window) is satisfied by neither out of the box.
 2. OAI's "last" counters are global per UE index inside the agent: two subscriptions would split the increments between them (the per-consumer-differencing concern in spec v0.1 §3 applies here too). Not tested.
 3. Useful as a cross-check that a real E2 stack produces per-UE rows at 1 s with UE IDs (`amf_ue_ngap_id`, `ran_ue_id`); C_i-style UE-set reconciliation is feasible in principle. Multi-UE and multi-cell not tested (rfsim, 1 gNB, 1 UE).
+
+## Decision (user, 2026-11-13)
+- Current positioning: report-semantics contrast + feasibility evidence (limitations / appendix), not a second dataset.
+- Whether to scale up (multi-gNB / multi-UE OAI to strengthen validation, e.g. S_i cross-node) is decided **after phase 1 (S_i interval correction) results**; the user is open to scaling up.
