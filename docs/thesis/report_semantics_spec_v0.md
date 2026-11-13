@@ -183,7 +183,9 @@ r8 = r7 ＋ S2（env `ZT_R7_S2=1` 啟用；預設 S0 原轉送行為）＋ R-7b 
 | (b) 每個 RLC PDU 之 PdcpTag 數 | S0：最大 89、平均 2.618；S2：最大 9、平均 1.646 | `R7b_hist_S{0,2}_fixedttt_8s.txt` |
 | (d) S2 vs S0 | 61 個共同輸出檔逐位相同（僅計數檔本身不同）| `r8_S2fixed_vs_S0fixed.json` |
 | RSS（8 s）| S0 327 MB、S2 320 MB | `mem.tsv` |
-| (c) NoAuto S0／S2 vs M0 | 11:04 UTC 啟動，待結果 | `data/r7_validate/R8{d,e}_*_noauto/` |
+| (c) NoAuto S0／S2 vs M0 | 兩者各 56 檔皆與原 binary 逐位相同（0 次換手；PdcpTag 最大 9、平均 1.290，S0＝S2）；RSS 321 MB | `r8_S{0,2}noauto_vs_M0.json` |
+
+V3（r7，僅第 1 項，FixedTtt，60 s）中途（12:30 UTC，模擬第 19 窗、318 次換手）：RSS 143 → 516 MB，約 1.2 MB／換手、後段約 12–15 MB／窗；原 binary 同 seed 於第 10 窗已 3.8 GB。仍隨換手緩增，是否來自未剝除之標籤須比對 S2 長 run（未做）。
 
 解讀（範圍限 seed 4200、8 s）：
 - S2 有界化標籤數（89 → 9）；剩餘之多個 PdcpTag 為一個 RLC PDU 串接多個 SDU 之正常情形（PdcpTag>1 之 PDU 數 S0、S2 皆 228,080，47.90 %）。
