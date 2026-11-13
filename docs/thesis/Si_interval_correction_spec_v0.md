@@ -60,6 +60,13 @@ E-ii 執行順序：`cv_interval.py` → `zt_kpm_xapp.py --fusion bound --eval-m
 - cell 1 歸屬之機制：已知 `m_e2RlcStatsVector` 內兩個計算器接收**相同**事件（D-30H、M0 之 `DlE2RlcStats.txt` 與 `DlE2RlcStatsLte.txt` 逐位相同），cell 欄被每筆 Tx（eNB 端）與 Rx（UE 端）覆寫。假設：UE 端 Rx 之 trace 以 LTE cellId 綁定。以 R-5 之 `DlE2RlcStats_percell.txt`（依事件自身 cellId 累計之 Tx／Rx）檢驗。
 - 若假設成立：S_i 之 cell 層級平均混入「列被歸到 cell 1 而被排除」之 UE（約 42 %），peer 母體與尺度都受影響——這是第二階段每 cell 統計要修的；第一階段結論須註明。
 
+**R-5 初步觀察（2026-11-13 05:21 UTC，seed 4200 NoAuto，窗 0–2；`data/r5_runs/seed4200_noauto_t301/DlE2RlcStats_percell.txt`）——原假設不成立，改為下述事實：**
+- 依事件自身 cellId 累計，30 個 UE 每個都有 cell 1 之事件，且 **Tx 與 Rx 同時存在**（30 UE 合計：窗 0 末 888／886、窗 1 末 1,888／1,886、窗 2 末 2,888／2,886），即每秒約 1,000 個 PDU（每 UE 約 33 個／秒、每個約 9.4 KB）。
+- cell 1 之 PDU 延遲**全部恰為 3.000 ms**（30 個 UE 之 Σdelay 完全相同，例：窗 1 末 188,999,937 ns／63 個）。
+- ⇒ 這是一條與 mmWave 並行、持續承載資料之 **LTE 路徑**（同一 LCID 3），不是「UE 端事件被綁到 cell 1」。主檔之 delay 為 mmWave 與 LTE 兩路 PDU 之**混合**平均；主檔 cell 欄為「該窗最後一個事件屬於哪一路」（窗 0–2 中 12、12、9 個 UE 被記為 cell 1）。
+- 影響（待證）：(a) H_i-D1 之「LTE-only」可能是兩路最後事件之先後競賽；mmWave 鏈路變差時 mmWave PDU 變少，最後事件落在 LTE 之機率上升，這與 E20-5 之 PHY 相關性一致，但**未驗證**。(b) S_i 之 cell 平均含 LTE 路徑之 3 ms 樣本。(c) 與先前程式閱讀之結論「`McEnbPdcp` 為擇一切換、不同時分流」**矛盾**，須重查（可能另有承載或應用走 LTE）。
+
+
 ## 8. 產出與判讀
 
 - 輸出全在 `data/results/d30_delay_reconstructed/`（E-ii）與 `.../d30_delay_reconstructed/E_i/`（E-i）。
