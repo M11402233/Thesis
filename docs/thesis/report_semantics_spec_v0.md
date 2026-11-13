@@ -164,6 +164,15 @@ r7 = R-5 複本＋`byte-tag-list.cc` 關閉 `USE_FREE_LIST`。seed 4200、8 s。
 **解讀（限本次 8 s 短跑）**：(1) 第 1 項不改任何輸出；(2) 記憶體在兩種情境皆大幅降低，且**有、無換手之差異幾乎消失**（322 vs 327 MB），與「主因是 ByteTagList 全域最大值配置」相符；(3) NoAuto 也降低，表示原版之記憶體放大不只發生在換手，LTE 分流路徑本身亦然。
 **尚未驗證**：8 s 之外之長度（需至少數十秒以確認增長曲線）；FixedTtt 在 300 s 之總量；本項只消除「被放大」之部分，標籤本身仍可能隨換手累積（第 2 項處理）。
 
+### 5.10 使用者決定與後續（2026-11-13）
+- **第 2 項採 S2**（保留第一個 PdcpTag、清除其餘 byte tag）。實作於 `~/ns-3-mmwave-oran-r8`（= r7 ＋ S2 ＋ R-7b 計數器；patch `scripts/ns3_patches/r8_item2_S2_and_R7b_counters.diff`）：
+  - S2 以環境變數 `ZT_R7_S2=1` 開啟；**未設定時為原版行為（S0）**，同一個二進位檔可量 S0 與 S2。
+  - 套用位置：`lte-enb-rrc.cc` 轉送迴圈（原 `:1190` 之後；涵蓋 SendUeData／ForwardRlcPdu／回送 LTE PDCP 三個分支）與 HANDOVER_LEAVING 直接轉送（原 `:1325`）。UL 方向（`lte-ue-rrc.cc:1851`）**未改**。
+  - R-7b 計數器（只讀）：`LteRlcAm::DoReceivePdu` 每個 Rx PDU 之 (RlcTag 數, PdcpTag 數, 是否找到 RlcTag) 直方圖，結束時寫 `R7b_rlc_rx_tag_hist.txt`；涵蓋 DL 與 UL、**未區分方向**。「未找到 RlcTag」= 該樣本延遲記為 0（§5.5）。
+  - 驗收：(a) S0 FixedTtt 8 s 與 M1 逐位相同（計數器不改輸出）；(b) S2 FixedTtt 8 s 之每 PDU 標籤數有上限；(c) NoAuto 之 S0 與 S2 皆與 M0 逐位相同（無 NR 轉送）；(d) S2 與 S0 在有換手時之輸出差異只出現在換手相關之 PDU（延遲值），並量化差異。
+- **60 s 換手測試**（r7、第 1 項，D-30H 命令列）：`data/r7_validate/V3_fixedttt_t60/`；與原版 D-30H seed 4200 之前約 45 s 逐位比對，並記錄 RSS 曲線（原版：10 s 3.8 GB、45 s 15 GB）。
+- **第 1 項是否足夠**：記憶體方面待 60 s 曲線判定；延遲語意方面**不足**——第 1 項不改行為，舊時間戳仍會使轉送封包之 RLC 延遲從來源 cell 起算，所以 D-30H 之延遲須用 S2。
+
 ## 6. 第一階段重跑（S_i 乾淨校準／評估與 E9）
 
 兩種用途不同之評估：

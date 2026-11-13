@@ -1,0 +1,11 @@
+--- /home/cindy1/ns-3-mmwave-oran-r5/src/network/model/byte-tag-list.cc	2026-06-29 10:57:36.642066729 +0000
++++ /home/cindy1/ns-3-mmwave-oran-r7/src/network/model/byte-tag-list.cc	2026-11-13 08:17:45.208201306 +0000
+@@ -24,7 +24,7 @@
+ #include <limits>
+ #include <vector>
+ 
+-#define USE_FREE_LIST 1
++// #define USE_FREE_LIST 1  /* R-7 item 1 (2026-11-13): free list off -> allocate exact size, no global g_maxSize high-water mark */
+ #define FREE_LIST_SIZE 1000
+ #define OFFSET_MAX (std::numeric_limits<int32_t>::max())
+ 

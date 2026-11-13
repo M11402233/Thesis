@@ -12,7 +12,7 @@ case "${MODE}" in
   *) echo "bad MODE"; exit 2;;
 esac
 OUT="${HOME}/oran-zt-kpm-verification/data/r7_validate/${TAG}"; mkdir -p "${OUT}"; cd "${OUT}" || exit 1
-{ echo "tag=${TAG} mode=${MODE} start=$(date -u '+%F %T') ns3_dir=${NS3_DIR} args=${ARGS}"; md5sum "${BIN}" "${NS3_DIR}/build/lib/libns3.38.rc1-network-optimized.so" "${NS3_DIR}/build/lib/libns3.38.rc1-lte-optimized.so"; } > meta.txt
+{ echo "tag=${TAG} mode=${MODE} start=$(date -u '+%F %T') ns3_dir=${NS3_DIR} ZT_R7_S2=${ZT_R7_S2:-unset} args=${ARGS}"; md5sum "${BIN}" "${NS3_DIR}/build/lib/libns3.38.rc1-network-optimized.so" "${NS3_DIR}/build/lib/libns3.38.rc1-lte-optimized.so"; } > meta.txt
 "${BIN}" ${ARGS} > run.log 2>&1 & npid=$!
 echo -e "wall_s\tlast_window\trss_mb\tho_end\tmem_avail_mb" > mem.tsv; t0=$(date +%s)
 while kill -0 ${npid} 2>/dev/null; do

@@ -1,0 +1,139 @@
+--- ns-3-mmwave-oran-r7/src/lte/model/lte-enb-rrc.cc	2026-06-29 10:57:36.386059742 +0000
++++ ns-3-mmwave-oran-r8/src/lte/model/lte-enb-rrc.cc	2026-11-13 09:39:41.122167048 +0000
+@@ -32,6 +32,8 @@
+ #include "lte-enb-rrc.h"
+ 
+ #include "ns3/lte-pdcp-tag.h"
++#include <cstdlib>
++#include <string>
+ #include <ns3/abort.h>
+ #include <ns3/eps-bearer-tag.h>
+ #include <ns3/fatal-error.h>
+@@ -59,6 +61,35 @@
+ 
+ NS_LOG_COMPONENT_DEFINE("LteEnbRrc");
+ 
++// ---- R-7 item 2 (S2, 2026-11-13; docs/thesis/report_semantics_spec_v0.md §5.8) ----
++// ZT_R7_S2=1：轉送前只保留第一個 PdcpTag（原始 PDCP 起點），清除其餘所有 byte tag（含舊 RlcTag）。
++// 未設定（預設）＝原版行為（S0），不改任何輸出。
++static bool
++R7S2Enabled()
++{
++    static const bool on = [] {
++        const char* e = std::getenv("ZT_R7_S2");
++        return e != nullptr && std::string(e) == "1";
++    }();
++    return on;
++}
++
++static void
++R7S2StripForwardedByteTags(Ptr<Packet> p)
++{
++    if (!R7S2Enabled())
++    {
++        return;
++    }
++    PdcpTag first;
++    bool has = p->FindFirstMatchingByteTag(first);
++    p->RemoveAllByteTags();
++    if (has)
++    {
++        p->AddByteTag(first);
++    }
++}
++
+ ///////////////////////////////////////////
+ // CMAC SAP forwarder
+ ///////////////////////////////////////////
+@@ -1188,6 +1219,7 @@
+                 NS_LOG_LOGIC("removed pdcp header, size = " << rlcSdu->GetSize());
+ 
+                 rlcSdu->RemoveAllPacketTags(); // this does not remove byte tags
++                R7S2StripForwardedByteTags(rlcSdu); // R-7 item 2 (S2)
+                 NS_LOG_LOGIC("removed tags, size = " << rlcSdu->GetSize());
+                 params.ueData = rlcSdu;
+                 /*
+@@ -1315,6 +1347,7 @@
+             params.sourceCellId = m_rrc->ComponentCarrierToCellId(m_componentCarrierId);
+             params.targetCellId = m_targetCellId;
+             params.gtpTeid = GetDataRadioBearerInfo(drbid)->m_gtpTeid;
++            R7S2StripForwardedByteTags(p); // R-7 item 2 (S2)
+             params.ueData = p;
+             NS_LOG_LOGIC("PDCP_FORWARDING_SEQ");
+             NS_LOG_LOGIC("sourceCellId = " << params.sourceCellId);
+--- ns-3-mmwave-oran-r7/src/lte/model/lte-rlc-am.cc	2026-06-29 10:57:36.398060070 +0000
++++ ns-3-mmwave-oran-r8/src/lte/model/lte-rlc-am.cc	2026-11-13 09:39:41.126167133 +0000
+@@ -34,6 +34,10 @@
+ #include "ns3/lte-rlc-am-header.h"
+ #include "ns3/lte-rlc-sdu-status-tag.h"
+ #include "ns3/lte-rlc-tag.h"
++#include "ns3/lte-pdcp-tag.h"
++#include <fstream>
++#include <map>
++#include <tuple>
+ #include "ns3/simulator.h"
+ #include "ns3/string.h"
+ 
+@@ -42,6 +46,32 @@
+ 
+ NS_LOG_COMPONENT_DEFINE("LteRlcAm");
+ 
++// ---- R-7b 觀測（2026-11-13；只讀，不改行為）：每個 RLC AM Rx PDU 之 byte tag 組成 ----
++// 程式結束時寫出 R7b_rlc_rx_tag_hist.txt（cwd）：nRlcTag、nPdcpTag、firstRlcTagFound、count。
++// 涵蓋 DL（UE 端）與 UL（eNB 端）所有 RLC AM 實體；未區分方向。
++namespace
++{
++struct R7bRlcRxTagHist
++{
++    std::map<std::tuple<uint32_t, uint32_t, uint32_t>, uint64_t> h;
++    ~R7bRlcRxTagHist()
++    {
++        if (h.empty())
++        {
++            return;
++        }
++        std::ofstream f("R7b_rlc_rx_tag_hist.txt");
++        f << "% nRlcTag\tnPdcpTag\tfirstRlcTagFound\tcount\n";
++        for (const auto& kv : h)
++        {
++            f << std::get<0>(kv.first) << "\t" << std::get<1>(kv.first) << "\t"
++              << std::get<2>(kv.first) << "\t" << kv.second << "\n";
++        }
++    }
++};
++R7bRlcRxTagHist g_r7bRlcRxTagHist;
++} // namespace
++
+ NS_OBJECT_ENSURE_REGISTERED(LteRlcAm);
+ 
+ LteRlcAm::LteRlcAm()
+@@ -1877,9 +1907,29 @@
+     // Receiver timestamp
+     RlcTag rlcTag;
+     Time delay;
++    bool r7bFound = false;
+     if (rxPduParams.p->FindFirstMatchingByteTag(rlcTag))
+     {
+         delay = Simulator::Now() - rlcTag.GetSenderTimestamp();
++        r7bFound = true;
++    }
++    {
++        // R-7b：計數（只讀）
++        uint32_t nRlc = 0, nPdcp = 0;
++        ByteTagIterator it = rxPduParams.p->GetByteTagIterator();
++        while (it.HasNext())
++        {
++            TypeId tid = it.Next().GetTypeId();
++            if (tid == RlcTag::GetTypeId())
++            {
++                ++nRlc;
++            }
++            else if (tid == PdcpTag::GetTypeId())
++            {
++                ++nPdcp;
++            }
++        }
++        ++g_r7bRlcRxTagHist.h[std::make_tuple(nRlc, nPdcp, r7bFound ? 1u : 0u)];
+     }
+     m_rxPdu(m_rnti, m_lcid, rxPduParams.p->GetSize(), delay.GetNanoSeconds());
+ 
