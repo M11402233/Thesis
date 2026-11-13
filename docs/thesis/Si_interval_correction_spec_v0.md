@@ -82,6 +82,17 @@ E-ii 執行順序：`cv_interval.py` → `zt_kpm_xapp.py --fusion bound --eval-m
 解讀（限本樣本）：(b) 成立——混入之偏移中位數已接近舊尺度（約 0.06 ms）。(a) 與「最後事件競賽」相符之單調關聯，**不是機制證明**；LTE 只占約 1 % 時仍有 7.5 % 被記為 cell 1，故「LTE-only」不能解讀為由 LTE 服務。(d) 另一影響：每窗約三成 UE 被記為 cell 1 而**整個從 mmWave cell 平均中消失**，S_i 之 cell 母體每窗隨機變動。
 
 
+### 7.1 外部審閱意見之處理（2026-11-13，使用者指示參考）
+- **0.5 與 2.7 %／87 % 不可直接對照**：`perPckToLTE=0.5` 是 PDCP 分流點之 SDU 機率；上表比例是 UE 端 RLC **Rx PDU 樣本**之比例。兩者的分母（SDU vs PDU）、觀測位置（eNB PDCP vs UE RLC）不同，加上 mmWave 每 SDU 可能切成多個 PDU，不能期待兩者一致。須分層核對：
+  | 層級 | 要核對之量 | 目前 |
+  |---|---|---|
+  | PDCP 分流點 | 送 LTE／NR 之 SDU 數與 bytes、當時之 `m_perPckToLTE` | **無輸出**（R-7b 補） |
+  | RLC 事件 | 各路 Tx／Rx PDU 數與 bytes | 有（`_percell.txt`） |
+  | 延遲統計 | 各路新增樣本數、延遲總和、區間平均 | 有（`_percell.txt`） |
+- **執行時之 `perPckToLTE`（程式路徑確認，非實測）**：唯一的執行期修改路徑是 `LteEnbNetDevice::SetUeQoS`（`lte-enb-net-device.cc:393`），它由 `qos_actions.csv` 控制檔觸發。`ReadControlFile` 在 `m_controlFilename == ""` 時不做任何事（`:133`），scenario 之 `controlFileName` 預設為空（`scenario-three.cc:263`），而 `collect_ues30.sh` 與 `run_r5_noauto.sh` 都沒有傳這個參數；scenario 也沒有任何 `Config::Set` 或 `SetDefault` 改這個屬性。因此 D-30 與 R-5 之值應為 0.5。**實測**留待 R-7b（於分流點記錄實際使用之值）。
+- **措辭**：「LTE-only」一律改稱 **「最後事件歸屬 LTE」**（主檔 cell 欄 = 1），不得寫成「只有 LTE 連線／沒有 NR 服務」。cell 欄會被 Tx 與 Rx 事件覆寫，延遲只來自 Rx；要確認「最後事件競賽」，須記錄**窗末最後一次覆寫之時間、方向（Tx／Rx）、cell**後直接對帳（R-7b），目前的比例相關只算支持，不算證明。
+- **上表之統計單位**：**UE × 窗**（每 UE 每窗一列；窗 0–6，最後一窗不計）。當窗兩路都沒有新 Rx 之 UE-窗**排除**；「混合 − 只計 mmWave」排除當窗沒有 mmWave Rx 樣本之 UE-窗（`mmw_only` 為空）。四分位分組的邊界兩端都含，位於邊界上的列會被算進兩組（只影響分組比率，不影響其他數字）。
+
 ## 8. 產出與判讀
 
 - 輸出全在 `data/results/d30_delay_reconstructed/`（E-ii）與 `.../d30_delay_reconstructed/E_i/`（E-i）。

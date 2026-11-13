@@ -96,6 +96,32 @@ NoAuto 下舊檔（`DlE2RlcStats.txt` 等）與 D-30 seed 4200 同長度前綴**
 
 人工換手之機制候選為 F9；其執行時點（是否只能在讀檔週期）須先驗證，不行則另寫最小測試 scenario。延遲平均按各 cell 實際樣本計算，不得複製整窗平均。
 
+### 5.5 延遲起訖點（2026-11-13 程式閱讀；外部審閱意見 3）
+ns-O-RAN `DlE2RlcStats` 之 delay 樣本（RLC AM；scenario 預設 `rlcAmEnabled=true`，`scenario-three.cc:167`）：
+| 項目 | ns-O-RAN（本版本） | 依據 |
+|---|---|---|
+| 單位 | **RLC PDU**（一個 PDU 可含多個 SDU 之片段） | `LteRlcAm::DoReceivePdu` 每 PDU 觸發一次 `m_rxPdu` |
+| 起點 | 新資料 PDU **交給 MAC 之時刻**（eNB 端；byte tag） | `lte-rlc-am.cc:1145–1146` |
+| 終點 | **UE 端 RLC 收到 PDU 之時刻** | `lte-rlc-am.cc:1878–1884` |
+| 不含 | SDU 在 RLC 緩衝之排隊時間（`:256` 之 SDU 到達時間戳為 packet tag，Rx 端只找 byte tag） | 同上 |
+| 重傳 PDU | 以 `m_txedBuffer` 之副本重送；副本在加 byte tag **之前**建立（`:1139` copy，`:1146` tag）→ Rx 端找不到 tag → `delay` 維持預設 **0**，仍計入樣本 | `:461`、`:551`、`:1139–1146`、`:1880–1884` |
+| 控制 PDU | status PDU 用 packet tag（`:409–411`），若經 `DoReceivePdu` 計入亦為 0 | 同上 |
+
+**與 3GPP 之差異**：`DRB.RlcSduDelayDl`（TS 28.552 §5.1.3.3.3，第三方鏡像，正式版待查）是 SDU 從抵達 RLC 到最後一部分交給 MAC 初次傳送之時間，也就是 **RLC 內排隊時間**。ns-O-RAN 的量是**交給 MAC 之後到 UE 收到**，兩者大致互補，不是同一個量。OAI（本版本）量 SDU 在 RLC 之停留時間，與 3GPP 較接近。因此「把窗口對齊成 1 秒」並不保證三者量的是同一延遲。
+
+**零延遲樣本之存在證據（實測，R-5 窗 0–9）**：主檔 min 欄 = 0 之列為 293／300（UE × 窗）。min 是自 t=0 起之累計最小值，所以這只證明「幾乎每個 UE 都至少出現過一個 0 延遲樣本」，**無法得知比例**。比例與來源（重傳 vs 控制 PDU）須逐樣本記錄（R-7b）。在此之前，不得把區間平均延遲解讀為純傳輸延遲。
+
+### 5.6 R-7b 加裝輸出（待 heaptrack 結束後建置；另一份 ns-3 複本，不動 R-5 執行中之二進位檔）
+1. PDCP 分流點：每 (IMSI, 窗) 送 LTE／NR 之 SDU 數、bytes，以及當時之 `m_perPckToLTE`。
+2. RLC Rx：每 (IMSI, cell, 窗) 之 delay = 0 樣本數；有無 byte tag 之計數。
+3. cell 欄最後覆寫：每 (IMSI, 窗) 窗末最後一次覆寫 `m_dlCellId` 之時間、方向（Tx／Rx）、cell。
+4. 短跑（seed 4200，30–60 秒，NoAuto）僅作功能／機制確認；**不作為最終驗收**（使用者 Q4）。
+
+### 5.7 驗收腳本漏洞修正（2026-11-13）
+- `check_Q2_acceptance.py`：原版在短跑（未達窗 270）時，`B_pass_late = None` 仍可得 `Q2_pass = True`，與 Q4 決定衝突 → 改為短跑只給 `functional_pass`、`Q2_pass` 一律 False；另加 exact／reconstructed 鍵集合一致檢查；失敗 exit 1。
+- `check_R5_R6.py`：原版只印數字、永遠 exit 0；只迭代舊檔之鍵；前一窗缺列時靜默略過；未比對 cell 欄 → 加 `R5_pass`／`R6_pass`、`extra_exact_row`、`gap_prev_missing`、`cell_mismatch`，失敗 exit 1。
+- 修正後於 R-5 窗 0–9 重跑：R-5 結構檢查 0 失敗、反推誤差 max 0.0004 ms；R-6 前 9 窗逐位相同（271 行）；Q2 `functional_pass = True`、`Q2_pass = False`（短跑，依定義）。
+
 ## 6. 第一階段重跑（S_i 乾淨校準／評估與 E9）
 
 兩種用途不同之評估：
@@ -112,6 +138,21 @@ NoAuto 下舊檔（`DlE2RlcStats.txt` 等）與 D-30 seed 4200 同長度前綴**
 ## 7. 記憶體（另線，已啟動；`scripts/memdiag_d30h.sh`，輸出 `data/d30h_memdiag/`）
 
 固定建置（同 §1 commit、binary md5 記於各 `meta.txt`），seed 4200、8 秒、一次改一個因素：M0 NoAuto；M1 FixedTtt；M2 FixedTtt＋`--enableTraces=false`；M3 FixedTtt＋E2 NR／LTE 報表關閉。記錄 RSS 與換手數。之後依結果檢查換手後是否重複註冊回呼、保留舊物件或累積未清除之統計容器（例如 F1 之 map 以 (IMSI, LCID) 為鍵不會隨換手成長，須另查 RLC／UeManager／X2）。不提高防護上限、不靠換機或 Docker。統計修正後以同一最小案例重跑比較。
+
+### 7.1 M0–M3 結果與表述（2026-11-13；措辭依外部審閱意見 5 修正）
+| 情境 | 換手數（8 s） | RSS 約 3–4 s 時 | RSS 末筆 |
+|---|---|---|---|
+| M0 NoAuto | 0 | 1,376 MB | 2,087 MB |
+| M1 FixedTtt | 123 | 1,685 MB | **缺**（取樣迴圈最後一次讀 /proc 時行程已結束） |
+| M2 FixedTtt，trace 關 | 123 | 1,735 MB | 3,094 MB |
+| M3 FixedTtt，E2 報表關 | 123 | 1,685 MB | 3,093 MB |
+
+**可以說的**：在這個 8 秒案例中，關閉 trace 或 E2 輸出都**沒有消除**換手情境多出來的約 1 GB；增長來源**尚待定位**。
+**不能說的**：「換手造成洩漏」或「每次換手洩漏固定容量」。M1 缺末筆；各情境的封包積壓（RLC／X2 轉送緩衝）也可能不同，額外使用量可能是**仍在使用中的緩衝**，不一定是洩漏。
+
+### 7.2 下一步（有辨識力之測試）
+- **H0／H1 heaptrack**（進行中，seed 4200，4 秒）：在 ubuntu:22.04 容器中跑既有 optimized 二進位檔，比較兩者的配置呼叫堆疊（`scripts/heaptrack_d30h.sh`，輸出 `data/d30h_memdiag/HT/`）。容器只用來提供 profiler（主機無 sudo 可裝），**不是**用 Docker 規避記憶體問題。
+- **凍結換手測試（待建）**：前段照常換手，於 t = T₀ 起禁止新換手（scenario 複本加選項，於 T₀ 把 `HoSinrDifference` 設為極大值），模擬繼續跑；記錄 RSS、累計換手數、各 eNB `m_ueMap` 大小、RLC 緩衝與 X2 轉送緩衝量。判讀：凍結後 RSS 停止增長或回落 → 是使用中的緩衝或暫態；持續增長 → 有與換手無關的累積；維持平台但不回收 → 換手留下的殘留（洩漏候選），再對照 heaptrack 之堆疊。
 
 ## 8. 待使用者決定（附建議）
 

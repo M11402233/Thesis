@@ -10,6 +10,9 @@
       （tgt 為 UE 平均、ref 為 peer cell 平均之中位數，兩者之變動皆 ≤ 該窗 UE 誤差最大值）；
       列出 |z_exact − τ_S| < Δz_bound 之 (節點, 窗) 與其判定是否翻轉。
 用法：check_Q2_acceptance.py <run_dir> [--late 270] [--loso-files f1 ...] --json out.json
+2026-11-13 修正驗收漏洞：(1) 原版短跑（未達 --late）時 B_pass_late=None 仍可得 Q2_pass=True，與使用者 Q4 決定
+（短跑僅功能檢查，最終驗收須 ≥1 個 NoAuto seed 301 秒）衝突 → 改為 Q2_pass 須後期組存在；短跑只給 functional_pass。
+(2) 原版只迭代 exact 之鍵 → 加 exact／reconstructed 之 (窗, cell, UE) 鍵集合一致檢查（不一致即失敗）。(3) 失敗時 exit 1。
 """
 import os, sys, json, argparse
 import numpy as np
@@ -43,11 +46,15 @@ out = {"run": a.run, "windows": [min(EX), max(EX)], "scale_exact_s_prime_ms": s_
        "note": "s′ 取自單一 R-5 run 之精確值（精確值僅此一 run，無法 LOSO）；是否接受此偏離待使用者決定"}
 if a.loso_files:
     out["scale_reconstructed_d30_pooled_ms"] = scale_of(a.loso_files, "reconstructed")
+# 鍵集合一致
+kx = {(w, c, i) for w in EX for c in EX[w] for i in EX[w][c]}; kr = {(w, c, i) for w in RC for c in RC[w] for i in RC[w][c]}
+out["keys_only_exact"] = len(kx - kr); out["keys_only_reconstructed"] = len(kr - kx); keys_ok = (kx == kr)
 # (B)
 err, err_late = [], []
 for w in EX:
     for c in EX[w]:
         for i, d in EX[w][c].items():
+            if (w, c, i) not in kr: continue
             e = abs(RC[w][c][i] - d); err.append(e)
             if w >= a.late: err_late.append(e)
 def summ(x):
@@ -60,7 +67,7 @@ if BL is None: out["B_late_note"] = f"run 未達窗 {a.late}（短跑），後�
 # (C)(D)
 same = tot = 0; near = []; flips = 0
 for w in EX:
-    werr = max(abs(RC[w][c][i] - EX[w][c][i]) for c in EX[w] for i in EX[w][c])
+    werr = max(abs(RC[w][c][i] - EX[w][c][i]) for c in EX[w] for i in EX[w][c] if (w, c, i) in kr)
     for j in EX[w]:
         if j == X.LTE_CELL: continue
         ve, ze, _ = X.verify_si(EX[w], j, s_ex); vr, zr, _ = X.verify_si(RC[w], j, s_ex)
@@ -73,6 +80,9 @@ for w in EX:
 out["C_verdict_identical_share"] = same / tot if tot else None; out["C_node_windows"] = tot; out["C_flips"] = flips
 out["C_pass"] = (same / tot >= 0.999) if tot else None
 out["D_near_threshold"] = near; out["D_near_threshold_n"] = len(near); out["D_near_flips"] = sum(n["flip"] for n in near)
-out["Q2_pass"] = bool(out["B_pass_all"] and (out["B_pass_late"] in (True, None)) and out["C_pass"])
+out["functional_pass"] = bool(keys_ok and out["B_pass_all"] and out["B_pass_late"] in (True, None) and out["C_pass"])
+out["Q2_pass"] = bool(out["functional_pass"] and out["B_pass_late"] is True)  # 最終驗收：須含窗 ≥ late
+if out["B_pass_late"] is None: out["Q2_note"] = "短跑：僅 functional_pass 有意義；Q2_pass 依定義為 False（使用者 Q4）"
 print(json.dumps({k: v for k, v in out.items() if k != "D_near_threshold"}, ensure_ascii=False, indent=1))
 if a.json: json.dump(out, open(a.json, "w"), ensure_ascii=False, indent=1)
+sys.exit(0 if out["Q2_pass"] else 1)
