@@ -64,7 +64,22 @@ E-ii 執行順序：`cv_interval.py` → `zt_kpm_xapp.py --fusion bound --eval-m
 - 依事件自身 cellId 累計，30 個 UE 每個都有 cell 1 之事件，且 **Tx 與 Rx 同時存在**（30 UE 合計：窗 0 末 888／886、窗 1 末 1,888／1,886、窗 2 末 2,888／2,886），即每秒約 1,000 個 PDU（每 UE 約 33 個／秒、每個約 9.4 KB）。
 - cell 1 之 PDU 延遲**全部恰為 3.000 ms**（30 個 UE 之 Σdelay 完全相同，例：窗 1 末 188,999,937 ns／63 個）。
 - ⇒ 這是一條與 mmWave 並行、持續承載資料之 **LTE 路徑**（同一 LCID 3），不是「UE 端事件被綁到 cell 1」。主檔之 delay 為 mmWave 與 LTE 兩路 PDU 之**混合**平均；主檔 cell 欄為「該窗最後一個事件屬於哪一路」（窗 0–2 中 12、12、9 個 UE 被記為 cell 1）。
-- 影響（待證）：(a) H_i-D1 之「LTE-only」可能是兩路最後事件之先後競賽；mmWave 鏈路變差時 mmWave PDU 變少，最後事件落在 LTE 之機率上升，這與 E20-5 之 PHY 相關性一致，但**未驗證**。(b) S_i 之 cell 平均含 LTE 路徑之 3 ms 樣本。(c) 與先前程式閱讀之結論「`McEnbPdcp` 為擇一切換、不同時分流」**矛盾**，須重查（可能另有承載或應用走 LTE）。
+- 影響（待證）：(a) H_i-D1 之「LTE-only」可能是兩路最後事件之先後競賽；mmWave 鏈路變差時 mmWave PDU 變少，最後事件落在 LTE 之機率上升，這與 E20-5 之 PHY 相關性一致，但**未驗證**。(b) S_i 之 cell 平均含 LTE 路徑之 3 ms 樣本。(c) ~~與先前程式閱讀之結論矛盾~~ → **已查明**：`src/lte/model/mc-enb-pdcp.cc:275–285`，mmWave 連線模式下**每個 PDCP SDU 以機率 `perPckToLTE` 送 LTE**（屬性預設 0.5，`mc-enb-pdcp.cc:109–114`；scenario-three 未設定）。先前「擇一切換」之說法錯誤：`SwitchConnection` 只決定能否分流。
+
+**R-5 量化（窗 0–6，30 UE，210 個 (UE, 窗)；`explore_r5_legs.py` → `data/results/semantics_v0/explore_r5_legs_w0-6.json`；探索性）**
+
+| 項 | 值 |
+|---|---|
+| LTE 路徑 PDU 延遲 | 全部 2.999999 ms（逐 (UE, 窗) 最小＝最大） |
+| LTE 樣本比例（Rx PDU 數） | 中位數 0.027；q10 0.010；q90 0.868 |
+| 混合平均 − 只計 mmWave | 中位數 +0.045 ms；q10 +0.022；q90 +0.756 |
+| 中位數：混合／只計 mmWave | 0.871／0.805 ms |
+| 主檔被記為 cell 1 之比例 | 0.319 |
+| 依 LTE 樣本比例四分位之 cell 1 比例 | 0.075 → 0.231 → 0.385 → 0.585（單調遞增） |
+| 記為 cell 1 而當窗無新 LTE 事件 | 0 |
+| 記為 mmWave cell 而當窗無新 mmWave Rx | 5（cell 欄亦被 eNB 端 Tx 覆寫，見 F1） |
+
+解讀（限本樣本）：(b) 成立——混入之偏移中位數已接近舊尺度（約 0.06 ms）。(a) 與「最後事件競賽」相符之單調關聯，**不是機制證明**；LTE 只占約 1 % 時仍有 7.5 % 被記為 cell 1，故「LTE-only」不能解讀為由 LTE 服務。(d) 另一影響：每窗約三成 UE 被記為 cell 1 而**整個從 mmWave cell 平均中消失**，S_i 之 cell 母體每窗隨機變動。
 
 
 ## 8. 產出與判讀
