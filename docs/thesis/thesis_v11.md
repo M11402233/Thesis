@@ -1,5 +1,8 @@
 # 非公眾網路 O-RAN 邊緣節點的零信任 E2 量測資料可信度驗證：以跨節點空間物理一致性對抗 KPM 偽造
 
+> **⚠️ 量測語意待修正（2026-11-13）**：本檔之 S_i／H_i／C_i／融合／准入／RQ3／E9–E26／E19 結果所用之 `DlE2RlcStats` delay 為自 t=0 起之累計平均、計數為累計、cell 為最後一筆 PDU 所在 cell（`docs/thesis/ns3_report_semantics_audit_20261113.md`）。**暫不支持「每窗（區間）量測」之主張**；檔案、程式與數值保留不動，待重建驗證與重跑（規格 `docs/thesis/report_semantics_spec_v0.md`）。D4（CU-CP 時點名單）不受 RLC 累計直接影響，但與主檔比對或融合之部分同樣待確認。
+
+
 *Zero-Trust Verification of E2 Measurement-Data Trustworthiness for NPN O-RAN Edge Nodes: Defending KPM Falsification via Cross-Node Spatial-Physical Consistency*
 
 **版本**： v11（2026-11-12）——v10 ＋ H_i 措辭修訂（W1–W12，依 E20-5 PHY 交叉驗證；見 `docs/thesis/H_i_wording_revision_20261112.md`）

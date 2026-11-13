@@ -22,7 +22,7 @@
   - **`data/ues30_ho_seeds/` = D-30H（含合法 NR 間換手；D-30 參數＋`--handoverMode=FixedTtt`）**：2026-11-12 19:12 UTC 起於舊機器收集，2 實例（A：4200/4202/4204/4206；B：4201/4203/4205/4207），每 seed 約 40 小時；規格 `docs/thesis/D30H_handover_data_spec.md`，腳本 `scripts/collect_d30h.sh`，log `data/ues30_ho_seeds/collect_{A,B}.log`。**不得終止**；加開第 3 個實例須問使用者。**2026-11-13 03:32 UTC 依使用者決定停止佇列；全部輸出僅供診斷（`README_DIAGNOSTIC_ONLY.md`），不得併入正式資料**
   - `data/ues28_seeds/` = 28 UE 校準紀錄（已被 D-30 取代，僅保留校準證據）
 
-> **⚠️ 2026-11-13 稽核（未決）**：`DlE2RlcStats`（D-30／D-SH 主檔）之計數與 delay 為**自 t=0 起累計／累計平均**，cell = 最後一筆 PDU 所在 cell（ns-3 E2 RLC 計算器從未重置）。詳見 `docs/thesis/ns3_report_semantics_audit_20261113.md`。使用者決定前不得據此改任何結果或正文。
+> **⚠️ 2026-11-13 稽核（已決：分階段重建→重評估）**：`DlE2RlcStats`（D-30／D-SH 主檔）之計數與 delay 為**自 t=0 起累計／累計平均**，cell = 最後一筆 PDU 所在 cell（ns-3 E2 RLC 計算器從未重置）。詳見 `docs/thesis/ns3_report_semantics_audit_20261113.md`。使用者決定前不得據此改任何結果或正文。
 
 ## ⚠️ 硬性規則（違反會毀掉論文資料）
 
@@ -56,6 +56,8 @@
 **已知結構缺口（已處理）**：window 政策下 `R2_SI_D1_BOUND` 無合法觸發路徑（D1 證據 UE 必在錨點）；定案之 uebound 以「UE 消失前之 serving mmWave cell」綁定，使其可觸發，代價為乾淨資料 6 筆誤拒（4.9.6.5）。
 
 ## 已確立之結果（D-30，2026-10-13；引用時以 `data/results/d30/` 之腳本輸出為準）
+
+> **⚠️ 2026-11-13 起標記為「量測語意待修正，暫不支持區間量測主張」**（使用者決定：分階段 (c) → 技術驗證通過後 (a) 全面重評估含 E19；**不採** 改寫為累計平均以維持原主張）。下列數字保留為歷史版本結果。
 
 > 前版 7 UE 資料（D-SH／D-C）之數字已不再作為主結果，僅見 thesis 附錄 A 與各節之「揭露」。
 
