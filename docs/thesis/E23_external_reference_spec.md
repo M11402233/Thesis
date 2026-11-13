@@ -110,3 +110,17 @@
 
 1. **實測路線不通**：D-30 內 DU 以外之逐 UE 延遲（PDCP）無法約束 KPM。依 Q6，E23 之外部參照**不進入 S2**，改列未來工作；可寫之結論為「需要對每個 UE、每一窗、精度約 5 % 以內之獨立量測，抽查不足」——此為假設性上界（Ref-O），不是已驗證之機制。
 2. **事後觀察（非判定依據；Ref-0 原為對照組）**：Ref-0＝「節點內 UE 之 log 延遲平均，對凍結之全域常數」，乾淨誤報 0.050 下對 ×0.8 偵測 0.870（單窗 S_i 於 ×0.8 之違反率為 3.7 %，E19 §13.3）；與 B-off 合用（即上表 Ref-P 列，其資訊等同 Ref-0）對固定攻擊者 FB 0.056、MF ×0.8 0.143。**不得據此主張**，理由：(a) 事後發現；(b) 參照為凍結之全域基線而非同時態 peer，共模變化與非穩態下之行為未評估（E9c、4.7 之自我參照盲點即此類）；(c) ×0.892 僅 0.369，學習型攻擊者可把偏離量縮至此區間——與 E21-S3 → S4「對固定攻擊者有效、對學習型不保持」同型；(d) 增益來自 log 域或來自全域參照尚未分離。
+
+## R11 查證紀錄（2026-11-13）
+
+> 來源為第三方條文鏡像（itecspec.com、whatthespec.net），**非 3GPP／ETSI 正式檔**；條號與文字三處一致，但寫入正文前須以正式版本（3GPP FTP 或 ETSI PDF）逐字再核，並依 Citation Map 慣例記版本號。
+
+| 項 | 條號與定義（鏡像所標版本） | 對本研究之意義 |
+|---|---|---|
+| (a) TS 28.552（鏡像標 Rel-20） | §5.1.3.3.1 *Average delay DL in CU-UP*：gNB-CU-UP 內 PDCP SDU 之平均延遲（自 NG-U ingress IP 終端到達，至經 F1-U／Xn-U 送往 gNB-DU 之 egress PDCP 層）；DER (n=1)；單位 0.1 ms；名稱 `DRB.PdcpSduDelayDl`（per PLMN／QoS／S-NSSAI 過濾）；物件 GNBCUUPFunction | 名稱屬 **CU-UP**，不是空口延遲；原 R11 寫「`DRB.PdcpSduDelayDl` 於 TS 28.552」之條號確認為 5.1.3.3.1 |
+|  | §5.1.3.3.3 *Average delay DL in gNB-DU*：gNB-DU 內 RLC SDU 之平均延遲（自 F1-U ingress 到達，至最後一段被排程送往 MAC）；AM 重傳只計原始延遲；單位 0.1 ms；名稱 `DRB.RlcSduDelayDl`；物件 **NRCellDU** | 這是本研究 DU 端 KPM 延遲之標準對應：**逐 cell、算術平均**。ns-O-RAN 之 E2 RLC 計算器從未重置（稽核 F2–F4），與「每個量測區間之平均」不一致（量測區間依 granularity period，屬本人對 28.552／28.550 之讀法，未逐字查證） |
+|  | §5.1.3.3.2 *Average delay DL on F1-U*；§5.1.1.1.1 *Average delay DL air-interface* | 由 38.314 引用 |
+| (b) TS 38.314（鏡像標 Rel-19） | §4.2.1.2.1：DL 之 RAN 部分 = D1 空口（→ 28.552 §5.1.1.1.1）＋ D2 gNB-DU RLC（→ §5.1.3.3.3）＋ D3 F1-U（→ §5.1.3.3.2）＋ D4 CU-UP（→ §5.1.3.3.1）。UL（含 UE）：D1 = UE 端 UL PDCP 平均延遲（§4.3.1.1，§4.3「NR measurements performed by the UE」）＋ D2.1 空口、D2.2 RLC、D2.3 F1-U、D2.4 PDCP 重排序 | **DL 之四段皆由 gNB 側產生**；UE 端量測只有 UL PDCP 延遲（§4.3.1.1）。⇒「DU 以外之 DL 延遲量測」在標準中由 CU-UP（D4）與 F1-U（D3）產生，**仍在 RAN 內**；UE 不產生 DL 延遲量測。D 編號於 Rel-16 草稿為三段（D1 DU、D2 F1-U、D3 CU-UP），引用時須註明版本 |
+| (c) TS 23.501（鏡像標 v20.2.0） | §5.33.3.1 *General*：QoS Monitoring 量測 UE 與 PSA UPF 間之封包延遲 = TS 38.314 之 RAN 部分 ＋ NG-RAN 至 PSA UPF 之延遲；由 AF 請求或 PCF 政策觸發，PCF 產生授權政策→ SMF 設定 UPF 與 NG-RAN；per QoS Flow per UE 或 per GTP-U path。§5.33.3.2：PSA UPF 於 GTP-U 標頭加 QMP 指示與時間戳 T1；**NG-RAN 與 PSA UPF 未時間同步時結果可能不準** | 唯一不由 DU 自報、由核心網（UPF）參與之延遲量測；但其 RAN 部分仍取自 38.314（即仍含 gNB 自報），且需時間同步。可作為 E23「外部參照」之標準依據之一，限制須照寫 |
+
+**結論**：R11 三項之條號已依鏡像確認；「`DRB.PdcpSduDelayDl` 是空口延遲」之類說法不成立（它是 CU-UP 段）。正文引用前仍須以正式版本核對，故 E23 正文維持【待正式版本核對】。
