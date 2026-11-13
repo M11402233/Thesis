@@ -1,0 +1,7 @@
+{
+ "run": "data/r7_validate/R8b_S0_fixedttt",
+ "ref": "data/d30h_memdiag/M1",
+ "files": 61,
+ "files_with_diff_or_empty": 0,
+ "diffs": {}
+}

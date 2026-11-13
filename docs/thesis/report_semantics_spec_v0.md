@@ -173,6 +173,25 @@ r7 = R-5 複本＋`byte-tag-list.cc` 關閉 `USE_FREE_LIST`。seed 4200、8 s。
 - **60 s 換手測試**（r7、第 1 項，D-30H 命令列）：`data/r7_validate/V3_fixedttt_t60/`；與原版 D-30H seed 4200 之前約 45 s 逐位比對，並記錄 RSS 曲線（原版：10 s 3.8 GB、45 s 15 GB）。
 - **第 1 項是否足夠**：記憶體方面待 60 s 曲線判定；延遲語意方面**不足**——第 1 項不改行為，舊時間戳仍會使轉送封包之 RLC 延遲從來源 cell 起算，所以 D-30H 之延遲須用 S2。
 
+### 5.11 R-7 第 2 項（S2）8 秒驗證結果（2026-11-13 11:03 UTC）
+
+r8 = r7 ＋ S2（env `ZT_R7_S2=1` 啟用；預設 S0 原轉送行為）＋ R-7b 唯讀計數（`lte-rlc-am.cc` `DoReceivePdu`，DL＋UL 合計，未分方向）。seed 4200、FixedTtt、8 s，123 次換手。
+
+| 檢查 | 結果 | 輸出 |
+|---|---|---|
+| (a) S0（r8）vs M1（原 binary）| 61 檔逐位相同 → 計數器不改輸出 | `data/results/semantics_v0/r8_S0fixed_vs_M1.json` |
+| (b) 每個 RLC PDU 之 PdcpTag 數 | S0：最大 89、平均 2.618；S2：最大 9、平均 1.646 | `R7b_hist_S{0,2}_fixedttt_8s.txt` |
+| (d) S2 vs S0 | 61 個共同輸出檔逐位相同（僅計數檔本身不同）| `r8_S2fixed_vs_S0fixed.json` |
+| RSS（8 s）| S0 327 MB、S2 320 MB | `mem.tsv` |
+| (c) NoAuto S0／S2 vs M0 | 11:04 UTC 啟動，待結果 | `data/r7_validate/R8{d,e}_*_noauto/` |
+
+解讀（範圍限 seed 4200、8 s）：
+- S2 有界化標籤數（89 → 9）；剩餘之多個 PdcpTag 為一個 RLC PDU 串接多個 SDU 之正常情形（PdcpTag>1 之 PDU 數 S0、S2 皆 228,080，47.90 %）。
+- **S2 未改變任何 E2 報表或 trace 輸出**。故 §5.8 之假設「舊時間戳使 delay 偏差」於此設定**不成立／未觀察到**：`FindFirstMatchingByteTag` 取到之第一個標籤在 S0 與 S2 相同。不得於正文宣稱舊標籤造成延遲偏差。
+- 記憶體面：第 1 項已足以消除 8 s 內之膨脹；S2 之額外效益為 7 MB。是否需要 S2 取決於 V3（60 s）與更長 run 之標籤累積，目前不能宣稱必要。
+- 無 RLC 時間標籤之 PDU：61,945／476,137（13.01 %）。**此為 DL＋UL 合計且含 STATUS 控制 PDU 與重傳副本，不等於「DL delay 0 樣本占比」**；要報 DL 0 延遲樣本占比須加方向與 PDU 類型區分之計數（未做）。
+
+
 ## 6. 第一階段重跑（S_i 乾淨校準／評估與 E9）
 
 兩種用途不同之評估：

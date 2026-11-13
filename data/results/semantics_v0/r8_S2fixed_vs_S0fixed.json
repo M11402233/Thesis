@@ -1,0 +1,14 @@
+{
+ "run": "data/r7_validate/R8c_S2_fixedttt",
+ "ref": "data/r7_validate/R8b_S0_fixedttt",
+ "files": 62,
+ "files_with_diff_or_empty": 1,
+ "diffs": {
+  "R7b_rlc_rx_tag_hist.txt": {
+   "lines_run": 15,
+   "lines_ref": 83,
+   "compared": 15,
+   "first_diff_line": 3
+  }
+ }
+}
