@@ -1,0 +1,345 @@
+{
+ "run": "data/r7_validate/V1_noauto",
+ "ref": "data/d30h_memdiag/M0",
+ "files": 56,
+ "files_with_diff_or_empty": 0,
+ "diffs": {},
+ "all": {
+  "CellIdStats.txt": {
+   "lines_run": 30,
+   "lines_ref": 30,
+   "compared": 30,
+   "first_diff_line": null
+  },
+  "DlE2PdcpStats.txt": {
+   "lines_run": 211,
+   "lines_ref": 211,
+   "compared": 211,
+   "first_diff_line": null
+  },
+  "DlE2PdcpStatsLte.txt": {
+   "lines_run": 241,
+   "lines_ref": 241,
+   "compared": 241,
+   "first_diff_line": null
+  },
+  "DlE2RlcStats.txt": {
+   "lines_run": 211,
+   "lines_ref": 211,
+   "compared": 211,
+   "first_diff_line": null
+  },
+  "DlE2RlcStatsLte.txt": {
+   "lines_run": 241,
+   "lines_ref": 241,
+   "compared": 241,
+   "first_diff_line": null
+  },
+  "DlMacStats.txt": {
+   "lines_run": 7889,
+   "lines_ref": 7889,
+   "compared": 7889,
+   "first_diff_line": null
+  },
+  "DlPdcpStats.txt": {
+   "lines_run": 31,
+   "lines_ref": 31,
+   "compared": 31,
+   "first_diff_line": null
+  },
+  "DlPhyTransmissionTrace.txt": {
+   "lines_run": 676050,
+   "lines_ref": 676050,
+   "compared": 676050,
+   "first_diff_line": null
+  },
+  "DlRlcStats.txt": {
+   "lines_run": 31,
+   "lines_ref": 31,
+   "compared": 31,
+   "first_diff_line": null
+  },
+  "DlRxPhyStats.txt": {
+   "lines_run": 15773,
+   "lines_ref": 15773,
+   "compared": 15773,
+   "first_diff_line": null
+  },
+  "DlTxPhyStats.txt": {
+   "lines_run": 7887,
+   "lines_ref": 7887,
+   "compared": 7887,
+   "first_diff_line": null
+  },
+  "EnbSchedAllocTraces.txt": {
+   "lines_run": 934796,
+   "lines_ref": 934796,
+   "compared": 934796,
+   "first_diff_line": null
+  },
+  "LteDlRsrpSinrStats.txt": {
+   "lines_run": 240001,
+   "lines_ref": 240001,
+   "compared": 240001,
+   "first_diff_line": null
+  },
+  "LteUlInterferenceStats.txt": {
+   "lines_run": 7875,
+   "lines_ref": 7875,
+   "compared": 7875,
+   "first_diff_line": null
+  },
+  "LteUlSinrStats.txt": {
+   "lines_run": 721,
+   "lines_ref": 721,
+   "compared": 721,
+   "first_diff_line": null
+  },
+  "MmWaveSinrTime.txt": {
+   "lines_run": 1050000,
+   "lines_ref": 1050000,
+   "compared": 1050000,
+   "first_diff_line": null
+  },
+  "MmWaveSwitchStats.txt": {
+   "lines_run": 30,
+   "lines_ref": 30,
+   "compared": 30,
+   "first_diff_line": null
+  },
+  "RlcAmBufferSize.txt": {
+   "lines_run": 191003,
+   "lines_ref": 191003,
+   "compared": 191003,
+   "first_diff_line": null
+  },
+  "RxPacketTrace.txt": {
+   "lines_run": 486771,
+   "lines_ref": 486771,
+   "compared": 486771,
+   "first_diff_line": null
+  },
+  "UeFailures.txt": {
+   "lines_run": 1,
+   "lines_ref": 1,
+   "compared": 1,
+   "first_diff_line": null
+  },
+  "UlE2PdcpStats.txt": {
+   "lines_run": 1,
+   "lines_ref": 1,
+   "compared": 1,
+   "first_diff_line": null
+  },
+  "UlE2PdcpStatsLte.txt": {
+   "lines_run": 1,
+   "lines_ref": 1,
+   "compared": 1,
+   "first_diff_line": null
+  },
+  "UlE2RlcStats.txt": {
+   "lines_run": 211,
+   "lines_ref": 211,
+   "compared": 211,
+   "first_diff_line": null
+  },
+  "UlE2RlcStatsLte.txt": {
+   "lines_run": 241,
+   "lines_ref": 241,
+   "compared": 241,
+   "first_diff_line": null
+  },
+  "UlMacStats.txt": {
+   "lines_run": 7881,
+   "lines_ref": 7881,
+   "compared": 7881,
+   "first_diff_line": null
+  },
+  "UlPdcpStats.txt": {
+   "lines_run": 1,
+   "lines_ref": 1,
+   "compared": 1,
+   "first_diff_line": null
+  },
+  "UlRlcStats.txt": {
+   "lines_run": 31,
+   "lines_ref": 31,
+   "compared": 31,
+   "first_diff_line": null
+  },
+  "UlRxPhyStats.txt": {
+   "lines_run": 7875,
+   "lines_ref": 7875,
+   "compared": 7875,
+   "first_diff_line": null
+  },
+  "UlTxPhyStats.txt": {
+   "lines_run": 7879,
+   "lines_ref": 7879,
+   "compared": 7879,
+   "first_diff_line": null
+  },
+  "X2Stats.txt": {
+   "lines_run": 268574,
+   "lines_ref": 268574,
+   "compared": 268574,
+   "first_diff_line": null
+  },
+  "bsState.txt": {
+   "lines_run": 50,
+   "lines_ref": 50,
+   "compared": 50,
+   "first_diff_line": null
+  },
+  "cu-cp-cell-1.txt": {
+   "lines_run": 211,
+   "lines_ref": 211,
+   "compared": 211,
+   "first_diff_line": null
+  },
+  "cu-cp-cell-2.txt": {
+   "lines_run": 64,
+   "lines_ref": 64,
+   "compared": 64,
+   "first_diff_line": null
+  },
+  "cu-cp-cell-3.txt": {
+   "lines_run": 29,
+   "lines_ref": 29,
+   "compared": 29,
+   "first_diff_line": null
+  },
+  "cu-cp-cell-4.txt": {
+   "lines_run": 22,
+   "lines_ref": 22,
+   "compared": 22,
+   "first_diff_line": null
+  },
+  "cu-cp-cell-5.txt": {
+   "lines_run": 29,
+   "lines_ref": 29,
+   "compared": 29,
+   "first_diff_line": null
+  },
+  "cu-cp-cell-6.txt": {
+   "lines_run": 29,
+   "lines_ref": 29,
+   "compared": 29,
+   "first_diff_line": null
+  },
+  "cu-cp-cell-7.txt": {
+   "lines_run": 22,
+   "lines_ref": 22,
+   "compared": 22,
+   "first_diff_line": null
+  },
+  "cu-cp-cell-8.txt": {
+   "lines_run": 22,
+   "lines_ref": 22,
+   "compared": 22,
+   "first_diff_line": null
+  },
+  "cu-up-cell-1.txt": {
+   "lines_run": 211,
+   "lines_ref": 211,
+   "compared": 211,
+   "first_diff_line": null
+  },
+  "cu-up-cell-2.txt": {
+   "lines_run": 64,
+   "lines_ref": 64,
+   "compared": 64,
+   "first_diff_line": null
+  },
+  "cu-up-cell-3.txt": {
+   "lines_run": 29,
+   "lines_ref": 29,
+   "compared": 29,
+   "first_diff_line": null
+  },
+  "cu-up-cell-4.txt": {
+   "lines_run": 22,
+   "lines_ref": 22,
+   "compared": 22,
+   "first_diff_line": null
+  },
+  "cu-up-cell-5.txt": {
+   "lines_run": 29,
+   "lines_ref": 29,
+   "compared": 29,
+   "first_diff_line": null
+  },
+  "cu-up-cell-6.txt": {
+   "lines_run": 29,
+   "lines_ref": 29,
+   "compared": 29,
+   "first_diff_line": null
+  },
+  "cu-up-cell-7.txt": {
+   "lines_run": 22,
+   "lines_ref": 22,
+   "compared": 22,
+   "first_diff_line": null
+  },
+  "cu-up-cell-8.txt": {
+   "lines_run": 22,
+   "lines_ref": 22,
+   "compared": 22,
+   "first_diff_line": null
+  },
+  "du-cell-2.txt": {
+   "lines_run": 64,
+   "lines_ref": 64,
+   "compared": 64,
+   "first_diff_line": null
+  },
+  "du-cell-3.txt": {
+   "lines_run": 29,
+   "lines_ref": 29,
+   "compared": 29,
+   "first_diff_line": null
+  },
+  "du-cell-4.txt": {
+   "lines_run": 22,
+   "lines_ref": 22,
+   "compared": 22,
+   "first_diff_line": null
+  },
+  "du-cell-5.txt": {
+   "lines_run": 29,
+   "lines_ref": 29,
+   "compared": 29,
+   "first_diff_line": null
+  },
+  "du-cell-6.txt": {
+   "lines_run": 29,
+   "lines_ref": 29,
+   "compared": 29,
+   "first_diff_line": null
+  },
+  "du-cell-7.txt": {
+   "lines_run": 22,
+   "lines_ref": 22,
+   "compared": 22,
+   "first_diff_line": null
+  },
+  "du-cell-8.txt": {
+   "lines_run": 22,
+   "lines_ref": 22,
+   "compared": 22,
+   "first_diff_line": null
+  },
+  "enbs.txt": {
+   "lines_run": 8,
+   "lines_ref": 8,
+   "compared": 8,
+   "first_diff_line": null
+  },
+  "ues.txt": {
+   "lines_run": 30,
+   "lines_ref": 30,
+   "compared": 30,
+   "first_diff_line": null
+  }
+ }
+}
