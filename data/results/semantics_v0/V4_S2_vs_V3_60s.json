@@ -1,0 +1,7 @@
+{
+ "run": "data/r7_validate/V4_S2_fixedttt_t60",
+ "ref": "data/r7_validate/V3_fixedttt_t60",
+ "files": 61,
+ "files_with_diff_or_empty": 0,
+ "diffs": {}
+}

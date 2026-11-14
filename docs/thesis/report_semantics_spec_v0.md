@@ -210,6 +210,9 @@ V3（r7，僅第 1 項，FixedTtt，60 s）中途（12:30 UTC，模擬第 19 窗
 - V3 與原 D-30H seed 4200（`data/ues30_ho_seeds/_work_D30H_ues30_t300_seed4200/`）之 `DlE2RlcStats.txt`、`CellIdStats.txt` 於 t ≤ 40 逐位相同。
 - 推估（非量測）：照 V3 斜率，301 s 約 3–4 GB，單一 run 可在 32 GB 機器上完成。
 
+**V4 完成（2026-11-13 22:54 UTC）**：exit 0；第 58 窗 832 MB（V3 926 MB，同為 937 次換手）；牆鐘 35,908 s（V3 36,695 s）。V4 vs V3 共 61 個輸出檔逐位相同（`data/results/semantics_v0/V4_S2_vs_V3_60s.json`；E2 報表去牆鐘欄）。V4 每 RLC PDU 之 PdcpTag 最大 9、平均 2.025（3,565,732 PDU）。
+結論（seed 4200、60 s）：S2 不改任何輸出、記憶體少約 10 %；第 1 項為必要修正，S2 為可選。
+
 ## 6. 第一階段重跑（S_i 乾淨校準／評估與 E9）
 
 兩種用途不同之評估：
