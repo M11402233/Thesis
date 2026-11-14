@@ -213,6 +213,8 @@ V3（r7，僅第 1 項，FixedTtt，60 s）中途（12:30 UTC，模擬第 19 窗
 **V4 完成（2026-11-13 22:54 UTC）**：exit 0；第 58 窗 832 MB（V3 926 MB，同為 937 次換手）；牆鐘 35,908 s（V3 36,695 s）。V4 vs V3 共 61 個輸出檔逐位相同（`data/results/semantics_v0/V4_S2_vs_V3_60s.json`；E2 報表去牆鐘欄）。V4 每 RLC PDU 之 PdcpTag 最大 9、平均 2.025（3,565,732 PDU）。
 結論（seed 4200、60 s）：S2 不改任何輸出、記憶體少約 10 %；第 1 項為必要修正，S2 為可選。
 
+**使用者決定（2026-11-14）**：採用第 1 項（ByteTagList free list 關閉）；**S2 亦採用**。之後含換手之 ns-3 run 一律用 `~/ns-3-mmwave-oran-r8` 並設 `ZT_R7_S2=1`（r8 = R-5 旁路＋第 1 項＋S2＋R-7b 唯讀計數；patch：`scripts/ns3_patches/r7_item1_bytetaglist_freelist_off.diff`、`r8_item2_S2_and_R7b_counters.diff`）。依據：8 s（NoAuto／FixedTtt）與 60 s（FixedTtt）之輸出皆與原 binary／V3 逐位相同。原 `~/ns-3-mmwave-oran` 與 R-5 run 不動。
+
 ## 6. 第一階段重跑（S_i 乾淨校準／評估與 E9）
 
 兩種用途不同之評估：
