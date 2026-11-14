@@ -1,0 +1,7 @@
+{
+ "run": "data/r7_validate/G8_newmachine_S2_fixedttt",
+ "ref": "data/r7_validate/R8c_S2_fixedttt",
+ "files": 62,
+ "files_with_diff_or_empty": 0,
+ "diffs": {}
+}

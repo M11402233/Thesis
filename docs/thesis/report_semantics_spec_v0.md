@@ -215,6 +215,8 @@ V3（r7，僅第 1 項，FixedTtt，60 s）中途（12:30 UTC，模擬第 19 窗
 
 **使用者決定（2026-11-14）**：採用第 1 項（ByteTagList free list 關閉）；**S2 亦採用**。之後含換手之 ns-3 run 一律用 `~/ns-3-mmwave-oran-r8` 並設 `ZT_R7_S2=1`（r8 = R-5 旁路＋第 1 項＋S2＋R-7b 唯讀計數；patch：`scripts/ns3_patches/r7_item1_bytetaglist_freelist_off.diff`、`r8_item2_S2_and_R7b_counters.diff`）。依據：8 s（NoAuto／FixedTtt）與 60 s（FixedTtt）之輸出皆與原 binary／V3 逐位相同。原 `~/ns-3-mmwave-oran` 與 R-5 run 不動。
 
+**D-30H 重收（2026-11-14，使用者決定：新機器、8 seed 同時）**：新機器 `~/ns-3-mmwave-oran-r8`（同源碼 2,788 個 .cc/.h 與舊機器 md5 全同；gcc-13、optimized／native）。閘門 G8（seed 4200、FixedTtt、8 s、S2）vs 舊機器 R8c：62 檔逐位相同（含 R-7b 計數；`data/results/semantics_v0/G8_newmachine_vs_R8c.json`），牆鐘 1,031 s vs 3,750 s。收集腳本 `scripts/collect_d30h_r8.sh`（輸出 `data/ues30_ho_r8_seeds/`，保留全部 .txt（gz）與 `_exact`／`_percell`；拒寫舊 `ues30_ho_seeds/`），2026-11-14 10:01 UTC 起 4200–4207 各一實例；log `data/ues30_ho_r8_seeds/collect_<seed>.log`（新機器）。
+
 ## 6. 第一階段重跑（S_i 乾淨校準／評估與 E9）
 
 兩種用途不同之評估：

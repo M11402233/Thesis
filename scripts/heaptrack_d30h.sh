@@ -4,11 +4,11 @@
 # 只寫入 data/d30h_memdiag/HT/<TAG>/。容器以 -d 啟動（不受工作階段結束影響）。
 set -eu
 TAG="${TAG:?}"; EXTRA="${EXTRA:-}"; SIMTIME="${SIMTIME:-4}"; SEED="${SEED:-4200}"
-NS3="${HOME}/ns-3-mmwave-oran"; BIN="${NS3}/build/scratch/ns3.38.rc1-scenario-three-optimized"
+NS3="${NS3:-${HOME}/ns-3-mmwave-oran}"; BIN="${NS3}/build/scratch/ns3.38.rc1-scenario-three-optimized"
 OUT="${HOME}/oran-zt-kpm-verification/data/d30h_memdiag/HT/${TAG}"; mkdir -p "${OUT}/hostlib"
 cp -L /lib/x86_64-linux-gnu/libstdc++.so.6 /lib/x86_64-linux-gnu/libgcc_s.so.1 "${OUT}/hostlib/"
 ARGS="--RngRun=${SEED} --simTime=${SIMTIME} --totalUes=30 --e2nrEnabled=true --trafficModel=0 --configuration=1 --minSpeed=3 --maxSpeed=10 --indicationPeriodicity=1.0 --heuristicType=-1 ${EXTRA}"
-echo "tag=${TAG} start=$(date -u '+%F %T') ns3_commit=$(git -C ${NS3} rev-parse --short HEAD) args=${ARGS}" > "${OUT}/meta.txt"; md5sum "${BIN}" >> "${OUT}/meta.txt"
+echo "tag=${TAG} ns3=${NS3} ZT_R7_S2=${ZT_R7_S2:-unset} start=$(date -u '+%F %T') ns3_commit=$(git -C ${NS3} rev-parse --short HEAD) args=${ARGS}" > "${OUT}/meta.txt"; md5sum "${BIN}" >> "${OUT}/meta.txt"
 sg docker -c "docker run -d --name zt-ht-${TAG} --user $(id -u):$(id -g) -v ${HOME}:${HOME} -w ${OUT} \
-  -e LD_LIBRARY_PATH=${OUT}/hostlib:${NS3}/build/lib zt-heaptrack:22.04 \
+  -e ZT_R7_S2=${ZT_R7_S2:-} -e LD_LIBRARY_PATH=${OUT}/hostlib:${NS3}/build/lib zt-heaptrack:22.04 \
   bash -c 'heaptrack -o ${OUT}/ht ${BIN} ${ARGS} > run.log 2>&1; echo exit=\$? end=\$(date -u \"+%F %T\") >> meta.txt'"
