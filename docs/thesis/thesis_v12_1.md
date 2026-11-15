@@ -585,7 +585,7 @@ SEEDS=4200–4207   # RngRun，8 個獨立 seed
 
 ### 4.3.1 KPM 解碼擴充
 
-於 4.0.6 之 E2 runtime 整合嘗試中，實測出現 "Measurement Name not yet supported"——測量值已在 indication message 內，但解碼器尚未映射部分名稱。本研究擴充 KPM parser 將可用欄位解析為數值。**因原始值已在訊息中，此為有界之解析擴充，而非從零自製 KPM mapping。** 本章之結果取自離線檔案記錄（4.0.6），不經此解碼路徑。
+FlexRIC 之範例 xApp（`examples/xApp/c/monitor/xapp_kpm_moni.c`）僅對寫死之七個量測名稱輸出數值，其餘名稱印出 "Measurement Name not yet supported"——此時測量值已在 indication message 內，僅未對應名稱，故補上名稱對應屬有界之解析擴充，而非從零自製 KPM mapping。【待確認：前版稱「實測出現」此訊息並「本研究擴充 KPM parser」；repo 與本機 FlexRIC 原始碼樹中查無此擴充與對應 log，且 4.0.6 之 ns-O-RAN 整合嘗試未送達任何 indication，不可能為該訊息之來源。無法提出證據則刪除本段。】本章之結果取自離線檔案記錄（4.0.6），不經此解碼路徑。
 
 ### 4.3.2 資料源與欄位
 

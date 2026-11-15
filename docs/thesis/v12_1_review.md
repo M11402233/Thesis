@@ -34,3 +34,8 @@
 4. **Stage 3 資料**以原版模擬器收集（無逐 cell 分帳）；第二階段是否重收尚未決定。新機器部分之逐 seed 檢查未做。
 5. **簡報 v1.12**：融合頁之 1.0% 已標 pre-correction，但未列 844（5.4%）；E9b 頁之措辭可依本表 8 調整。
 6. ch2 攻擊者等級草稿（`ch2_attacker_tiers_draft.md`）仍未併入正文。
+
+## 後續查核（2026-11-15，使用者要求）
+
+- **4.3.1 "Measurement Name not yet supported"**：v12.1 原改寫「於 4.0.6 之 E2 runtime 整合嘗試中出現」**為錯誤推斷，已撤回**。查核：(1) 該字串出自 FlexRIC 範例 xApp `xapp_kpm_moni.c` 第 99、113 行，於量測名稱不在寫死清單（4 個整數型、3 個實數型）時印出，須有 indication 送達 xApp 才會出現；(2) 4.0.6 之 ns-O-RAN 嘗試阻滯於 Indication Header 編碼，未送達任何 indication；(3) `~/flexric`、`~/asn1c/flexric` 之工作樹無本地修改，唯一改過之副本 `xapp_kpm_l2a.c`（L2a）未改數值解析；repo 內無 KPM parser；(4) 該句首見於 thesis_v7（2026-10-05），早於 OAI 檢查（11-13），本機查無對應 log。結論：「實測出現」與「本研究擴充 KPM parser」兩項皆無證據，正文已改為可查證之敘述並標【待確認】。
+- **使用者決定（2026-11-15）**：Stage 3 資料於第二階段**重收**；正文工作用語於定稿前處理；簡報待全部結果跑完後一併改。三個不在 Citation Map 之條號由使用者核對。
