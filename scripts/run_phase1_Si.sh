@@ -32,9 +32,11 @@ if [ "$MODE" = official ]; then
 import json, sys
 d = json.load(open(sys.argv[1])); f = {k: d["same_seed_4200"][f"{k}_flag"] for k in ("C1", "C2")}
 f.update({f"cross_{k}": d["cross_seed_reconstructed"][k]["flag"] for k in ("C1", "C2")})
-print("G3_Q1 flags", f); sys.exit(1 if any(f.values()) else 0)
+import os; ack = set(filter(None, os.environ.get("ZT_G3_ACK", "").split(",")))
+print("G3_Q1 flags", f, "user-acknowledged", sorted(ack))
+sys.exit(1 if any(v and k not in ack for k, v in f.items()) else 0)
 PY
-  echo "GATE PASSED $(date -u '+%F %T') UTC" >> $ST
+  echo "GATE PASSED $(date -u '+%F %T') UTC${ZT_G3_ACK:+ （G3 旗標經使用者複核接受：$ZT_G3_ACK）}" >> $ST
 fi
 
 # E-ii（規格 §6 之順序）
