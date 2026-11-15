@@ -23,6 +23,7 @@
   - **`data/r5_runs/seed4200_noauto_t301/` = R-5／R-6 驗收 run（2026-11-13 05:00 UTC 起，舊機器，約 40 小時）**：R-5 旁路版 ns-3（`~/ns-3-mmwave-oran-r5`），命令列同 D-30；腳本 `scripts/run_r5_noauto.sh`。**不得終止**
   - **修正版 ns-3（2026-11-14 使用者決定）**：含換手之新 run 一律用 `~/ns-3-mmwave-oran-r8` ＋ `ZT_R7_S2=1`（R-5 旁路＋ByteTagList free list 關閉＋換手轉送剝除舊 byte tag）；60 s 驗證輸出與原版逐位相同、RSS 926／832 MB vs 原版 15 GB。詳見 `docs/thesis/report_semantics_spec_v0.md` §5.11
   - **`data/ues30_ho_r8_seeds/` = D-30H 重收（修正版 r8＋S2，新機器，2026-11-14 10:01 UTC 起 8 seed 同時，每 seed 預估 15–20 h）**：`scripts/collect_d30h_r8.sh`；log 在新機器 `data/ues30_ho_r8_seeds/collect_<seed>.log`。**不得終止**
+  - **`data/ues30_ho_r8c_seeds/` = D-30H 重收（r8c，新機器，2026-11-15 21:51 UTC 起 8 seed 同時，預估 15–20 h）**：r8c ＝ r8 ＋ RLC AM 換手轉送修正（`scripts/r8b/patch_r8c.py`：F1 自 VT(A) 起依模序、F2 每次轉送自初始狀態、F3 無頭片段走有遺失分支；`scripts/r8b/README.md`）。**不得終止**。r8 收之 `data/ues30_ho_r8_seeds/`（7 seed 完成、4202 當機）含轉送順序錯誤（8 s 內 123 次換手中 4 次），**僅供診斷**。r9 須以 r8c 為基礎（使用者 2026-11-15 同意）。新機器 `data/ues30_ho_r8b_diag/` 為 r8b 診斷 run（4202），非正式資料
   - `data/ues28_seeds/` = 28 UE 校準紀錄（已被 D-30 取代，僅保留校準證據）
 
 > **⚠️ 2026-11-13 稽核（已決：分階段重建→重評估）**：`DlE2RlcStats`（D-30／D-SH 主檔）之計數與 delay 為**自 t=0 起累計／累計平均**，cell = 最後一筆 PDU 所在 cell（ns-3 E2 RLC 計算器從未重置）。詳見 `docs/thesis/ns3_report_semantics_audit_20261113.md`。使用者決定前不得據此改任何結果或正文。

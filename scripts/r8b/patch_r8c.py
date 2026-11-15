@@ -75,12 +75,23 @@ g4 = r'''    // ZT_R8C F1: process PDUs in modular SN order starting at VT(A).
             RlcPdus.push_back(kv.second);
         }
     }
+    const size_t ztStaleSdus = m_transmittingRlcSdus.size(); // diagnostics only
+    const size_t ztNPdu = RlcPdus.size();
     // ZT_R8C F2: start every forwarding reassembly from a clean state.
     m_assemblingState = WAITING_SI_SF; // same as the constructor's initial state
     m_keepS0Reassemble = nullptr;
     m_sdusAssembleBuffer.clear();
 '''
 f = f.replace(o4, g4 + o4)
+o5 = '    CreateRlcSduBuffer();\n}'
+assert f.count(o5) == 1
+f = f.replace(o5, """    // ZT_R8C diagnostics (no effect on behaviour): one line per forwarding reassembly.
+    std::cerr << "ZT_R8C FWD t=" << Simulator::Now().GetSeconds() << " rnti=" << m_rnti
+              << " lcid=" << (uint32_t)m_lcid << " nPdu=" << ztNPdu << " sdusBefore=" << ztStaleSdus
+              << " sdusAfter=" << m_transmittingRlcSdus.size() << " mapBefore="
+              << m_transmittingRlcSduBuffer.size() << " seg=" << (m_segmented_rlcsdu ? 1 : 0)
+              << " txon=" << m_txonBuffer.size() << std::endl;
+""" + o5)
 s = s[:a] + f + s[b:]
 for inc in ('<iostream>', '<algorithm>'):
     if '#include ' + inc not in s:

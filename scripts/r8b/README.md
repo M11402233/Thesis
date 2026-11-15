@@ -16,3 +16,18 @@
 - **r8c ＝ r8 ＋ `patch_r8c.py`**（根本修正，新機器 `~/ns-3-mmwave-oran-r8c`）：F1 自 VT(A) 起依模序處理；F2 每次轉送自建構子初始狀態開始；F3 與狀態不一致之「連續」PDU 改走既有之有遺失分支。F1 重排與 F3 事件各印一行 `ZT_R8C`。
 - 閘門（`~/chain_r8c.sh`）：G10（FixedTtt 8 s vs r8 之 G8）、G11（無換手 8 s vs r8 之 H2）、G12（G10 重跑之確定性）。G10／G11 與 r8 不同不必然為失敗（修正本身會改變行為），須連同 `ZT_R8C` 行數解讀。
 - 未涵蓋：轉送路徑之其他部分（txon 緩衝區中尚未切完之 SDU 殘段、`MergeBuffers`）未逐行稽核。
+
+## r8c 閘門結果與正式重收（2026-11-15）
+
+| 閘門（8 s，seed 4200） | 結果 |
+|---|---|
+| G11 無換手 vs r8（H2） | 57 檔 0 差異；F1／F3／轉送呼叫皆 0 次 |
+| G12 FixedTtt 重跑 vs G10 | 62 檔 0 差異（確定性） |
+| G10 FixedTtt vs r8（G8） | 8／62 檔不同（PDCP 統計、X2Stats、RlcAmBufferSize、cu-up-cell-1、du-cell-6／8）；F1 重排 4 次（123 次換手）、F3 0 次 |
+| G13／G14（加 `ZT_R8C FWD` 診斷行後）vs G10／G11 | 皆 0 差異 |
+
+轉送路徑稽核（`UeManager::ForwardRlcBuffers`、`LteRlcAm` 之 LL HO 部分）：
+- `MergeBuffers`：未發現錯誤（順序問題由 F1 涵蓋）。
+- 重組結果（`m_transmittingRlcSdus`）不清空：G13 之 118 次轉送呼叫中，進入時非空者 0 次 → 於此情境未發生重複轉送。
+- **未修正、須揭露**：(a) 118 次中 72 次重組出 0 個完整 SDU，此時走「只轉送 txon」分支，切到一半之 SDU 不補送（每次換手至多遺失 1 個 SDU）；(b) 其餘 46 次補送 `m_segmented_rlcsdu`（最後一個被切過之 SDU 之完整備份），該備份不隨 SDU 送完而清除，可能為重複或過時之 SDU（每次至多 1 個）；(c) 原作者刻意補送 PDCP SN 相鄰之前 1–3 個 SDU。三者合計每次換手約數個封包之遺失／重複，屬此模組「lossless HO」實作之限制；修正須改動每次傳輸機會皆執行之切段路徑（影響無換手資料），風險高於效益，**本版不修**。
+- 正式重收：新機器 `data/ues30_ho_r8c_seeds/`，8 seed 同時，2026-11-15 21:51 UTC 起。
