@@ -54,11 +54,22 @@ run 09_Ei            run_Ei_diagnostic.py
 if [ "$MODE" = official ] && [ -d $REPO/data/results/phase1_dryrun/d30_delay_reconstructed ]; then
   python3 - $REPO/data/results/phase1_dryrun/d30_delay_reconstructed $OUT >> $ST <<'PY' || stop "official 與 dryrun 之 JSON 不同（確定性破壞，先查）"
 import json, os, sys, glob
-a, b = sys.argv[1:]; bad = []
+# 2026-11-15 使用者決定：計時欄位（實際執行時間，本質上每次不同）不納入逐位比對；其餘欄位仍須逐位相同
+TIMING = {"mean_ms", "median_ms", "p95_ms", "p99_ms", "max_ms", "us_per_full_eval", "seed_mean_spread_ratio",
+          "seed_normalised_spread_ratio", "budget_utilisation_p99", "granularity_utilisation_p99"}
+def strip(o):
+    if isinstance(o, dict): return {k: strip(v) for k, v in o.items() if k not in TIMING}
+    if isinstance(o, list): return [strip(x) for x in o]
+    return o
+a, b = sys.argv[1:]; bad = []; timing_only = []
 for p in sorted(glob.glob(os.path.join(a, "**", "*.json"), recursive=True)):
-    q = os.path.join(b, os.path.relpath(p, a))
-    if not os.path.exists(q) or json.load(open(p)) != json.load(open(q)): bad.append(os.path.relpath(p, a))
-print("dryrun vs official JSON:", "identical" if not bad else bad); sys.exit(1 if bad else 0)
+    q = os.path.join(b, os.path.relpath(p, a)); r = os.path.relpath(p, a)
+    if not os.path.exists(q): bad.append(r); continue
+    x, y = json.load(open(p)), json.load(open(q))
+    if x == y: continue
+    (timing_only if strip(x) == strip(y) else bad).append(r)
+print("dryrun vs official JSON（排除計時欄位 %s）:" % sorted(TIMING), "identical" if not bad else bad,
+      "| 僅計時欄位不同:", timing_only or "none"); sys.exit(1 if bad else 0)
 PY
 fi
 echo "ALLDONE $(date -u '+%F %T') UTC" >> $ST
