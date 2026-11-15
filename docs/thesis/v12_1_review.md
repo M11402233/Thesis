@@ -39,3 +39,9 @@
 
 - **4.3.1 "Measurement Name not yet supported"**：v12.1 原改寫「於 4.0.6 之 E2 runtime 整合嘗試中出現」**為錯誤推斷，已撤回**。查核：(1) 該字串出自 FlexRIC 範例 xApp `xapp_kpm_moni.c` 第 99、113 行，於量測名稱不在寫死清單（4 個整數型、3 個實數型）時印出，須有 indication 送達 xApp 才會出現；(2) 4.0.6 之 ns-O-RAN 嘗試阻滯於 Indication Header 編碼，未送達任何 indication；(3) `~/flexric`、`~/asn1c/flexric` 之工作樹無本地修改，唯一改過之副本 `xapp_kpm_l2a.c`（L2a）未改數值解析；repo 內無 KPM parser；(4) 該句首見於 thesis_v7（2026-10-05），早於 OAI 檢查（11-13），本機查無對應 log。結論：「實測出現」與「本研究擴充 KPM parser」兩項皆無證據，正文已改為可查證之敘述並標【待確認】。
 - **使用者決定（2026-11-15）**：Stage 3 資料於第二階段**重收**；正文工作用語於定稿前處理；簡報待全部結果跑完後一併改。三個不在 Citation Map 之條號由使用者核對。
+
+- **4.3.1 已刪除（使用者決定，2026-11-15）**：原 4.3.1「KPM 解碼擴充」整節移除；4.3 改題「資料前處理」，原 4.3.2／4.3.3／4.3.4 順移為 4.3.1／4.3.2／4.3.3（內文交互參照同步）。
+- **三個條號之核對（2026-11-15）**：
+  - TS 28.552 V20.4.0 §5.1.1.2.5 ✓（`~/Downloads/28552-k40.docx`：標題 Mean DL PRB used for data traffic；c) arithmetic mean … during a time period T；d) single integer value；e) RRU.PrbUsedDl；f) NRCellDU）。
+  - TS 23.501 §3.1 ✓ 但版本改引：本機僅有 V20.3.0（2026-09，`R-S6_…V20.3.0.pdf`），§3.1 第 40 頁「Stand-alone Non-Public Network: A non-public network not relying on network functions provided by a PLMN」；正文與參考文獻由 V20.2.0 改為 V20.3.0。（「Non-Public Network」於 §3.1 僅轉引 TS 22.261。）
+  - RICARCH v08 §6.2.2 ✗ **未能核對**：本機無此 PDF、公開網路查無原文；引文與條號仍待使用者提供原檔。
