@@ -268,3 +268,25 @@ V3（r7，僅第 1 項，FixedTtt，60 s）中途（12:30 UTC，模擬第 19 窗
 | Q4 | **不採用作最終驗收。** 30–60 s 短跑只作功能檢查；最終驗收至少一個 NoAuto seed 跑滿原本完整之 301 s（R-5 與 R-6 皆於該 run 檢查） |
 
 R-5：使用者同意執行。v11 正文：等第一階段重跑完再一起改（含 `review_ch4_verification_20261113.md` 所列各處）。
+
+## 附：4202 當機對照與 heaptrack H2／H3（2026-11-15，新機器）
+
+**4202 當機（FixedTtt，seed 4202）**：三個版本皆於模擬 54.2655 s、UE 23 由 cell 146 換手至 cell 6 時 SIGSEGV，堆疊相同（`UeManager::RecvHandoverRequestAck → ForwardRlcBuffers → LteRlcAm::RlcPdusToRlcSdus → Reassemble → Packet::AddAtEnd`，傳入之封包指標為空），`CellIdStats.txt`／`CellIdStatsHandover.txt` 之 md5 三者相同。
+
+| 版本 | 目錄（新機器） | 當機時 RSS |
+|---|---|---|
+| r8＋S2 | `~/crash4202_gdb` | — |
+| V1：r8、S2 未開 | `~/crash4202_V1_r8_noS2` | 0.9 GB |
+| V2：原版 ns-3 | `~/crash4202_V2_original` | 14.8 GB |
+
+結論：此為原版 ns-3 既有之錯誤，非 r8 或 S2 引入。seed 4202 於 FixedTtt 下任何版本皆無法完成；處理方式（換 seed／修正／以 7 seed 報告）待使用者決定。
+
+**heaptrack（r8＋S2，seed 4200，simTime=8）**：`data/d30h_memdiag/HT_newmachine/{H2_r8S2_noauto,H3_r8S2_fixedttt}/ht_print.txt`。
+
+| | H2 無換手 | H3 FixedTtt（123 次換手） |
+|---|---|---|
+| heap 峰值 | 255.43 MB | 253.26 MB |
+| 結束時未釋放 | 40.70 MB | 41.02 MB |
+| 配置呼叫數 | 4.00×10⁹ | 4.86×10⁹ |
+
+前三大未釋放來源兩者相同（頻譜模型之 vector 複製 18.33 MB、`Buffer::Create` 9.5 MB、`ThreeGppChannelModel::GenerateChannelParameters` 6.54 MB），皆與換手無關。**於此 8 秒、123 次換手之範圍內，heap 層級未見隨換手累積之配置**（差 0.3 MB）。先前由 RSS 觀察到之每次換手殘留，於此量測中無法由 heap 上之存活配置解釋；是否為配置器碎片化或僅於較長模擬出現，未驗證。
