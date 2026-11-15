@@ -1,5 +1,7 @@
 # v11 降級清單（2026-11-14；只列待改處，不改正文）
 
+> **2026-11-15 執行狀態**：§D 步驟 1（措辭 A3、A4、B1–B3、C1）、步驟 2（第一階段數字 A1、A2、B4、B5）、步驟 4（chapter6_draft 同步）已寫入 `thesis_v12.md`；表格數字由 `scripts/v12/v12_numbers.py` 自正式版 JSON 產生。A2 之 E13、4.7.8 未於第一階段重跑，於 v12 標為歷史版本結果。步驟 3（A5、A6、融合、准入、資源評估、E19）待第二階段。
+
 > 使用者決定（2026-11-13）：實驗全部跑完後，依本清單**一次**改寫正文（v12）。本清單不改任何結果與正文。
 > 行號指 `docs/thesis/thesis_v11.md`（2558 行版）。「狀態」：**可定**＝根據已有；**待一**＝等第一階段（R-5 驗收 → E-i／E-ii）；**待二**＝等第二階段（per-cell 歸屬、融合／准入／E19 重跑）。
 > 依據文件：`ns3_report_semantics_audit_20261113.md`（F1–F6）、`report_semantics_spec_v0.md`、`Si_interval_correction_spec_v0.md`（§7、§7.1）、`review_ch4_verification_20261113.md`、`D30H_handover_data_spec.md` §7。
