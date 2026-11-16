@@ -45,3 +45,11 @@
   - TS 28.552 V20.4.0 §5.1.1.2.5 ✓（`~/Downloads/28552-k40.docx`：標題 Mean DL PRB used for data traffic；c) arithmetic mean … during a time period T；d) single integer value；e) RRU.PrbUsedDl；f) NRCellDU）。
   - TS 23.501 §3.1 ✓ 但版本改引：本機僅有 V20.3.0（2026-09，`R-S6_…V20.3.0.pdf`），§3.1 第 40 頁「Stand-alone Non-Public Network: A non-public network not relying on network functions provided by a PLMN」；正文與參考文獻由 V20.2.0 改為 V20.3.0。（「Non-Public Network」於 §3.1 僅轉引 TS 22.261。）
   - RICARCH v08 §6.2.2 ✗ **未能核對**：本機無此 PDF、公開網路查無原文；引文與條號仍待使用者提供原檔。
+
+### RICARCH 引文核對（2026-11-16，使用者提供 v09.00 原檔）
+
+- 原檔：`~/Downloads/Thesis/reference/O-RAN.WG3.TS.RICARCH-R005-v09.00.docx`（O-RAN WG3, *Near-RT RIC Architecture*）。
+- §6.2.2「xApp Subscription Management」列點逐字含「Managing subscriptions from xApps to E2 Nodes;」「Enforcing authorization of policies controlling xApp access to messages;」→ ✓ 與正文引文一致。
+- 版本史表：v08.00 = 2025.12.08；v09.00 = 2026.07.17。正文原寫「v08.00 (2026)」，年份不符，且 v08.00 原文本機仍無。
+- 修正（比照 TS 23.501 之處理，改引已於本機核對之版本）：正文 4.x 權限邊界段改「RICARCH v09.00 §6.2.2」；參考文獻改「O-RAN.WG3.TS.RICARCH-R005-v09.00 (2026-07)」。
+- 舊版正文（v7–v12）不動。

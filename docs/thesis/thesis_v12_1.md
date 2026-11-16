@@ -1678,7 +1678,7 @@ LOSO，注入超時消失，per-seed 明細：
 
 ### 4.9.3 動作模式：對合作消費端之准入，而非攔截
 
-**權限邊界**：O-RAN 架構下各 xApp 獨立向 Near-RT RIC 訂閱 E2 資料，由平台之 subscription management 管理並執行授權（xApp-TR v07 §4.2；RICARCH v08 §6.2.2：「Managing subscriptions from xApps to E2 Nodes; Enforcing authorization of policies controlling xApp access to messages」）；C-ZT **無權阻斷其他 xApp 之訂閱或攔截 KPM 資料流**。四種可能之動作模式比較如下：
+**權限邊界**：O-RAN 架構下各 xApp 獨立向 Near-RT RIC 訂閱 E2 資料，由平台之 subscription management 管理並執行授權（xApp-TR v07 §4.2；RICARCH v09.00 §6.2.2：「Managing subscriptions from xApps to E2 Nodes; Enforcing authorization of policies controlling xApp access to messages」）；C-ZT **無權阻斷其他 xApp 之訂閱或攔截 KPM 資料流**。四種可能之動作模式比較如下：
 
 | 模式 | 機制 | 標準相容性 | 代價 | 本研究 |
 |---|---|---|---|---|
@@ -2518,7 +2518,7 @@ $$\text{regret}(t) = \text{delay}^{\text{true}}_{j^*(t)}(t) - \min_{j \in \mathc
 - O-RAN.WG11.TR.ZTA-R005-v06.00 (2026). *Study on Zero Trust Architecture for O-RAN.*
 - O-RAN.WG3.TS.E2SM-KPM-R005-v08.00 (2026). *E2 Service Model (E2SM) KPM.*
 - ETSI TS 104 038 V4.1.0 (2024-10) = O-RAN.WG3.E2GAP-R003-v04.01. *E2 interface: General Aspects and Principles.*
-- O-RAN.WG3.TS.RICARCH-R005-v08.00 (2026). *Near-RT RIC Architecture.*
+- O-RAN.WG3.TS.RICARCH-R005-v09.00 (2026-07). *Near-RT RIC Architecture.*
 
 **3GPP 規範**
 - 3GPP TS 33.501 V20.2.0 (2026-06), Rel-20.
