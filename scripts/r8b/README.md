@@ -31,3 +31,37 @@
 - 重組結果（`m_transmittingRlcSdus`）不清空：G13 之 118 次轉送呼叫中，進入時非空者 0 次 → 於此情境未發生重複轉送。
 - **未修正、須揭露**：(a) 118 次中 72 次重組出 0 個完整 SDU，此時走「只轉送 txon」分支，切到一半之 SDU 不補送（每次換手至多遺失 1 個 SDU）；(b) 其餘 46 次補送 `m_segmented_rlcsdu`（最後一個被切過之 SDU 之完整備份），該備份不隨 SDU 送完而清除，可能為重複或過時之 SDU（每次至多 1 個）；(c) 原作者刻意補送 PDCP SN 相鄰之前 1–3 個 SDU。三者合計每次換手約數個封包之遺失／重複，屬此模組「lossless HO」實作之限制；修正須改動每次傳輸機會皆執行之切段路徑（影響無換手資料），風險高於效益，**本版不修**。
 - 正式重收：新機器 `data/ues30_ho_r8c_seeds/`，8 seed 同時，2026-11-15 21:51 UTC 起。
+
+## r8d（2026-11-16）：轉送集合之根本修正 F4（使用者 2026-11-16 決定「必須修正」）
+
+r8c 稽核所列之限制 (a)(b)(c) 不再保留為「揭露」，改以 `patch_r8d.py`（套用於 r8c 樹；改 `lte-rlc-am.{h,cc}`、`lte-enb-rrc.cc`）修正。逐行閱讀後原程式之問題：
+(a) 未重組出完整 SDU 時，切到一半之 SDU 不補送；(b) 備份 `m_segmented_rlcsdu` 從不清除，可能為已完整傳送者（重複／過時）；
+(c) 自不完整之歷史補送前 3 個 SDU（含第一個 SDU 自身之副本）；(d) 切剩之後半段（無 PDCP 標頭）被當成封包轉送；(e) 首段已 ACK、尾段未 ACK 之 SDU 被丟棄。
+
+F4：RLC 於每個 SDU 交給 PDU 時記帳（完整副本、首／末 PDU SN、是否全部交出）；換手時轉送「帳上尚未全部確認者（未交完，或至少一個 PDU 未 ACK）」各一次、依序，其後接 txonBuffer（去掉切剩片段）。原重組程式保留作對照（其重組出之 SDU 必須皆在 F4 清單內）。記帳僅保留封包副本，不改 PDU 組法。僅支援 EnableAQM=false（本情境之預設）。
+
+| 驗證（新機器，seed 4200，8 s） | 結果 |
+|---|---|
+| G16／G19 無換手 vs r8c（G11） | 62 檔 0 差異 |
+| G17 有換手重跑 vs G15；G18、G20（僅改診斷）vs 前一版 | 0 差異 |
+| G15 有換手 vs r8c（G10） | 14／62 檔不同（預期；轉送內容改變） |
+| 轉送呼叫 | 153 次（30 次為起始切換、無資料；123 次帶資料） |
+| 對照缺漏 missing／MISMATCH、PRE、AQM 警示 | 0／0 |
+| 帳本轉送 SDU 合計／原重組合計 | 1,463／1,243（每次差 0–4） |
+| 帶切到一半 SDU 之轉送 | 122 次（片段不再送出，改送完整 SDU） |
+| 重複封包（uid） | 0 |
+| PDCP SN 倒退：帳本內／接合處／txonBuffer 內 | 0／0／203 處（83 次轉送） |
+
+txonBuffer 內之倒退：診斷印出之 139 處步幅僅 −1（14）與 −2（125），型態為兩條各自有序之串流交錯（例 1394, 1392, 1395, 1393）。
+推論（未逐一以程式驗證）：路徑切換時，仍送往舊 cell 再被轉送之封包與直接送往新 cell 之封包於到達目標 RLC 時交錯；F4 不改變 txonBuffer 之順序。屬到達順序而非轉送清單之錯誤，未修；正文須揭露。
+第一次編譯因複製之 cmake 快取失敗、三個驗證以舊 r8c 執行檔起跑約半分鐘，已停止並改名 `G1[5-7]*.stale_r8cbinary`。
+
+r8d md5（含診斷之最終版；G20：FWD 153 FLAGS 0）：
+```
+694dcf8fdd64bc6eb49f89d930eff5c6  build/scratch/ns3.38.rc1-scenario-three-optimized
+619af23f855de6efa8e966bfb9f68243  build/lib/libns3.38.rc1-lte-optimized.so
+e7946d1b7341722d2a9adac0462f3f59  src/lte/model/lte-rlc-am.cc
+ae35ebaac23fa7482f2c8fe9aa7d8bee  src/lte/model/lte-rlc-am.h
+1c60e1e9d8af1e46eb0fccf49e2337ec  src/lte/model/lte-enb-rrc.cc
+```
+r8c 之 D-30H 重收（`data/ues30_ho_r8c_seeds/`）降為診斷用；seed 4202 已通過 54.27 s（2026-11-16 05:00 UTC 時於模擬 92 s）。r9 改以 r8d 為基礎。
