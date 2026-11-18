@@ -27,7 +27,7 @@ for c in sorted(um):  # make sure empty report instants are not lost: they have 
 k1 = {}
 for c in sorted(um):
     fn = f'cu-cp-cell-{c}.txt'
-    if not os.path.exists(os.path.join(D, fn)): k1[c] = 'no cu-cp file'; continue
+    if not os.path.exists(os.path.join(D, fn)): k1[c] = 'no cu-cp file'; bad.append(f'K1 cell {c} (no cu-cp file)'); continue
     blocks = collections.OrderedDict()
     with open(os.path.join(D, fn)) as f:
         next(f)
