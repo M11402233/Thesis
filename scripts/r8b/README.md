@@ -74,24 +74,17 @@ Binary md5 unchanged (694dcf8f…, lib 619af23f…).
 `ZT_R8D` totals over 8 seeds: FWD 37,178; MISMATCH 0; PRE 0; AQM 0; `missing` 0 in every FWD line; dup 0; partial = frag in every call.
 Back-steps (PDCP SN, 12-bit, step ≥ 2048 mod 4096 counted as backward): backT 199,791; **backL 279; backJ 42** (the 8 s gate had 0 / 0).
 
-Classification of the 321 ledger/junction back-steps (`scratchpad` analysis of run.log BACK lines):
-
-| step size | forwarding set n > 4096 | same (seed, prev, cur) printed at an earlier forwarding | count |
-|---|---|---|---|
-| large (> 8) | yes | yes | 185 |
-| large (> 8) | yes | no | 68 |
-| small (≤ 8) | yes / no | yes | 58 / 4 |
-| small (≤ 8) | yes / no | no | 5 / 1 |
-
-Reading (inference, not proven):
-* All 253 large steps occur when the forwarding set holds more than 4096 SDUs, so the 12-bit PDCP SN repeats inside the set and the
-  SN-based backward test cannot tell order from wrap-around. These are not evidence of an order error, nor of correct order.
-* 62 of 68 small steps had the same SN pair earlier (222 of the 247 earlier occurrences were first printed in the txon part):
-  the ledger keeps the RLC transmission order, which inherits the arrival-order back-steps already present in txon. BACK lines for
-  txon are printed only for the first two per call, so 'no earlier occurrence' does not mean new.
-* Why only now: forwarding sets exceed 4096 SDUs in 36,043 of 37,178 calls (median n ≈ 8,000 at the back-step events); in the first 8 s
-  the queues are still small (8 seeds, t < 8 s: 3 ledger/junction back-steps), and inherited reorderings need repeated handovers of the
-  same SDUs.
-* Side finding: source RLC queues of ~8,000 SDUs at handover exceed the 2,048 PDCP reordering window of a 12-bit SN; ns-3 PDCP does not
-  use the SN at the receiver, so delivery is unaffected in the simulator, but this would be invalid in a real stack (disclose).
-Not done: an order check on packet identity (uid sequence at PDCP) that does not depend on the SN.
+Classification of the 321 ledger/junction back-steps (analysis of run.log BACK lines, 8 seeds):
+* 253 are large jumps (|SN step| > 8), 68 are small (≤ 8). 247 of the 321 repeat an (seed, prev SN, cur SN) pair already printed at an earlier
+  forwarding, i.e. the same neighbouring SDUs are forwarded again after another handover (222 of these were first printed in the txon part).
+* CORRECTION of the first version of this note: "all large steps occur in sets with more than 4096 SDUs, so SN wrap-around explains them" is
+  not evidence. 36,043 of 37,178 forwarding calls (97 %) have such sets (median ≈ 8,000), so that cross-tabulation has no discriminating
+  power. The 12-bit SN can alias inside such a set, but nothing shows that this is the cause.
+* Leading explanation (inference, not verified): the transmission queue at the target is an interleaving of two ordered streams (SDUs forwarded
+  from the source and fresh SDUs arriving through the anchor); the ledger records transmission order and inherits that interleaving, so a
+  ledger/junction back-step is the earlier txon back-step carried one step further. This is the same mechanism as backT.
+* The 8 s gate had 3 ledger/junction back-steps in 1,224 forwarding calls before t < 8 s (all seeds); the long runs have 321 in 37,178 calls.
+* Side finding: forwarding sets of ≈ 8,000 SDUs exceed the 2,048-SN reordering window of a 12-bit PDCP SN; ns-3's receiving PDCP does not use
+  the SN, so delivery in the simulator is unaffected, but this would not hold in a real stack (disclose).
+* Order check independent of the SN: `patch_r8d_seq.py` (diagnostic tree `~/ns-3-mmwave-oran-r8d-seq`, new machine) tags every PDCP PDU with
+  its creation counter and counts backward steps of that counter by position. Result: see the section below once available.
