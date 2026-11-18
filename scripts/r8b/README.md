@@ -88,3 +88,26 @@ Classification of the 321 ledger/junction back-steps (analysis of run.log BACK l
   the SN, so delivery in the simulator is unaffected, but this would not hold in a real stack (disclose).
 * Order check independent of the SN: `patch_r8d_seq.py` (diagnostic tree `~/ns-3-mmwave-oran-r8d-seq`, new machine) tags every PDCP PDU with
   its creation counter and counts backward steps of that counter by position. Result: see the section below once available.
+
+## Sequence-counter check, seed 4200, 0–130 s (2026-11-18)
+
+Run: `~/ns-3-mmwave-oran-r8d-seq` (r8d + `patch_r8d_seq.py` v2: ZtSeqTag creation counter on every PDCP PDU, kept across the HO-forwarding
+`RemoveAllPacketTags`), seed 4200, simTime 130, FixedTtt, output `~/seq_diag_4200/` on the new machine (diagnostic only). Binary md5
+`004b8fb3d6a7c9463526a96ddc99cf37`. The first run (`~/seq_diag_4200_run1_tagsLost/`) lost the tag on forwarded SDUs (84 % untagged) and is discarded.
+The run log has no end marker; the last FWD line is at t = 129.992 and the process had exited.
+
+Regression against the formal D-30H r8d seed 4200 run (`data/ues30_ho_r8d_seeds/D30H_ues30_t300_seed4200_aux/`):
+* all 2,046 `ZT_R8D FWD` lines with t < 130 identical after removing the new seq fields (including the SN-based backL/J/T);
+* `DlE2RlcStats.txt` (3,870 lines), `CellIdStats.txt` (89,556), `CellIdStatsHandover.txt` (2,015): prefixes identical.
+So the diagnostic does not change the simulation.
+
+| measure (2,046 forwarding calls, 15,379,050 txon SDUs) | ledger | junction | txon |
+|---|---|---|---|
+| back-steps by PDCP SN (12-bit, as before) | 10 | 3 | 8,345 |
+| back-steps by creation counter (true order) | **3** (3 calls) | **1** (1 call) | **2,753** (1,361 calls) |
+| SDUs without the tag (noSeq) | | | 0 |
+
+Reading:
+* 7 of the 10 ledger and 2 of the 3 junction SN back-steps are not real reorderings (SN aliasing); 4 real ones remain in 2,046 calls.
+* txon back-steps by counter are 33 % of the SN count; consistent with the interleaving of two ordered streams described above (not a forwarding-list error).
+* One seed, 130 s; not extrapolated to the 8 × 301 s run (backL 279 / backJ 42 by SN there).

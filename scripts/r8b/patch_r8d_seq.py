@@ -94,3 +94,13 @@ s = once(s, '    std::cerr << "ZT_R8D FWD t="', '''    uint32_t seqBackL = 0, se
 s = once(s, '<< " backT=" << backT << std::endl;', '<< " backT=" << backT << " seqBackL=" << seqBackL << " seqBackJ=" << seqBackJ << " seqBackT=" << seqBackT << " noSeq=" << noSeq << std::endl;')
 open(root + n, 'w').write(s)
 print('patched r8d_seq', root)
+
+# --- v2: the HO forwarding path (lte-enb-rrc.cc, "RemoveAllPacketTags") strips every packet tag, including ZtSeqTag, so forwarded SDUs
+# arrived untagged at the target (first run: 84% of txon SDUs untagged). Preserve the tag across the strip.
+n = 'lte-enb-rrc.cc'; s = rd(n); assert 'ZtSeqTag' not in s
+old = "                rlcSdu->RemoveAllPacketTags(); // this does not remove byte tags\n"
+assert s.count(old) == 1
+s = s.replace(old, "                ZtSeqTag ztKeep; const bool ztHas = rlcSdu->PeekPacketTag(ztKeep); // seq diagnostic\n" + old +
+              "                if (ztHas) { rlcSdu->AddPacketTag(ztKeep); } // seq diagnostic\n")
+i = s.index('#include "lte-enb-rrc.h"'); s = s[:i] + '#include "zt-seq-tag.h"\n' + s[i:]
+open(root + n, 'w').write(s)
