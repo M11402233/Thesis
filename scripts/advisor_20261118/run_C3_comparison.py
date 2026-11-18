@@ -84,6 +84,10 @@ def predict(m, X):
     with torch.no_grad():
         return torch.sigmoid(m(torch.from_numpy(X))).numpy()
 
+def predict_logit(m, X):  # v2: threshold on logits (sigmoid saturates to 1.0 in float32 -> ties, v1 thr = 1.0)
+    with torch.no_grad():
+        return m(torch.from_numpy(X)).numpy()
+
 def train_lstm(tag, trs, cals, med, s, sl, seed):
     ch = 1 if tag == "M7" else 2
     rng = np.random.default_rng(seed)
@@ -106,12 +110,13 @@ def train_lstm(tag, trs, cals, med, s, sl, seed):
             b = perm[i:i + BATCH]; opt.zero_grad(); lossf(m(Xt[b]), yt[b]).backward(); opt.step()
     m.eval(); p = predict(m, X)
     tpr = float((p[y == 1] > 0.5).mean()); tnr = float((p[y == 0] <= 0.5).mean())
-    thr_tr = float(np.quantile(predict(m, np.concatenate(cal)), 0.99))
+    thr_tr = float(np.quantile(predict_logit(m, np.concatenate(cal)), 0.99))
     hc = []
     for d, pm, pl in cals:
-        idx, X = feats(d, pl, med, s, sl, ch); hc.append(predict(m, X[idx >= len(d) // 2]))
-    thr = float(np.quantile(np.concatenate(hc), 0.99))
-    return m, thr, {"balanced_acc": (tpr + tnr) / 2, "tpr": tpr, "tnr": tnr, "n_train": int(len(y)), "thr_1pct_heldout": thr, "thr_1pct_trainfit_v0": thr_tr, "n_cal_windows": int(sum(len(x) for x in hc))}
+        idx, X = feats(d, pl, med, s, sl, ch); hc.append(predict_logit(m, X[idx >= len(d) // 2]))
+    hcc = np.concatenate(hc); thr = float(np.quantile(hcc, 0.99))
+    sat32 = float((torch.sigmoid(torch.from_numpy(hcc)).numpy() >= 1.0).mean())
+    return m, thr, {"balanced_acc": (tpr + tnr) / 2, "tpr": tpr, "tnr": tnr, "n_train": int(len(y)), "thr_1pct_heldout": thr, "thr_1pct_trainfit_v0_logit": thr_tr, "thr_space": "logit", "cal_frac_sigmoid_saturated_f32": sat32, "cal_frac_logit_gt0": float((hcc > 0).mean()), "n_cal_windows": int(sum(len(x) for x in hc))}
 
 METHODS = ["M1_range", "M2_selfref", "M3_peer_lin", "M4_peer_log2", "M5_peer_log_low", "M6_cusum_low", "M6_cusum_up", "M7_prior_lstm", "M8_sup_lstm"]
 st = {m: collections.defaultdict(lambda: collections.defaultdict(list)) for m in METHODS}
@@ -148,7 +153,7 @@ for fi, ts in enumerate(seeds):
         if meth.startswith("M6"): return cusum((np.log(o) - pl) / sl, h["low" if meth.endswith("low") else "up"], "low" if meth.endswith("low") else "up")
         tag = meth[:2]; m, th, _ = models[tag]
         idx, X = feats(o, pl, med, sV0, sl, 1 if tag == "M7" else 2)
-        a = np.zeros(len(o), bool); a[idx] = predict(m, X) > th; return a
+        a = np.zeros(len(o), bool); a[idx] = predict_logit(m, X) > th; return a
     for _, d, pm, pl in SM[ts]:
         n = len(d); t0 = n // 2; cache = {}
         for meth in METHODS:
@@ -189,7 +194,7 @@ for meth, v in (("M3_peer_lin", "V0e"), ("M5_peer_log_low", "V3e")):
                 if abs((res[meth][k][q] or 0) - (b1[v][k][q] or 0)) > 1e-12: bad.append((meth, k, q, res[meth][k][q], b1[v][k][q]))
 if bad: stop(f"C3-1 未重現 B1：{bad[:5]}")
 gate = {t: all(folds[s]["fit"][t]["balanced_acc"] >= FIT_GATE for s in seeds) for t in ("M7", "M8")}
-json.dump({"spec": "docs/thesis/C3_same_condition_comparison_spec_v0.md", "version": "v1", "checks": {"C3-0": "pass", "C3-1": "pass", "C3-2_fit_gate": gate},
+json.dump({"spec": "docs/thesis/C3_same_condition_comparison_spec_v0.md", "version": "v2", "checks": {"C3-0": "pass", "C3-1": "pass", "C3-2_fit_gate": gate},
            "config": {"SEQ": SEQ, "HIDDEN": HIDDEN, "LAYERS": LAYERS, "EPOCHS": EPOCHS, "K_ON": K_ON, "AF": AF, "ARL0": ARL0, "K_CU": K_CU},
            "folds": folds, "results": res, "elapsed_s": round(time.time() - T0, 1)}, open(OUT, "w"), indent=1)
 print("C3-1 ✓  C3-2 fit gate:", gate)
