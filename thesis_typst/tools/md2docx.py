@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""thesis_v12_2.md ＋ chapter6_draft.md → Word 初稿（.docx）。與 md2typ.py 讀同一來源、同一章節切分。
+"""thesis_v12_3.md ＋ chapter6_v12_3.md → Word 初稿（.docx）。與 md2typ.py 讀同一來源、同一章節切分。
 格式：標楷體／Times New Roman 12 pt、1.5 倍行距、A4、上下 2.5 cm 左 3 cm 右 2.5 cm（近 NTUST 規定；正式格式以 Typst 版為準）。
 數學式以 Unicode 近似呈現（精確版見 Typst PDF）。用法：python3 md2docx.py <repo> <out.docx>"""
 import os, re, sys
@@ -11,7 +11,7 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
 REPO, OUT = sys.argv[1], sys.argv[2]
-SRC = os.path.join(REPO, "docs/thesis/thesis_v12_2.md"); CH6 = os.path.join(REPO, "docs/thesis/chapter6_draft.md")
+SRC = os.path.join(REPO, "docs/thesis/thesis_v12_3.md"); CH6 = os.path.join(REPO, "docs/thesis/chapter6_v12_3.md")
 HACKMD = {"https://hackmd.io/_uploads/S1NP2wItzx.jpg": "thesis_typst/figures/hackmd_S1NP2wItzx.jpg",
           "https://hackmd.io/_uploads/HJZ2XzboGx.png": "thesis_typst/figures/hackmd_HJZ2XzboGx.png"}
 CN = "一二三四五六七八九十"
@@ -217,7 +217,7 @@ def main():
         txt = "\n".join(x for x in txt.split("\n") if not x.startswith("#block("))
         txt = re.sub(r"#v\([^)]*\)", "", txt).replace("#text(weight: \"bold\")[關鍵字：]", "**關鍵字：**").replace("*Keywords:*", "**Keywords:**")
         txt = re.sub(r"#align\(right\)\[([^\]]*)\]", r"\1", txt)
-        d.add_paragraph("【初稿，由 Claude 依正文 v12.2 第一章摘寫，未列數字；請依最終結果改寫】" if f != "ackn.typ" else "")
+        d.add_paragraph("【初稿，由 Claude 依正文 v12.3 第一章摘寫，未列數字；請依最終結果改寫】" if f != "ackn.typ" else "")
         w.blocks(txt.split("\n"))
     d.add_page_break(); h = d.add_heading(level=1); runs(h, "目錄", size=18); h.alignment = WD_ALIGN_PARAGRAPH.CENTER; toc(d)
     L = open(SRC, encoding="utf-8").read().replace("\r", "").split("\n")
@@ -232,7 +232,7 @@ def main():
     for o in ["第一章", "第二章", "第三章", "第四章", "第五章"]:
         w.blocks(seg[o][:1])
         if o == "第一章":
-            p = d.add_paragraph(); runs(p, "**初稿說明（自 HackMD 正文 v12.2 轉出）**", size=10); shade(p, "E3E3E3")
+            p = d.add_paragraph(); runs(p, "**初稿說明（自 HackMD 正文 v12.3 轉出）**", size=10); shade(p, "E3E3E3")
             s0 = len(d.paragraphs); w.blocks([re.sub(r"^>\s?", "", x) for x in note])
             for p in d.paragraphs[s0:]: shade(p, "E3E3E3")
         w.blocks(seg[o][1:])

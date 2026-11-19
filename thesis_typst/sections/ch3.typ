@@ -30,7 +30,7 @@
 #strong[概念先例與本研究之界定]：三類證據之概念皆非本研究首創。以守恆律檢驗節點之自我回報見於偵測惡意路由器之 WATCHERS（Bradley et al., 1998），其可被繞過之性質亦已被指出（Hughes et al., 2000）；以鄰近節點之空間相關偵測持合法金鑰之內部攻擊者見於無線感測網路（Liu et al., 2007），跨 cell 之 KPI 比較亦用於 sleeping cell 偵測（Asghar et al., 2017）；以移動之物理可能性檢驗回報見於 VANET 之位置驗證（Leinmüller et al., 2006；van der Heijden et al., 2018）。本研究之貢獻因此界定為：(1) 將三者用於 O\-RAN E2 KPM 之#strong[界內]偽造，並以「受測節點無法單方面設定」為共同之設計原則；(2) 以 NPN 之已登記母體使守恆檢驗可用；(3) 以階層式融合產生四種信任狀態並接到准入政策與可用資源評估（RQ3），此為上述先例所無；(4) 量化各證據之盲點（守恆式替換、串謀節點數、D1 規模效應）。
 
 #heading(level: 3, numbering: none)[3.3.1 觀測基礎：實測 RLC 欄位（取代 PDCP 假設）]
-先前版本假設 KPM 建立於 PDCP 層四項欄位（#raw("DRB.PdcpSduVolumeDl") 等）。實測發現此假設在 MC （Multi\-Connectivity）雙連結架構下不成立——ns\-O\-RAN 的 PDCP 錨點固定聚在 LTE eNB （#raw("DlE2PdcpStats.txt") 的 CellId 全部 \= 1），無 per\-gNB 資料，S\_i／H\_i 需要的跨節點比對因而 失去意義。改用 #strong[RLC 層 trace（#raw("DlE2RlcStats.txt")）]——各 mmWave gNB 各自統計，具完整 per\-cell（CellId 1–8）資料，方能支撐跨節點驗證。#strong[此為本研究方法論最重要的實測修正。]
+先前版本假設 KPM 建立於 PDCP 層四項欄位（#raw("DRB.PdcpSduVolumeDl") 等）。實測發現此假設在 MC （Multi\-Connectivity）雙連結架構下不成立——ns\-O\-RAN 的 PDCP 錨點固定聚在 LTE eNB （#raw("DlE2PdcpStats.txt") 的 CellId 全部 \= 1），無 per\-gNB 資料，S\_i／H\_i 需要的跨節點比對因而 失去意義。改用 #strong[RLC 層 trace（#raw("DlE2RlcStats.txt")）]——主檔提供 CellId 欄位（1–8），可依每個 UE 在該窗 最後一筆事件之 cell 分組，方能支撐跨節點驗證。此欄#strong[不代表各 cell 之獨立統計]：計數依 UE／LCID 累積、 delay 混合 LTE 與 mmWave 兩路（本節下文、4.6.5）；第一階段結果以此歸屬語意為條件，獨立之 per\-cell 統計屬第二階段（D\-30P）。#strong[此為本研究方法論最重要的實測修正。]
 
 #strong[實測可得欄位]（前 11 欄；第 12 欄後有黏欄 bug，parse 時忽略）：
 
@@ -76,7 +76,7 @@ H\_i 驗證「UE 在各 cell 報表中之出現、缺席與歸屬變化是否符
 ]
 #strong[D1 成員消失（非參數統計檢定）]
 
-實測顯示 UE「最後事件歸屬 LTE」之連續窗數呈#strong[雙峰重長尾]分布，且對幾何等單一參數族 的卡方適合度檢定顯著不符（χ² ≫ 臨界值），故採不需分布假設的非參數方法。對每個 UE x，由 乾淨資料建 Hampel identifier 與經驗分布：
+實測顯示 UE「最後事件歸屬 LTE」之連續窗數呈#strong[雙峰重長尾]分布，且所測之幾何分布 擬合不佳（卡方適合度 χ² ≫ 臨界值；同一 UE 之多個停留事件彼此相依，p 值僅供參考），故採不依賴該分布假設的非參數方法。對每個 UE x，由 乾淨資料建 Hampel identifier 與經驗分布：
 
 #block(width: 100%, fill: luma(245), inset: 6pt)[#set text(size: 8.5pt)
 #raw("z_d(x,t) = ( d(x,t) − median_x ) / ( 1.4826 · MAD_x )       （Hampel robust z；d = 連續 最後事件歸屬 LTE 停留窗數）

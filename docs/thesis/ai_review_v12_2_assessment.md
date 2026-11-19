@@ -24,3 +24,8 @@
 
 - **A1 → (b) 改程式**：`zt_kpm_xapp.py` 新增證據可得性閘（`EVIDENCE_GATE`，預設開；`ZT_EVIDENCE_GATE=0` 只供重現歷史輸出）：註記之 S_i 不可得（`si_raw`／`S_i` = unavailable，或 R3_ABSTAIN 為最終或 also_matched 規則）→ 任何准入政策皆不准入，判定標籤不變，另記 `evidence_gate`；`run_RQ3_decision_replay.admitted` 之 C_restrict_annot 同步。審稿之反例重跑：開閘時 strict／restrict_annotated 皆不准入；關閘時與原行為相同。`C_none`、`C_notrej` 為對照用之假想消費端，非 P3 政策，未加閘。影響量測（D-30、區間重建延遲、severity，開閘 vs 關閘）：`data/results/phase2/A1_evidence_gate/`。
 - **A2 → E30 修正**：見 `E30_coevolution_spec.md` §0a；`psro.py --payoff-split train`。
+
+## v12.3 落實（2026-11-19）
+
+`thesis_v12_3.md`、`chapter6_v12_3.md`、`thesis_typst/frontpages/abstract.*.typ`；腳本 `scripts/v12_3/`。A1 → 4.4.0（三）、4.4.3（三）、4.9.3（證據可得性閘）、6.3.3；A2 → 1.5 C4、5.2、6.1 RQ4；A3 → 3.3.1；A4 → 4.0 引言、4.9.1–4.9.2、4.12、4.13、5.2；A5 → 6.4 第 2 點；A6 → 4.8 限制；A7 → 1.4（R7、RQ4）、1.5 C4、第五章、6.1／6.2／6.3.4；A8 → 1.5、2 章比較表、4.7.5.5、4.13；B1 → 1.2、摘要；B2 → 4.0.1、4.0.4；B3 → 1.5、4.9.6.6、4.13；B4 → 1.5、4.9.5、4.13、6.1；B5 → 1.2；B6 → 3.3.3、4.8；C1 → 4.7.5.5；C2 → 第六章版本表；C3 → 4.7.5.5 標題與各處引用改「同條件偵測方法比較」。
+E 節：資源分配移出本篇（使用者：「這篇做 evaluation，下一篇做 allocation」）→ 1.4 RQ3、1.5 C3、4.12、6.1、6.2、6.4 第 8 點；6.5 之凍結 vs 線上、token 洩漏、Stage 3 改為【待作者核認】。

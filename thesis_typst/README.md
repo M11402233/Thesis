@@ -1,6 +1,6 @@
 # 碩論初稿（NTUST Typst 模板 ＋ Word 版）
 
-來源：`docs/thesis/thesis_v12_2.md`（HackMD 正文）＋ `docs/thesis/chapter6_draft.md`。正文改了就重跑轉換，不要直接改 `sections/*.typ`（會被覆蓋）。
+來源：`docs/thesis/thesis_v12_3.md`（HackMD 正文）＋ `docs/thesis/chapter6_v12_3.md`。正文改了就重跑轉換，不要直接改 `sections/*.typ`（會被覆蓋）。
 
 ```bash
 # 1. Typst（NTUST 模板 @preview/ntust-thesis-unofficial:1.3.0；需 typst ≥ 0.14、字型 Liberation Serif ＋ TW-MOE-Std-Kai）

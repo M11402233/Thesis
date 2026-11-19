@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""thesis_v12_2.md（HackMD 正文）＋ chapter6_draft.md → NTUST Typst 模板之章節檔。
+"""thesis_v12_3.md（HackMD 正文）＋ chapter6_v12_3.md → NTUST Typst 模板之章節檔。
 用法：python3 md2typ.py <repo> <out_dir>
 - 第 X 章 → 一級標題（模板自動編「第X章」）；其餘標題保留原文編號（4.7.4 等）、不另編號，使正文交叉引用仍正確
 - LaTeX 數學以 @preview/mitex 呈現（#mi／#mitex）
@@ -8,8 +8,8 @@
 import os, re, sys
 
 REPO, OUT = sys.argv[1], sys.argv[2]
-SRC = os.path.join(REPO, "docs/thesis/thesis_v12_2.md")
-CH6 = os.path.join(REPO, "docs/thesis/chapter6_draft.md")
+SRC = os.path.join(REPO, "docs/thesis/thesis_v12_3.md")
+CH6 = os.path.join(REPO, "docs/thesis/chapter6_v12_3.md")
 HACKMD = {"https://hackmd.io/_uploads/S1NP2wItzx.jpg": "/thesis_typst/figures/hackmd_S1NP2wItzx.jpg",
           "https://hackmd.io/_uploads/HJZ2XzboGx.png": "/thesis_typst/figures/hackmd_HJZ2XzboGx.png"}
 
@@ -197,7 +197,7 @@ def main():
         c = Conv(); body = c.blocks(seg[o])
         if o == "第一章":
             prebox = c.blocks([">" + l for l in note if l.strip()])
-            body = body[:1] + ["#block(width: 100%, fill: luma(235), inset: 8pt)[#set text(size: 9.5pt)\n#strong[初稿說明（自 HackMD 正文 v12.2 轉出）]\n\n"] + [x[x.index(']\n') + 2:-2] if x.startswith('#block') else x for x in prebox] + ["]\n"] + body[1:]
+            body = body[:1] + ["#block(width: 100%, fill: luma(235), inset: 8pt)[#set text(size: 9.5pt)\n#strong[初稿說明（自 HackMD 正文 v12.3 轉出）]\n\n"] + [x[x.index(']\n') + 2:-2] if x.startswith('#block') else x for x in prebox] + ["]\n"] + body[1:]
         open(os.path.join(OUT, f"{fn}.typ"), "w").write("".join(head + body))
     c6 = open(CH6, encoding="utf-8").read().replace("\r", "").split("\n")
     c6[0] = re.sub(r"^#\s+", "## ", c6[0])
