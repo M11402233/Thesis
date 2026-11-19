@@ -285,6 +285,23 @@ def verify_ci(cells, prev_violated_run):
     return ("violated" if violated else "conserved"), run, ev
 
 
+def verify_ci_ref(mm_lists, anchor_set, prev_violated_run, mode="set"):
+    """C_i 第二階段（phase2 Q-C1 = a，2026-11-19）：LTE 錨點名單為參照集合。
+    mm_lists：{mmWave cell: set(IMSI)}；anchor_set：錨點（cell 1）名單。
+    mode="set"：mmWave 名單聯集 ≠ 錨點名單即違反（主）；mode="card"：只比基數（對照）。
+    回傳 (verdict, run, evidence)；verdict 與 verify_ci 相同，可直接交給 fuse()。"""
+    union = set()
+    for c in mm_lists:
+        union |= set(mm_lists[c])
+    extra, missing = union - anchor_set, anchor_set - union
+    violated = (len(union) != len(anchor_set)) if mode == "card" else bool(extra or missing)
+    run = prev_violated_run + 1 if violated else 0
+    ev = {"n_mm_union": len(union), "n_anchor": len(anchor_set), "n_extra": len(extra), "n_missing": len(missing)}
+    if violated and extra:
+        ev["candidate_cells"] = sorted(c for c in mm_lists if set(mm_lists[c]) & extra)
+    return ("violated" if violated else "conserved"), run, ev
+
+
 def verify_si(cells, target, scale):
     """S_i:跨節點共識殘差。peer<MIN_PEER → unavailable(abstain)
 
