@@ -104,6 +104,12 @@ def drift_down(cell, rate, T=T):              # run_RQ3_decision_replay.py:155�
     return {"schedule": {cell: m}, "t0": T // 2}
 
 
+def drift_up(cell, rate, T=T):                # E29 調高之漂移：乘法 1 + rate·(k−t0)（與 drift_down 對稱；E9 為加法，見規格 §2）
+    m = np.ones(T); k = np.arange(T // 2, T)
+    m[T // 2:] = 1.0 + rate * (k - T // 2)
+    return {"schedule": {cell: m}, "t0": T // 2}
+
+
 def apply(windows, gen):
     """windows 之格式同 run_RQ3_decision_replay.py：windows[k] = (時間, {cell: {ue: delay}})"""
     import copy
