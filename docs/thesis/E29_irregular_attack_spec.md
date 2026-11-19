@@ -53,7 +53,9 @@
 
 | 指標 | 定義 |
 |---|---|
-| 偵測率 DR | 被竄改之 (node, s) 中判為 low-trust 或 rejected 之比例；另報只算 rejected 者 |
+| **偵測增量 ΔDR（主，使用者 2026-11-19 選 a）** | 配對：同一 (seed, node, s) 被竄改時判為 low-trust／rejected 之比例 − 乾淨時之比例（同 anchor）。原因：乾淨資料本身即有 53.5% 判為 low-trust／rejected（開發試跑，§7），未扣除則各列皆貼近底量 |
+| ΔDR_rej（輔，b） | 同上，只算 rejected |
+| DR（並列） | 未扣乾淨之原始比例 |
 | 攻擊者得利（down） | 被竄改之秒中 lured 之比例（R7；C_strict） |
 | 攻擊者得利（up） | 被竄改之秒中，乾淨時最佳 cell 為攻擊 cell、但 steering 改選他者之比例 |
 | 傷害 | regret（同 RQ3 口徑） |
@@ -98,3 +100,4 @@
 - 條件：D-30、`ZT_DELAY_SOURCE=reconstructed`（第一階段區間延遲，cell 歸屬仍為最後 PDU 所在 cell）、severity、uebound、10 r × 8 seed；`run_E29_irregular.py --dev`，輸出 `data/results/phase2/E29/dev_d30/`（654 s）。
 - 流程檢查：乾淨資料 rejected 844／15,534、trusted 46.5%，與 v12.1 第一階段 xApp 重跑逐數相同 ✓。
 - 觀察（僅供設計討論）：(1) 乾淨 flag 率 0.535，階躍與不規則之 DR_flag 0.53–0.60 幾乎等於乾淨水準，只有漂移明顯較高（0.76–0.90）⇒ DR_flag 主要反映 D1 綁定之 low-trust 底量，須改報「相對乾淨之增量」或以 rejected／S_i 證據為主；(2) 調高攻擊在嚴格准入下攻擊者得利反而上升（被排除正合攻擊者「把流量推走」之目的）；(3) 除漂移外，嚴格准入之 regret 高於不驗證（乾淨誤排除之代價大於攻擊傷害）。
+- 改用配對 ΔDR 後重跑（`dev_d30_v2/`，不得引用）：調低之階躍與不規則 ΔDR −0.015～+0.001（等於或低於乾淨），漂移 ↓ 0.25／0.35；調高之不規則 +0.045～0.050、×1.5 +0.092、漂移 ↑ 0.216。即開發資料上規則版對「調低」之階躍與不規則攻擊幾乎無偵測力。

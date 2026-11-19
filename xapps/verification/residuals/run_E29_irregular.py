@@ -6,8 +6,10 @@ run_E29_irregular.py — E29：一般攻擊者（規律／不規則）下之 Rul
 Rule + DRL 欄不在本腳本（須 D-30P 上之完整 PSRO，使用者 2026-11-19 決定）。
 
 指標（每列）：
-  DR_flag      被竄改之 (node, s) 判為 low-trust 或 rejected 之比例
-  DR_rej       同上，只算 rejected
+  ΔDR_flag     【主指標，使用者 2026-11-19 選 a】配對增量：同一 (seed, node, s) 被竄改時判為
+               low-trust／rejected 之比例 − 乾淨時之比例（同 anchor、同 seed 之乾淨註記）
+  ΔDR_rej      同上，只算 rejected（輔指標，b）
+  DR_flag／DR_rej  未扣乾淨之原始比例（並列）
   gain_none    攻擊者得利，無驗證（C_none）    down：lured／機會；up：repelled／機會
   gain_strict  攻擊者得利，嚴格准入（C_strict）
   regret_*     t ≥ t0 且真值 ≥ 2 候選之窗之平均 regret（ms）
@@ -59,7 +61,7 @@ def make_gen(kind, p, sd, cell, r, fam, T):
 
 
 def new_acc():
-    return {"att": 0, "flag": 0, "rej": 0, "att_possible": 0,
+    return {"att": 0, "flag": 0, "rej": 0, "att_possible": 0, "cflag": 0, "crej": 0,
             "opp_none": 0, "gain_none": 0, "opp_strict": 0, "gain_strict": 0,
             "reg_none": [], "reg_strict": [], "eps": 0}
 
@@ -98,6 +100,10 @@ def eval_seed(args):
                         if dec is None:
                             continue
                         a["att"] += 1; a["flag"] += dec["decision"] in FLAG; a["rej"] += dec["decision"] == "rejected"
+                        cd = cl.get(k, {}).get(j)
+                        if cd is None:                    # 乾淨無註記之 (node, s)：配對不成立即停
+                            raise SystemExit(f"配對失敗 seed {sd} k {k} cell {j}")
+                        a["cflag"] += cd["decision"] in FLAG; a["crej"] += cd["decision"] == "rejected"
                     truth = td[k]
                     if len(truth) < 2:
                         continue
@@ -129,12 +135,14 @@ def summarize(per_seed):
                 continue
             for f in tot:
                 tot[f] = tot[f] + v[f]
-            seeds[sd] = v["flag"] / v["att"] if v["att"] else None
+            seeds[sd] = (v["flag"] - v["cflag"]) / v["att"] if v["att"] else None
         rg = lambda L: float(np.nanmean(L)) if L else None
         res[key] = {"episodes": tot["eps"], "attacked_node_s": tot["att"],
+                    "dDR_flag": (tot["flag"] - tot["cflag"]) / tot["att"] if tot["att"] and key != "clean|clean" else None,
+                    "dDR_rej": (tot["rej"] - tot["crej"]) / tot["att"] if tot["att"] and key != "clean|clean" else None,
                     "DR_flag": tot["flag"] / tot["att"] if tot["att"] else None,
                     "DR_rej": tot["rej"] / tot["att"] if tot["att"] else None,
-                    "DR_flag_seed_range": [min(x for x in seeds.values() if x is not None),
+                    "dDR_flag_seed_range": [min(x for x in seeds.values() if x is not None),
                                            max(x for x in seeds.values() if x is not None)] if seeds else None,
                     "gain_none": tot["gain_none"] / tot["opp_none"] if tot["opp_none"] else None,
                     "gain_strict": tot["gain_strict"] / tot["opp_strict"] if tot["opp_strict"] else None,
@@ -171,7 +179,7 @@ def main():
     print(json.dumps(meta, ensure_ascii=False))
     for k, v in res.items():
         f = lambda x: "—" if x is None else f"{x:.3f}"
-        print(f"{k:32s} eps {v['episodes']:4d}  DR {f(v['DR_flag'])}  rej {f(v['DR_rej'])}  "
+        print(f"{k:32s} eps {v['episodes']:4d}  ΔDR {f(v['dDR_flag'])} Δrej {f(v['dDR_rej'])}  DR {f(v['DR_flag'])}  rej {f(v['DR_rej'])}  "
               f"gain none {f(v['gain_none'])} strict {f(v['gain_strict'])}  share {f(v['attacked_share'])}")
 
 
