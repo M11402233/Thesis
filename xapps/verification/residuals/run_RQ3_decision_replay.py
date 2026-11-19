@@ -130,7 +130,7 @@ def admitted(consumer, anns, reported):
         return {j for j, a in anns.items() if a["admitted"]}
     if consumer == "C_restrict_annot":                # P3 admission=restrict_annotated
         ok = X.ADMISSION["restrict_annotated"]
-        return {j for j, a in anns.items() if a["action"] in ok}
+        return {j for j, a in anns.items() if a["action"] in ok and not a.get("evidence_gate", False)}
     return {j for j, a in anns.items() if a["decision"] != "rejected"}   # C_notrej（含 abstain）
 
 

@@ -498,6 +498,17 @@ def fuse_first_match(ci, ci_run, si, d2, d1, d1_ev=None, target=None, d3=None):
 # ==========================================================================
 # 5. P3 Policy Enforcement —— 信任狀態 → 准入動作 → policy-admitted KPM
 # ==========================================================================
+# 證據可得性閘（使用者 2026-11-19 決定，審稿 A1 → (b)）：S_i 證據不可得（peer < MIN_PEER，R3_ABSTAIN 成立，
+# 不論是否被更嚴之規則蓋過）之註記，於任何准入政策下皆不准入；判定標籤不變，另記 evidence_gate。
+# ZT_EVIDENCE_GATE=0 僅供重現 2026-11-19 前之歷史輸出（strict 之輸出不受影響）。
+EVIDENCE_GATE = os.environ.get("ZT_EVIDENCE_GATE", "1") != "0"
+
+
+def evidence_unavailable(a):
+    return a.get("si_raw") == "unavailable" or a.get("S_i") == "unavailable" \
+        or a.get("rule_id") == "R3_ABSTAIN" or "R3_ABSTAIN" in a.get("also_matched", ())
+
+
 def enforce(win_ann, cells, w, admission=None):
     """依准入政策將該窗之信任註記轉為動作,並產出 policy-admitted view 與 execution record。
 
@@ -514,8 +525,13 @@ def enforce(win_ann, cells, w, admission=None):
     rec = {"window": w, "allow": [], "restrict": [], "exclude": [], "defer": []}
     for a in win_ann:
         act = ACTION[a["decision"]]
-        adm = (act in allowed) and a["node"] is not None
+        gate = EVIDENCE_GATE and evidence_unavailable(a)
+        adm = (act in allowed) and a["node"] is not None and not gate
         a["action"], a["admitted"] = act, adm
+        if EVIDENCE_GATE:
+            a["evidence_gate"] = gate
+            if gate:
+                rec.setdefault("evidence_gate", []).append(a["node"])
         if a["node"] is not None:
             rec[act].append(a["node"])
         if adm:

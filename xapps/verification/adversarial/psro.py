@@ -64,17 +64,22 @@ def _load(strat, fold, role):
 
 
 def _eval_job(args):
-    """一個 (偵測端, 攻擊者, fold) 於該 fold 測試 seed 之全部 cell；回傳累計 stats"""
-    dstrat, astrat, fold = args
+    """一個 (偵測端, 攻擊者, fold, split) 之累計 stats。
+    split="test"：該 fold 之測試 seed（外層評估；E19 原行為）。
+    split="train"：該 fold 之 7 個訓練 seed（anchor 排除測試 seed；內層＝策略選擇用，E30 / 審稿 A2）"""
+    dstrat, astrat, fold = args[:3]
+    split = args[3] if len(args) > 3 else "test"
     G, E, ds = _W["G"], _W["E"], _W["ds"]
-    sd = ds.get(ds.files[fold])                              # 評估 anchor = 其餘 7 seed（重現第四章）
+    test = ds.files[fold]
+    sds = [ds.get(test)] if split == "test" else [ds.get(f, test) for f in ds.files if f != test]
     det, atk = _load(dstrat, fold, "det"), _load(astrat, fold, "atk")
     tot = {}
-    for cell in sd.cells_all:
-        ep = _W["cache"].get(sd, cell, det, E.new_episode)
-        G.run_episode(ep, det, atk)
-        for k, v in ep.stats.items():
-            tot[k] = tot.get(k, 0) + v
+    for sd in sds:
+        for cell in sd.cells_all:
+            ep = _W["cache"].get(sd, cell, det, E.new_episode)
+            G.run_episode(ep, det, atk)
+            for k, v in ep.stats.items():
+                tot[k] = tot.get(k, 0) + v
     return tot
 
 
@@ -175,15 +180,18 @@ def solve(A, B):
 class PSRO:
     def __init__(self, args):
         self.a = args
-        self.dir = os.path.join(OUT_BASE, args.level, f"t{args.train_seed}")
+        base = OUT_BASE + ("_e30" if args.payoff_split == "train" else "")   # E30 不與 E19 輸出混用
+        self.dir = os.path.join(base, args.level, f"t{args.train_seed}")
         self.state_path = os.path.join(self.dir, "state.json")
         if os.path.exists(self.state_path):
             self.st = json.load(open(self.state_path, encoding="utf-8"))
+            if self.st.get("payoff_split", "test") != args.payoff_split:
+                raise SystemExit(f"✗ 既有 state 之 payoff_split = {self.st.get('payoff_split', 'test')} ≠ {args.payoff_split}；停止")
             print(f"續跑：{self.state_path}（round {self.st['round']}）")
         else:
             self.st = {"round": 0, "D": [{"name": "D0", "kind": "floor"}],
                        "A": [{"name": f"A0_{k}_{p}", "kind": "scripted", "attack": k, "param": p} for k, p in A0_SPEC],
-                       "payoff": {}, "history": []}
+                       "payoff": {}, "history": [], "payoff_split": args.payoff_split}
         self.pool = mp.Pool(args.workers, initializer=_init_worker)
 
     def save(self):
@@ -192,9 +200,10 @@ class PSRO:
         json.dump(self.st, open(tmp, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
         os.replace(tmp, self.state_path)
 
-    def fill_payoff(self):
-        todo = [(d, a) for d in self.st["D"] for a in self.st["A"] if f"{d['name']}|{a['name']}" not in self.st["payoff"]]
-        jobs = [(d, a, f) for d, a in todo for f in FOLDS]
+    def _fill(self, key, split):
+        tab = self.st.setdefault(key, {})
+        todo = [(d, a) for d in self.st["D"] for a in self.st["A"] if f"{d['name']}|{a['name']}" not in tab]
+        jobs = [(d, a, f, split) for d, a in todo for f in FOLDS]
         t = time.time()
         res = self.pool.map(_eval_job, jobs, chunksize=1)
         for i, (d, a) in enumerate(todo):
@@ -202,8 +211,18 @@ class PSRO:
             for r in res[i * len(FOLDS):(i + 1) * len(FOLDS)]:
                 for k, v in r.items():
                     tot[k] = tot.get(k, 0) + v
-            self.st["payoff"][f"{d['name']}|{a['name']}"] = summarize(tot)
-        print(f"  報酬表：新增 {len(todo)} 對（{time.time() - t:.0f} s）")
+            tab[f"{d['name']}|{a['name']}"] = summarize(tot)
+        print(f"  報酬表[{key}／{split} seed]：新增 {len(todo)} 對（{time.time() - t:.0f} s）")
+
+    def fill_payoff(self):
+        """payoff ＝ meta-solver／NashConv／下一輪訓練所用之表（選擇用）。
+        payoff_split="test"（E19 原行為）：payoff 取自測試 seed，此時測試 seed 參與策略選擇。
+        payoff_split="train"（E30）：payoff 取自訓練 seed；另存 payoff_test（測試 seed）僅供評估，程式中無任何選擇讀取它。"""
+        if self.a.payoff_split == "train":
+            self._fill("payoff", "train")
+            self._fill("payoff_test", "test")
+        else:
+            self._fill("payoff", "test")
         self.save()
 
     def matrices(self):
@@ -219,7 +238,7 @@ class PSRO:
         rq3 = json.load(open(os.path.join(SEV, "RQ3_decision_replay.json"), encoding="utf-8"))
         bad = []
         for a in self.st["A"][:3]:
-            got = self.st["payoff"][f"D0|{a['name']}"]["lure_rate_C_strict"]
+            got = self.st.get("payoff_test", self.st["payoff"])[f"D0|{a['name']}"]["lure_rate_C_strict"]
             exp = rq3[f"uebound|{RQ3_NAME[(a['attack'], a['param'])]}|C_strict"]["lured_rate"]
             print(f"  G4 {a['name']}：誘導率 {got:.4%}（RQ3 {exp:.4%}）")
             if abs(got - exp) > 1e-12:
@@ -252,7 +271,7 @@ class PSRO:
             print(f"Round 0：σ_D={np.round(s, 3).tolist()} σ_A={np.round(t, 3).tolist()}（{how}）")
         if a.g4_only:
             return
-        while st["round"] <= MAX_ROUNDS:
+        while st["round"] <= self.a.max_rounds:
             r = st["round"]
             sig = st["sigma"]
             mdir = os.path.join(self.dir, "models", f"r{r}")
@@ -298,7 +317,7 @@ class PSRO:
                 self.save()
                 break
         else:
-            st["stop"] = f"達最大輪數 {MAX_ROUNDS}"
+            st["stop"] = f"達最大輪數 {self.a.max_rounds}"
         self.save()
         print("停止：", st["stop"])
 
@@ -319,13 +338,16 @@ def main():
     ap.add_argument("--br-every", type=int, default=BR_EVERY)
     ap.add_argument("--smoke", action="store_true", help="冒煙測試：只用 fold 0、輸出至 psro_smoke/；結果不得引用")
     ap.add_argument("--g4-only", action="store_true")
+    ap.add_argument("--payoff-split", choices=["test", "train"], default="test",
+                    help="選擇用報酬表之資料：test＝E19 原行為；train＝E30（測試 seed 只作評估，審稿 A2）")
+    ap.add_argument("--max-rounds", type=int, default=MAX_ROUNDS, help="E19＝6；E30＝12")
     args = ap.parse_args()
     if os.environ.get("ZT_DATASET") != "d30" or os.environ.get("ZT_FUSION_ORDER") != "severity":
         raise SystemExit("須在 ZT_DATASET=d30 與 ZT_FUSION_ORDER=severity 下執行")
     import importlib.metadata as md
     meta = {"git_commit": subprocess.run(["git", "-C", ROOT, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip(),
             "packages": {p: md.version(p) for p in ("torch", "gymnasium", "stable-baselines3", "sb3-contrib", "numpy", "nashpy")},
-            "hyperparameters": HP, "br_max": args.br_max, "br_every": args.br_every, "smoke": args.smoke, "stop_rule": f"NashConv <= {REL_STOP} x round-1 NashConv", "max_rounds": MAX_ROUNDS}
+            "hyperparameters": HP, "br_max": args.br_max, "br_every": args.br_every, "smoke": args.smoke, "stop_rule": f"NashConv <= {REL_STOP} x round-1 NashConv", "max_rounds": args.max_rounds, "payoff_split": args.payoff_split}
     global FOLDS, OUT_BASE
     if args.smoke:
         FOLDS, OUT_BASE = [0], OUT_BASE + "_smoke"

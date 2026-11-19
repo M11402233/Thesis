@@ -19,3 +19,8 @@
 | C1 | p.59 擬合門檻「≥ 0.95」 vs 規格 0.80 | 第 1298 行 vs `C3_same_condition_comparison_spec_v0.md` C3-2、`run_E9b_supervised_baseline.py` FIT_GATE = 0.80 | **成立**：正文寫錯門檻（實際 0.995–0.998，不改通過與否） |
 | C2–C3 | 第六章版本聲明疊加、C3 代號同名 | — | 成立，整理類 |
 | D、E、F | 非幻覺之項目、須作者認領之決定、核對範圍 | — | 同意；審稿未重跑實驗，數字之真實性未受質疑 |
+
+## 使用者決定（2026-11-19）與落實
+
+- **A1 → (b) 改程式**：`zt_kpm_xapp.py` 新增證據可得性閘（`EVIDENCE_GATE`，預設開；`ZT_EVIDENCE_GATE=0` 只供重現歷史輸出）：註記之 S_i 不可得（`si_raw`／`S_i` = unavailable，或 R3_ABSTAIN 為最終或 also_matched 規則）→ 任何准入政策皆不准入，判定標籤不變，另記 `evidence_gate`；`run_RQ3_decision_replay.admitted` 之 C_restrict_annot 同步。審稿之反例重跑：開閘時 strict／restrict_annotated 皆不准入；關閘時與原行為相同。`C_none`、`C_notrej` 為對照用之假想消費端，非 P3 政策，未加閘。影響量測（D-30、區間重建延遲、severity，開閘 vs 關閘）：`data/results/phase2/A1_evidence_gate/`。
+- **A2 → E30 修正**：見 `E30_coevolution_spec.md` §0a；`psro.py --payoff-split train`。
