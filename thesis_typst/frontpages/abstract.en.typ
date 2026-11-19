@@ -1,0 +1,10 @@
+#block(fill: luma(235), inset: 6pt)[#text(size: 9.5pt)[[Draft written by Claude from Chapter 1 of thesis v12.2; no numbers; to be rewritten from the final results.]]]
+
+In non-public O-RAN networks, Near-RT RIC xApps steer traffic and allocate resources based on E2SM-KPM measurements reported by O-DUs, yet zero-trust architectures and authorization mechanisms verify only who reports, not whether the reported values are trustworthy. This thesis addresses an O-DU with a valid identity that has been compromised and falsifies its own measurements at the KPM assembly point while keeping them within plausible ranges.
+
+We propose C-ZT, which checks every (node, window) report against field references that the reporting node cannot set unilaterally: cardinality conservation of the registered UE population (C_i), same-window cross-node consensus (S_i), and membership-transition consistency mediated by the LTE anchor (H_i). A hierarchical rule fusion maps the evidence to four trust states (trusted, abstain, low-trust, rejected); each decision records the rule that fired, so it can be replayed and audited. Admission policies decide which measurements consumer xApps may use, and an available-resource evaluation xApp quantifies the resources that remain once untrustworthy measurements are excluded. An OAuth 2.0 authorization layer limits what a node may request and complements the consistency checks.
+
+The checks are evaluated on an ns-O-RAN closed field with 30 UEs, 7 gNBs and one LTE anchor, reporting detection ability, blind spots and clean false rejections. An adversarial game between a learning attacker and a learning detector tests whether the checks hold against an adaptive adversary. A correction of the simulator's measurement semantics (phase 1 done, phase 2 in progress) leaves part of the results as historical versions; the text labels the validation level of each result.
+
+#v(1em)
+*Keywords:* Zero Trust, O-RAN, E2SM-KPM, Measurement Falsification, Non-Public Network, Consistency Verification, Adversarial Reinforcement Learning

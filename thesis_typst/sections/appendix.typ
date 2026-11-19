@@ -1,0 +1,80 @@
+#import "@preview/mitex:0.2.7": mi, mitex
+#heading(level: 1, numbering: none)[附錄 A：S\_i 時間單位修訂前後之數字對照]
+#strong[修訂內容]（2026\-10\-06，依事前登記之規格 #raw("docs/thesis/planB_realtime_spec.md")）：4.7.4–4.7.8 初版以「被評估之 full\-consensus 窗」為漂移速率、時間參照視窗與「連續」之單位；full\-consensus 序列中相鄰索引實際相隔 1 秒者僅 53.4 %，同一「%\/窗」對應之實際速率因樣本而異，且與 4.12 以實際秒計之注入不一致。修訂後：(1) 漂移與竄改以實際秒計；(2) 時間參照為受測節點於 \[w − 10, w − 1\] 秒內之上報中位數，上報少於 5 個時不可評估；(3) 監督式分類器之輸入為實際秒對齊之值與遮罩兩通道；(4) 準則 2c 改為實際連續兩秒；(5) 主結果於三種方法皆可評估之共同集合上比較。空間參照之同窗判定不依賴時間序列，故其乾淨與階躍判定於原始評估集合上逐窗重現修訂前之值（腳本內建檢查）。
+
+#strong[修訂前之數字不再引用]，下表僅供對照；修訂前之 4.7.4 未分 own／common 集合。修訂前之腳本與輸出保留不動（程式碼目錄末列）。
+
+#block(width: 100%)[#set text(size: 9pt)
+#set par(first-line-indent: 0pt, justify: false)
+#table(columns: 4, inset: 4pt, align: left, stroke: 0.5pt,
+  table.header([項目], [修訂前（%\/窗）], [修訂後（%\/秒；共同集合）], [備註]),
+  [4.7.4 乾淨誤報（空間／時間）], [0.037／0.014], [0.036／0.013], [新版為共同集合],
+  [4.7.4 漂移 0.5 %（空間／時間）], [0.26／0.01], [0.57／0.01], [單位：修訂前 %\/窗，新版 %\/秒],
+  [4.7.4 漂移 1 %（空間／時間）], [0.54／0.01], [0.73／0.01], [單位：修訂前 %\/窗，新版 %\/秒],
+  [4.7.4 漂移 2 %（空間／時間）], [0.74／0.01], [0.86／0.02], [單位：修訂前 %\/窗，新版 %\/秒],
+  [4.7.4 漂移 4 %（空間／時間）], [0.86／0.14], [0.92／0.21], [單位：修訂前 %\/窗，新版 %\/秒],
+  [E9 階躍 AF \= 1.3：偵測率（空間／時間）], [0.62／0.08], [0.60／0.06], [],
+  [E9 階躍 AF \= 1.3：onset 命中率（空間／時間）], [0.81／0.88], [0.75／0.75], [新版上限 0.875（見 4.7.5）],
+  [E9 階躍 AF \= 1.5：偵測率（空間／時間）], [0.96／0.11], [0.96／0.08], [],
+  [E9 階躍 AF \= 1.5：onset 命中率（空間／時間）], [1.00／1.00], [0.88／0.88], [新版上限 0.875（見 4.7.5）],
+  [E9b 監督式乾淨誤報], [0.132], [0.136], [],
+  [E9b 監督式漂移 1 %], [0.81], [0.90], [],
+  [E9c 共模漂移 2 %：時間參照誤報], [0.46], [0.06], [修訂前之時間參照以受評估窗計],
+  [E9c 共模階躍 ×1.1：監督式誤報], [0.51], [0.52], [],
+  [E9c 共模漂移 2 %：空間參照誤報], [0.23], [0.23], [],
+  [E13 1 % 差距（τ\_S \= 3／3.5／4／4.5／5）], [\+0.62／\+0.58／\+0.53／\+0.48／\+0.42], [\+0.80／\+0.79／\+0.72／\+0.69／\+0.67], [],
+  [Q1 空間 #mi("r^*_D")（D \= 5／10／20／40）], [15 %／4 %／1.5 %／0.75 %], [15 %／6 %／4 %／1 %], [修訂前 D 以窗計],
+  [Q1 空間乾淨底線（D \= 20／40）], [0.12／0.19], [0.00／0.00], [2c 改為實際連續兩秒],
+  [Q1 時間 #mi("r^*_D")（D \= 5／10／20／40）], [15 %／6 %／6 %／6 %], [15 %／8 %／6 %／6 %], [修訂前 D 以窗計],
+  [Q1 時間乾淨底線（D \= 20／40）], [0.06／0.12], [0.00／0.00], [2c 改為實際連續兩秒],
+  [Q4 空間 oracle β \= 0.99：平均偏差], [27.8 %], [28.2 %], [],
+  [Q4 時間 oracle β \= 0.99：區間末偏差], [333.9 %], [391.9 %], [],
+  [Q4 空間 lag1 β \= 0.9：偵測率], [0.22], [0.20], [],
+  [Q6 未中毒：空間 1 % 偵測率], [0.54], [0.73], [],
+  [Q6 k \= 1：#mi("s") 放大倍數], [1.80–2.70], [1.80–2.70], [校準期竄改改以實際秒計],
+  [Q6 k \= 1：空間 1 % 偵測率], [0.13–0.20], [0.51–0.55], [變化之組成未分解])]
+#strong[主要之結論變化]：(1) 低速漂移下空間參照之偵測率上升（1 %：0.54 → 0.73），兩種參照之差距擴大；(2) 共模漂移下時間參照之誤報大幅下降（0.46 → 0.06）；(3) 準則 2c 之乾淨底線降為 0；(4) 校準期單一 cell 中毒之影響較修訂前小。上述變化皆以修訂後之腳本輸出為準，個別變化之成因未逐項分解。
+
+#heading(level: 1, numbering: none)[附錄 B：程式碼目錄]
+#block(width: 100%)[#set text(size: 9pt)
+#set par(first-line-indent: 0pt, justify: false)
+#table(columns: 3, inset: 4pt, align: left, stroke: 0.5pt,
+  table.header([檔案], [功能], [對應章節]),
+  [#raw("collect_ues30.sh")], [D\-30 資料集收集（30 UE、E2 NR 報表、8 seed）], [4.0.3],
+  [#raw("collect_Ci_60s_10seed.sh")], [前版 D\-C 資料集收集], [附錄],
+  [#raw("cardinality.py")], [C\_i 核心函式庫（斷言、攻擊注入）], [4.6],
+  [#raw("run_Ci_unified.py")], [C\_i 之 E0–E8（判定經 #raw("zt_kpm_xapp.verify_ci")／#raw("fuse")；規格 #raw("docs/thesis/Ci_unified_spec.md")）], [4.6.2–4.6.8],
+  [#raw("make_fig_Ci_unified.py")], [Fig 4\-1 ～ 4\-4], [4.6],
+  [#raw("run_Ci_experiments.py")、#raw("run_Ci_extended_E6E8.py")、#raw("make_fig_Ci_final.py")], [前版（D\-C）之 C\_i 腳本；僅供附錄對照], [附錄],
+  [#raw("audit_Si_data.py")], [S\_i 資料盤點（差分、離散度）], [4.7.1],
+  [#raw("audit_delay_cv.py")], [同窗跨 cell 延遲離散度、S\_i 證據可用性、serving cell 轉移統計], [4.7.1、4.8.4],
+  [#raw("make_fig_Si_ablation_rt.py")], [Fig 4\-5（僅讀 E9 實際秒輸出作圖）], [4.7.4],
+  [#raw("run_Si_experiments.py")], [S\_i 定義與漂移實驗], [4.7.2],
+  [#raw("planB_rt.py")], [實際秒定義之共用核心（共同集合、2c 準則、回歸基準）], [4.7.4–4.7.8],
+  [#raw("run_E9_rt.py")], [參照機制受控消融與 E9 操作區對照（實際秒）], [4.7.4、4.7.5],
+  [#raw("run_E9b_rt.py")], [E9b 監督式分類器對照（實際秒）], [4.7.5.1],
+  [#raw("run_E9c_rt.py")], [E9c 良性共模擾動（實際秒）], [4.7.5.2],
+  [#raw("run_E9d_rt.py")], [E9d 真實 trace 之其他 cell 背景（觀察性）], [4.7.5.3],
+  [#raw("lstm_baseline_anchor.py")], [自我參照 LSTM 基準], [4.7.6],
+  [#raw("make_fig_lstm_rt.py")], [Fig 4\-7（僅讀 LSTM 輸出作圖；檢查錨點為連續秒）], [4.7.6],
+  [#raw("run_E13_rt.py")], [E13 τ\_S 敏感度（實際秒）、誤報非穩態十等分表], [4.7.7],
+  [#raw("make_fig_E13_rt.py")], [Fig 4\-7b（僅讀 E13 輸出作圖）], [4.7.7],
+  [#raw("run_slow_poisoning_rt.py")], [慢性中毒題組 Q1／Q2／Q4／Q6（實際秒）；#raw("--q6-k") 為 E17 之延伸], [4.7.8],
+  [#raw("run_Si_reference_ablation.py")、#raw("run_E9_operating_regime.py")、#raw("run_E9b_supervised_baseline.py")、#raw("run_E9c_common_mode.py")、#raw("run_E13_tauS_sensitivity.py")、#raw("run_slow_poisoning_suite.py")], [時間單位修訂前（%\/窗）之版本；僅供附錄對照], [附錄],
+  [#raw("run_Hi_experiments.py")], [H\_i 之 D1／D2 定義驗證], [4.8.3、4.8.4],
+  [#raw("run_Hi_D1_performance.py")], [D1 效能（FPR、TPR、delay）], [4.8.6],
+  [#raw("run_E15_E16_D1_robustness.py")], [E15 分群門檻敏感度、E16 嚴重度–反應曲線（補充實驗；規格 #raw("docs/thesis/E15_E18_supplementary_spec.md")）], [4.8.6],
+  [#raw("make_fig_Hi_H1_H4.py")], [Fig 4\-9 ～ 4\-12（含對帳）], [4.8.1、4.8.2、4.8.4、4.8.6],
+  [#raw("make_fig_Hi_D1_grading.py")], [Fig 4\-13], [4.8.5],
+  [#raw("datasets.py")], [資料集登錄（#raw("ZT_DATASET")）：資料路徑、N\_known、aux 路徑、輸出目錄], [全章],
+  [#raw("prepare_d30.py")], [D\-30 分析檔（0–299 窗）與一致性檢查], [4.0.3、4.2.3],
+  [#raw("prb_reader.py")], [原生 PRB 讀取與 #raw("RxPacketTrace") 交叉驗證], [4.12],
+  [#raw("zt_kpm_xapp.py")], [C\-ZT 之 Detection／Trust Assessment／Policy Enforcement（P1–P3）、規則稽核、runtime benchmark], [4.9],
+  [#raw("run_E10_D1_policy_ablation.py")], [E10：D1 節點歸屬政策消融], [4.9.6.5],
+  [#raw("run_E14_D1_sensitivity.py")], [E14：D1 門檻與持續窗之敏感度（事後新增；規格 #raw("docs/thesis/E14_D1_sensitivity_spec.md")）], [4.9.6.6],
+  [#raw("run_E11_transitions.py")、#raw("run_E11b_pulses.py")、#raw("run_E12_persist.py")], [轉移與恢復、重複單窗脈衝、#mi("S_i") 持續性升級（候選）], [4.4.0（四）、4.6.7],
+  [#raw("run_adversarial_msweep.py")], [抗串謀 m\-sweep], [4.10],
+  [#raw("run_fusion_replay.py")], [規則回放], [4.11],
+  [#raw("resource_eval_xapp.py")], [可用資源評估 xApp：每窗於 P3 發布後自 DB 讀取准入結果與 PRB，回報可用率與 PRB 能見度損失（含 #raw("SharedDB")、#raw("ResourceTermination") 之抽象）；#raw("--attacks") 為 E18、#raw("--benchmark") 為 M1], [4.9.2、4.9.5、4.12],
+  [#raw("run_RQ3_decision_replay.py")], [攻擊情境之決策重放（RQ3；含原生 PRB 指標）], [4.12],
+  [#raw("scripts/run_d30_pipeline.sh")], [D\-30 全部實驗之執行順序（任一內建檢查失敗即停止）], [全章])]
