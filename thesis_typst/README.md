@@ -11,5 +11,5 @@ python3 thesis_typst/tools/md2docx.py . thesis.docx
 ```
 
 - 校徽 `logo.png` 不入 repo（授權不明），下載方式見模板 README。
-- 封面資料在 `frontpages/names.typ`；【待填】：系所、指導教授英文姓名、口試年月、畢業級別、誌謝。摘要為 Claude 依第一章所寫之草稿。
+- 封面資料在 `frontpages/names.typ`；【待填】：指導教授英文姓名、誌謝（系所＝電子工程系、口試＝民國 116 年 6 月已填；系所英文名為推測）。摘要為 Claude 依第一章所寫之草稿。
 - 第五章尚未依 2026-11-19 會議決定（`meeting_minutes_advisor_20261119.md`）改寫。

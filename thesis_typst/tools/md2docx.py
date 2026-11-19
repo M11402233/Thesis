@@ -204,10 +204,10 @@ def main():
         if rf is None: rf = OxmlElement("w:rFonts"); h.element.rPr.append(rf)
         rf.set(qn("w:eastAsia"), "標楷體"); h.paragraph_format.first_line_indent = Cm(0)
     # 封面
-    for t, sz in (("國立臺灣科技大學", 20), ("【待填：系所】", 18), ("碩士學位論文", 18), ("", 12),
+    for t, sz in (("國立臺灣科技大學", 20), ("電子工程系", 18), ("碩士學位論文", 18), ("", 12),
                   ("非公眾網路 O-RAN 邊緣節點的零信任 E2 量測資料可信度驗證：以跨節點空間物理一致性對抗 KPM 偽造", 16),
                   ("Zero-Trust Verification and Admission of KPM Reports in Non-Public O-RAN: Countering Falsification by Authenticated Nodes with Field-Referenced Consistency Evidence", 14),
-                  ("", 12), ("研究生：王芊瑜（M11402233）", 14), ("指導教授：王瑞堂 博士", 14), ("", 12), ("中華民國 【待填】 年 【待填】 月", 14)):
+                  ("", 12), ("研究生：王芊瑜（M11402233）", 14), ("指導教授：王瑞堂 博士", 14), ("", 12), ("中華民國 116 年 6 月", 14)):
         p = d.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER; p.paragraph_format.first_line_indent = Cm(0)
         if t: r = p.add_run(t); set_font(r, sz); r.bold = sz >= 16
     w = W(d)

@@ -10,8 +10,8 @@
     (zh: "王瑞堂 博士", en: "Dr. 【待填：指導教授英文姓名】"),
   ),
   university: (zh: "國立臺灣科技大學", en: "National Taiwan University of Science and Technology"),
-  department: (zh: "【待填：系所】", en: "【待填：Department】"),
+  department: (zh: "電子工程系", en: "Department of Electronic and Computer Engineering"),
   degree: (zh: "碩士", en: "Master "),
-  date: (year: "【待填】", month: "【待填】"),
-  graduation-class: "【待填】",
+  date: (year: "一一六", month: "六"),
+  graduation-class: "116",
 )
