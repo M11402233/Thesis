@@ -1,4 +1,5 @@
 # 規格 E19：DRL 偵測端 × 學習型攻擊者 × OAuth 授權層（總規格）
+> **〔2026-11-19 會議，決定變更〕** 見 `docs/thesis/meeting_minutes_advisor_20261119.md` §A。 要點：第五章不以 NashConv／均衡為主要成功判準（M1）；PSRO 改定位為策略池擴展與探索機制、NashConv 為輔助指標（M2）；偵測端須能調整門檻（M3）；成功判準改為適應能力與策略多樣性（M4）。下列各節之原文保留，與 M1–M4 衝突處以該檔為準；具體定義待 Q-M1～Q-M4。
 
 > 狀態：**v2 定案（2026-11-08；R-a～R-f 由使用者依建議值確認）**：訓練流程由「分階段單次訓練」改為 **PSRO**（依使用者之簡報 v1.5 第 42 頁）；新增之 §3a 與 §10b 之 R-a～R-f 已於 2026-11-08 依建議值確認。v1（2026-11-07）之 Q-a～Q-g 已確認，於 v2 不變（以〔已確認〕標示）。v1 全文見 git 歷史（commit 34a6c26 之前）。
 > 依據：`WUT_feedback_DRL_ZT_plan.md`（含 1.2a 之 P1–P11 決定）、`fusion_severity_order_spec.md`。
@@ -67,6 +68,7 @@
 | 決策單位 | (節點 j, 秒 t)；L1 rejected 規則（`R1_AUTHZ`、`R1_CI_VETO`、`R1_D2_VETO`）觸發時不交給 DRL |
 | floor | V-escalate（主）：severity 版 `fuse()` 之完整判定。V-replace（對照）：僅 L1（含 `R1_CI_PENDING` → ≥ low-trust）＋ L3 |
 | action | {trusted, low-trust, rejected}，以 action mask 限於 severity(a) ≥ severity(floor)；abstain 只由 L3 產生 |
+| action〔2026-11-19 M3，待 Q-M1〕 | 另加**門檻調整**：τ_S、τ_H^warn／τ_H^reject（候選；L_C 屬 C_i 硬否決，暫不納入）依狀態調整，範圍事先登錄；是否允許放寬至凍結值以下待使用者決定 |
 | state | $z_j(t)$、peer 數、歸屬 j 之 D1 $z_d$ 最大值與證據強度、C_i pending 旗標；過去 k 秒之上述值與本 agent 過去 action。k = 5〔已確認〕。**不含** peer 中位數與尺度 s 本身 |
 | reward | 竄改且判 rejected：+1；竄改且判 low-trust：+λ；竄改且判 trusted：−α·(該秒 steering 錯誤成本，RQ3 regret 正規化)；未竄改且判 rejected：−β；未竄改且判 low-trust：−μ；未竄改且判 trusted：+μ。λ=0.3、α=1、β=5、μ=0.05〔已確認〕 |
 | 演算法 | MaskablePPO（sb3-contrib 2.6.0）〔已確認〕；於 PSRO 中作為偵測端之最佳回應訓練器（§3a）；訓練 seed 0、1、2（≥3），報平均與範圍 |
@@ -89,6 +91,8 @@
 4. 新策略加入各自之池，回到 1。
 
 **停止**：NashConv（各方最佳回應相對目前混合之報酬增益之和；即 exploitability）≤ 0.05 × 第 1 輪之 NashConv，或達最大輪數（R-d，2026-11-09 改為相對門檻）。
+
+> **〔2026-11-19 M1／M2〕** 本段之「主張」降為輔助分析：NashConv 照報逐輪曲線，不作主要成功判準；PSRO 之角色為策略池擴展與攻防策略探索。停止規則待 Q-M3。
 
 **主張**：僅為**受限賽局（目前之策略池）之近似均衡**，以 NashConv 衡量並報告其隨輪數之曲線；**不是**全域均衡保證。每輪之 $D_i$ 皆受規則下限約束（只能更嚴），故任何混合仍為 fail-closed。
 
@@ -120,6 +124,8 @@
 
 ## 5. OAuth 授權層（Phase 2；P10 = B）
 
+> **〔2026-11-19 M5〕** 會議初估授權請求約每秒一次，可接受；須統計實際請求量（短 TTL 續發＋P10 撤銷／重發），請求量提高時重評估。
+
 - 模組：`xapps/verification/authz/`；RFC 6749 client credentials 之邏輯層模擬（不實作 HTTP）。
 - scope：DU 身分、可上報之 cell ID、量測類型、請求種類。新規則 `R1_AUTHZ`（token 無效／過期／scope 不符 → rejected）。
 - **P10 = B（連動，使用者 2026-11-07 決定）**：token scope／續發隨信任狀態變動。條件：
@@ -138,6 +144,8 @@
 1 規則版 L2（severity）；2 E12 `R2_SI_PERSIST`（L_S 格點）；3 E14 D1 門檻格點；4 E9b 監督式分類器。每個 DRL 結果與 1–4 並列。
 
 ## 8. 成功判準（事先登錄）
+
+> **〔2026-11-19 M4〕** 下列判準保留為「偵測品質」一項（其負面結果照實報告）；主要判準改為適應能力與策略多樣性：新有效攻擊之出現、對新攻擊之識別、攻擊改變後之恢復、攻擊者能否持續找到有效攻擊、對未入池（未知）攻擊之偵測。操作定義須先於任何新評估登錄（Q-M2）。
 
 - 偵測端：同一乾淨誤拒率下，DRL 之「TPR 對偵測延遲」優於基線 1–3 之前緣；E9c 下誤報不高於規則版。
 - V-escalate 之 TPR 依構造不低於基線 1；若 V-replace 比規則寬鬆（乾淨誤拒相同下 TPR 較低），如實報告。
