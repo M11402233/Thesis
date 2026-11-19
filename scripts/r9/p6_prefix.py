@@ -4,7 +4,8 @@ SKIP={'mem_trace.tsv','run.log','meta.txt'}
 def op(p): return gzip.open(p,'rt') if p.endswith('.gz') else open(p)
 def strip(name,l):
     if re.match(r'(du-cell|cu-cp-cell|cu-up-cell)-',name): return l.split(',',1)[1] if ',' in l else l
-    if name.startswith('bsState'): return l.split(None,1)[1] if len(l.split(None,1))>1 else l
+    if name.startswith('bsState'):
+        f=l.split(); return ' '.join(f[:1]+f[2:])  # col 2 = UNIX wall clock
     return l
 res={}
 for fn in sorted(os.listdir(S)):
