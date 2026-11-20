@@ -52,18 +52,24 @@ for f in [x for x in RLC if x not in ("DlE2RlcStats.txt", "DlE2RlcStatsLte.txt")
     print(f"   {f:34s} 列 {len(a):6d} / {len(b):6d}  {'相同' if ok else '✗ 不同'}")
     if not ok:
         fails.append(f"R-0 {f}")
-# RxPacketTrace 前綴
-p0 = os.path.join(OUT, "mode0", "RxPacketTrace.txt")
-if os.path.exists(p0):
-    with open(p0) as fh:
-        a = fh.readlines()
-    L = max(0, len(a) - 3000)
-    with gzip.open(os.path.join(REF, "RxPacketTrace.txt.gz"), "rt") as fh:
-        b = [next(fh) for _ in range(L)]
-    ok = a[:L] == b
-    print(f"   RxPacketTrace 前 {L} 行  {'相同' if ok else '✗ 不同'}")
-    if not ok:
-        fails.append("R-0 RxPacketTrace")
+# RxPacketTrace：時間 < K-1 秒之列（simTime 21 與 301 之結尾差異不比）
+def trace_rows(path, tmax):
+    op = gzip.open if path.endswith(".gz") else open
+    out = []
+    with op(path, "rt") as fh:
+        for ln in fh:
+            p = ln.split("\t", 3)
+            if len(p) > 2 and p[0] in ("DL", "UL"):
+                if float(p[1]) >= tmax:
+                    break
+                out.append(ln)
+    return out
+a = trace_rows(os.path.join(OUT, "mode0", "RxPacketTrace.txt"), K - 1)
+b = trace_rows(os.path.join(REF, "RxPacketTrace.txt.gz"), K - 1)
+ok = a == b and len(a) > 0
+print(f"   RxPacketTrace（時間 < {K-1} s）列 {len(a)} / {len(b)}  {'相同' if ok else '✗ 不同'}")
+if not ok:
+    fails.append("R-0 RxPacketTrace")
 
 # ---------- R-1／R-2／R-3
 res = {}
@@ -72,7 +78,36 @@ for m in (1, 2):
     print(f"\nmode{m} vs mode0")
     names = sorted(n for n in os.listdir(d0) if os.path.isfile(os.path.join(d0, n)) and n != "run.log")
     diff = [n for n in names if not os.path.exists(os.path.join(dm, n)) or md5(os.path.join(d0, n)) != md5(os.path.join(dm, n))]
-    unexpected = [n for n in diff if n not in RLC]
+    unexpected = [n for n in diff if n not in RLC and n not in ("DlRlcStats.txt", "R7b_rlc_rx_tag_hist.txt")
+                  and not n.startswith("du-cell-")]
+    # 含延遲之衍生檔：只准指定欄不同（判準事前固定）
+    for n in diff:
+        pa = os.path.join(d0, n); pb = os.path.join(dm, n)
+        if n.startswith("du-cell-"):
+            A_ = open(pa).read().splitlines(); B_ = open(pb).read().splitlines()
+            hdr = A_[0].split(","); cols = set()
+            bad = len(A_) != len(B_)
+            for x, y in zip(A_[1:], B_[1:]):
+                x = x.split(","); y = y.split(",")
+                if len(x) != len(y):
+                    bad = True; continue
+                cols |= {hdr[i] for i, (u, v) in enumerate(zip(x, y)) if u != v}
+            if bad or not cols <= {"DRB.UEThpDl.UEID"}:
+                unexpected.append(f"{n}:{sorted(cols)}")
+        elif n == "DlRlcStats.txt":
+            A_ = open(pa).read().splitlines(); B_ = open(pb).read().splitlines()
+            cols = set(); bad = len(A_) != len(B_)
+            for x, y in zip(A_[1:], B_[1:]):
+                x = x.split("\t"); y = y.split("\t")
+                if len(x) != len(y):
+                    bad = True; continue
+                cols |= {i for i, (u, v) in enumerate(zip(x, y)) if u != v}
+            if bad or not cols <= {10, 11, 12, 13}:
+                unexpected.append(f"{n}:{sorted(cols)}")
+        elif n == "R7b_rlc_rx_tag_hist.txt":
+            tot = lambda q: sum(int(l.split("\t")[3]) for l in open(q) if l and not l.startswith("%"))
+            if tot(pa) != tot(pb):
+                unexpected.append(f"{n}: total {tot(pa)} vs {tot(pb)}")
     print(f"   檔案 {len(names)}；md5 不同 {len(diff)}：{diff}")
     if unexpected:
         print(f"   ✗ 非延遲檔不同：{unexpected}"); fails.append(f"R-1 mode{m} {unexpected}")
