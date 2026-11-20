@@ -40,15 +40,18 @@ print(f"截斷末行 {trunc}；統計回呼主實例候選 {len(cand)}（取第�
 if not cand: print("✗ 無主實例"); sys.exit(1)
 C = byptr[cand[0]]
 # J
-dec = []; nomatch = 0
+dec = []; unm = []
+tmaxD = max(k[0] for k in DL)
 for r in C:
     if r[9] < 0: dec.append(None); continue
     k = (r[0], r[3], r[4], r[9], r[11], r[8]); v = DL.get(k)
-    if not v: nomatch += 1; dec.append(None); continue
+    if not v: unm.append(r); dec.append(None); continue
     dec.append(v.pop(0))
 ndata = sum(1 for r in C if r[9] >= 0)
-print(f"J   KPM 資料 RX {ndata}；對不上接收端判定 {nomatch}")
-if nomatch: fails.append("J")
+late = [r for r in unm if r[0] >= tmaxD]          # 僅限追蹤檔最後時刻（未 flush）才可豁免
+print(f"J   KPM 資料 RX {ndata}；對不上接收端判定 {len(unm)}；其中發生於判定檔最後時刻（{tmaxD} ns，未 flush）{len(late)}；"
+      f"判定行未被消耗 {sum(len(v) for v in DL.values())}")
+if len(unm) != len(late) or sum(len(v) for v in DL.values()): fails.append("J")
 # 實例：有時間戳 → tag；無 → 該 SN 於 RX 前最近一次 N 型 TX 之時間
 txN = collections.defaultdict(list)
 for t in TX:
@@ -95,6 +98,17 @@ for name, f in defs.items():
         if first and r[7] == 1: nd += 1; sd += r[6]; sel.append(r[6] / 1e6)
     print(f"F   {name}：有效延遲樣本 {nd}（占 KPM 資料 RX {nd/ndata:.4f}）；非首次 {ndup}；"
           f"平均 {sd/max(1,nd)/1e6:.2f} ms；P50/P90/P99 {'/'.join(f'{np.quantile(sel,q):.2f}' for q in (.5,.9,.99))} ms")
+fa = [(r, d, c) for r, d, c in zip(C, dec, cls) if r[9] >= 0 and r[7] == 1 and c in ("NEW", "PART")]
+n_fa = len(fa); sum_fa = sum(r[6] for r, d, c in fa)
+part = [(r, d, c) for r, d, c in fa if c == "PART"]
+print(f"P   Fa 有效延遲樣本 {n_fa}：其中部分重疊（PART）{len(part)}（占樣本 {len(part)/n_fa:.5f}；占延遲總和 {sum(r[6] for r,d,c in part)/sum_fa:.5f}）；全新（NEW）{n_fa-len(part)}")
+rej = collections.Counter((d[2] if d else "?") for r, d, c in fa)
+print(f"    Fa 樣本依接收端判定：{dict(rej)}")
+dis = [(r, d, c) for r, d, c in fa if d and d[2] in ("W", "DO", "OI", "DW")]
+print(f"    Fa 計入但接收端實際丟棄／忽略（W／DO／OI／DW）：{len(dis)}（占樣本 {len(dis)/n_fa:.5f}；占延遲總和 {sum(r[6] for r,d,c in dis)/sum_fa:.5f}）")
+wm = sum(r[6] * 0 for r, d, c in fa)
+# 位元組比例加權版（敏感度）：權重 = 新位元組數 / 該次接收位元組數；以 PART 代表部分重疊
+print("    （位元組比例加權之敏感度版本須另行計算，本腳本未實作；見規格 §6）")
 old = [r[6] / 1e6 for r in C if r[9] >= 0 and r[7] == 1]
 print(f"    對照（原生，含重複）：樣本 {len(old)}；平均 {np.mean(old):.2f} ms")
 print("\n" + ("✓ 無失敗項" if not fails else f"✗ {fails}"))
