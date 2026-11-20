@@ -257,19 +257,22 @@ def main():
                             continue
                         opt_cell = min(truth, key=lambda c: truth[c])
                         anns = by_win.get(k, {})
+                        # 資源（ρ_cap／ρ_PRB）之「有上報 cell」＝ 當窗有任何 UE 列入之 mmWave cell；與有無有效延遲無關。
+                        # 無缺值（D-30）時與 rep[k] 相同；D-30P 之延遲缺值 cell 仍上報 KPM（PRB），故不可排除。
+                        present_k = {c for c, u in mod[k][1].items() if c != X.LTE_CELL and u}
                         masks = {}
                         for consumer in CONSUMERS:
                             key = (ann_name, atk_name, consumer)
                             a = acc[key]
                             a["win"] += 1
                             a["ann"] += len(anns)
-                            adm = admitted(consumer, anns, rep[k])
+                            adm = admitted(consumer, anns, present_k)
                             masks[consumer] = sorted(adm)
                             a["usable_ann"] += len(adm)
-                            a["cap_base"] += sum(RESOURCE_INVENTORY[j] for j in rep[k])
+                            a["cap_base"] += sum(RESOURCE_INVENTORY[j] for j in present_k)
                             a["cap_kept"] += sum(RESOURCE_INVENTORY[j] for j in adm)
                             if prb_on:                       # U 取自乾淨模擬（開迴路，見規格 §5）
-                                for j in rep[k]:
+                                for j in present_k:
                                     if (j, k) not in U[sd]:
                                         a["prb_missing"] += 1                    # 檢查 5：不補值
                                     u, us = U[sd].get((j, k), 0.0), U_sym[sd].get((j, k), 0.0)

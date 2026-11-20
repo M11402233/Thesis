@@ -113,9 +113,23 @@ def main():
     med_g = float(np.median([d for f in files[1:] for _, cells in X.TraceReplaySource(f).windows()
                              for c, u in cells.items() if c != X.LTE_CELL for d in u.values() if d is not None]))
 
-    tw = next(w for w, cells in wins[10:] if len([c for c in cells if c != X.LTE_CELL]) >= 3)
-    prev_w = tw - 1 if tw - 1 in W else tw
-    target = [c for c in W[tw] if c != X.LTE_CELL][0]
+    # 情境之前提：基線（無注入）為 R0_CLEAN／trusted。取第一個 ≥3 mmWave cell 之窗與其第一個 cell（舊規則）；
+    # 若該 (窗, cell) 於本資料之基線已非 trusted（D-30P 乾淨 S_i 誤報較高），依序改取下一個基線為 trusted 者，並列印所選。
+    # D-30 之第一候選即成立，選擇與舊版相同。
+    tw = target = prev_w = None
+    for w_, cells_ in wins[10:]:
+        mm_ = [c for c in cells_ if c != X.LTE_CELL]
+        if len(mm_) < 3:
+            continue
+        pw_ = w_ - 1 if w_ - 1 in W else w_
+        for c_ in mm_:
+            if replay("baseline", W[w_], W[pw_], c_, anchor, w_)["decision"] == "trusted":
+                tw, prev_w, target = w_, pw_, c_
+                break
+        if tw is not None:
+            break
+    if tw is None:
+        raise SystemExit("找不到基線為 trusted 之 (窗, cell)；無法建立情境，停止")
     n_mmw = len([c for c in W[tw] if c != X.LTE_CELL])
     seed = os.path.basename(test).split("seed")[-1][:4]
     print(f"規則回放(seed {seed}, window {tw}, {n_mmw} 個 mmWave cell, 受測節點 {target})")

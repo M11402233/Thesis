@@ -161,9 +161,10 @@ def trace(windows, anchor, n_known):
                 if lv:
                     lev[i] = lv
         mmw = sorted(c for c in cells if c != LTE)
+        mmw_v = [c for c in mmw if _IS.valid_vals(cells[c])]      # 第二階段：無任何有效延遲之 cell 不可作 target／peer（與 verify_si 相同；D-30 無此情形）
         for j in mmw:
-            peers = [c for c in mmw if c != j]
-            if len(peers) < X.MIN_PEER:
+            peers = [c for c in mmw_v if c != j]
+            if len(peers) < X.MIN_PEER or not _IS.valid_vals(cells[j]):
                 si, z = "unavailable", None
             else:
                 tgt = float(np.mean(_IS.valid_vals(cells[j])))
