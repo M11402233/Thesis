@@ -6,6 +6,10 @@
   reconstructed  由 6 位有效數字之累計平均與累計 nRxPDUs 反推每窗平均：
                  d_w = (D_w·N_w − D_{w−1}·N_{w−1}) / (N_w − N_{w−1})；窗 0 = 累計值（計算器於 t=0 建立，R-3）
   exact          由 R-5 加裝之 <file>_exact.txt（整數 Σdelay_ns 與 nRxPDUs）差分：d_w = ΔΣ / ΔN（精確）
+  percell        第二階段（phase2_percell_spec_v0.md §4、§9.1 Q-P5）：r9 之 _percell／_r9rx，cell = 事件自身 cell（D-b），
+                 排除零延遲 PDU；分母 0 → 該 (cell, UE) 缺值（D-f，不出現、不報錯）。僅限登錄 r9 aux 之資料集（d30p）
+  percell_zero   同上但含零延遲 PDU（Q-P5 之對照版本）
+  percell*：融合層（H_i／C_i，zt_kpm_xapp.run_xapp、E10）之新輸入屬步 4，未實作前遇此模式即停止（require_fusion_input）。
 共同約定：
   * cell 歸屬**沿用主檔列之 cell**（= 最後一筆 PDU 所在 cell；規格 F1）。每 cell 拆分屬第二階段，本模組不改歸屬。
   * 當窗無新 Rx PDU（ΔN = 0）時延遲為缺值（D-f）。缺值時**直接報錯（fail-closed）**，不填 0、不沿用舊值；
@@ -14,7 +18,7 @@
 """
 import os, collections
 
-MODES = ("cumulative", "reconstructed", "exact")
+MODES = ("cumulative", "reconstructed", "exact", "percell", "percell_zero")
 
 
 def mode():
@@ -62,8 +66,28 @@ def _rows_exact(path):
     return E
 
 
+def is_percell(m=None):
+    return (m or mode()).startswith("percell")
+
+
+def require_fusion_input(where):
+    """融合層尚未接上第二階段輸入：percell 模式下停止，避免以每事件 cell 之字典誤算 H_i／C_i。"""
+    if is_percell():
+        raise SystemExit(f"{where}：ZT_DELAY_SOURCE={mode()} 之融合層輸入屬第二階段步 4，尚未實作；停止。")
+
+
+def parse_percell(path, m):
+    import datasets as DS, percell_source as PS
+    if not DS.CFG.get("percell"):
+        raise SystemExit(f"ZT_DELAY_SOURCE={m} 只適用登錄 r9 aux 之資料集（目前 ZT_DATASET={DS.NAME}）")
+    aux = os.path.dirname(DS.aux_path(DS.seed_of(path), "x"))
+    return PS.si_windows(aux, zero=(m == "percell_zero"), max_window=DS.CFG["max_window"] - 1)
+
+
 def parse_interval(path, m=None):
     m = m or mode()
+    if is_percell(m):
+        return parse_percell(path, m)
     R = _rows_old(path)
     E = None
     if m == "exact":

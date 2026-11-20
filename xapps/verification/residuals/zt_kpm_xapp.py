@@ -567,6 +567,8 @@ def run_xapp(source, anchor, eval_mode="all", node_of_interest=None, collect=Tru
     後,其他 xApp(合作消費端、可用資源評估 xApp)於同一窗讀取之時點。於 P1–P3 計時結束後呼叫,
     不計入 C-ZT 之延遲;預設 None 時行為與先前完全相同。
     """
+    import interval_source as _IS
+    _IS.require_fusion_input("zt_kpm_xapp.run_xapp")
     binding = binding or D1_BINDING
     annotations, latencies, recs, exec_recs = [], [], [], []
     prev_map, ci_run = {}, 0
