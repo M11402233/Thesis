@@ -33,13 +33,15 @@ for p in sys.argv[2:]:
 print("GATE phase0", {k: f"{sum(v)}/{len(v)}" for k, v in r.items()})
 sys.exit(0 if all(len(v) == 8 and all(v) for v in r.values()) else 1)
 PY
-(cd $CODE && $PY - ) >> $ST <<'PY' || stop "aux 與主檔不一致或新輸入層檢查 X1–X3 未過"
+(cd $CODE && $PY - ) >> $ST <<'PY' || stop "aux 與主檔不一致或新輸入層檢查 X1–X4 未過"
 import os, datasets as DS, percell_source as PS
 ok = True
 for f in DS.files():
     s = DS.seed_of(f); aux = os.path.dirname(DS.aux_path(s, "x")); r = PS.check(aux)
     m = DS.aux_matches_main(s); ok &= m and r["PASS"]
-    print(f"GATE seed {s}: aux==main {m}; X1 {r['X1_percell_sum_eq_exact_mismatch']} X2 {r['X2_mismatch']} X3 {r['X3_not_in_enb_list']} PASS {r['PASS']}")
+    x4 = PS.check_eff(aux, DS.CFG["max_window"] - 1) if DS.CFG.get("eff") else {"PASS": True, "skipped": "not eff"}   # D-30P1：X4
+    ok &= x4["PASS"]
+    print(f"GATE seed {s}: aux==main {m}; X1 {r['X1_percell_sum_eq_exact_mismatch']} X2 {r['X2_mismatch']} X3 {r['X3_not_in_enb_list']} PASS {r['PASS']}; X4 {x4}")
 raise SystemExit(0 if ok and len(DS.files()) == 8 else 1)
 PY
 echo "GATE PASSED $(date -u '+%F %T') UTC" >> $ST

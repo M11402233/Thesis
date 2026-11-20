@@ -25,7 +25,8 @@ grep -q "^ALLDONE" $OUT/_pipeline_logs/status.txt 2>/dev/null || stop "步 2 未
 echo "GATE step2 ALLDONE ok" >> $ST
 run 4a_xapp            zt_kpm_xapp.py --fusion bound --eval-mode all
 run 2x_E13             run_E13_tauS_sensitivity.py
-run 2x_E13_rt          run_E13_rt.py
+SB=""; [ "${SETBASE:-0}" = 1 ] && SB="--set-baseline"   # 同步 2：新資料集之回歸基準（須設 ZT_BASELINE_NOTE）
+run 2x_E13_rt          run_E13_rt.py $SB
 run 3a_E10             run_E10_D1_policy_ablation.py
 run 5a_RQ3             run_RQ3_decision_replay.py
 run 4b_E11             run_E11_transitions.py
