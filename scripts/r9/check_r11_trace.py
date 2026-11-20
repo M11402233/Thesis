@@ -30,9 +30,8 @@ for ln in open(f"{D}/R10_trace.txt"):
     if p[0] != "D": continue
     if len(p) != 19: trunc += 1; continue
     t, rnti, lcid, imsi, sn, tag, seg, so, lo, last = map(int, p[1:11])
-    pdec, peff, ppart, plen, pnew, payload, hdr = map(int, p[12:19])
-    payload -= hdr           # p.size は標頭を含む；実際に除去された標頭長で差し引く
-    DL[(t, rnti, lcid, sn, so, tag)].append((imsi, p[11], pdec, peff, ppart, plen, pnew, payload))
+    pdec, peff, ppart, plen, pnew, psize, hdr = map(int, p[12:19]); payload = psize
+    DL[(t, rnti, lcid, sn, so, tag)].append((imsi, p[11], pdec, peff, ppart, plen, pnew, payload, so, lo, seg, hdr))
 for ln in open(f"{D}/R10_trace_calc.txt"):
     p = ln.split()
     if len(p) != 14: trunc += 1; continue
@@ -67,39 +66,38 @@ print(f"P1  預測判定碼 ≠ 實際分支：{bad1}／{sum(1 for r,d in pair i
 if bad1: fails.append("P1")
 # 全部 D 行（含非 KPM 實體）之 P1
 allD = [(k, v) for k, vs in ((k, [x for x in vs]) for k, vs in DL.items()) for v in vs]
-# P2 獨立重算：依時間序，每實例 (imsi,rnti,lcid,sn,tag)；對全部 D 行（含已消耗者需重建）→ 重新讀檔
-ev = []
-for ln in open(f"{D}/R10_trace.txt"):
-    p = ln.split()
-    if p[0] == "D" and len(p) == 19:
-        t, rnti, lcid, imsi, sn, tag, seg, so, lo, last_ = map(int, p[1:11]); q = list(map(int, p[12:19])); q[5] -= q[6]
-        ev.append((t, rnti, lcid, imsi, sn, tag, so, p[11], *q[:6], seg, lo))
-cov = {}; bad2 = 0; n2 = 0; ex2 = []
-segbad = 0
-for (t, rnti, lcid, imsi, sn, tag, so, adec, pdec, peff, ppart, plen, pnew, payload, seg, lo) in ev:
-    if seg == 1 and lo - so != payload: segbad += 1      # 分段：標頭之 lastOffset 為獨立來源
-    L = payload; new = 0; eff = 0; part = 0
+# P2 獨立重算（只對 KPM 回呼對上之接收；實例鍵 = (cell, IMSI, rnti, lcid, SN, 首次傳送時間)，cell／IMSI 取自統計回呼，因 UE 端 RLC 之 m_imsi 為 0）
+# 資料長度之獨立來源：分段 = 標頭 lastOffset − segOffset；整包 = 寫出時之封包大小 − 實際移除之標頭長（整包不經重組，封包未被改動）
+cov = {}; bad2 = 0; n2 = 0; ex2 = []; nseg = nwhole = 0; chk_seg = chk_bad = 0
+for r, d in pair:
+    if d is None or r[9] < 0: continue
+    imsi0, adec, pdec, peff, ppart, plen, pnew, psize, so, lo, seg, hdr = d
+    L = (lo - so) if seg == 1 else (psize - hdr)
+    nseg += seg == 1; nwhole += seg != 1
+    if seg == 1 and adec != "AS":                 # AS 之末段已於寫出前重組（標頭被移除），其封包大小不可用
+        chk_seg += 1; chk_bad += (psize - hdr != lo - so)
+    tag = r[8]; new = 0; eff = 0; part = 0
     if tag >= 0 and L > 0:
-        key = (imsi, rnti, lcid, sn, tag); iv = cov.get(key, [])
+        key = (r[1], r[2], r[3], r[4], r[9], tag); iv = cov.get(key, [])
         inter = sum(max(0, min(y, so + L) - max(x, so)) for x, y in iv); new = L - inter
-        a, b = so, so + L; m = []; placed = False
+        a_, b_ = so, so + L; m = []; placed = False
         for x, y in iv:
-            if y < a: m.append((x, y))
-            elif x > b:
-                if not placed: m.append((a, b)); placed = True
+            if y < a_: m.append((x, y))
+            elif x > b_:
+                if not placed: m.append((a_, b_)); placed = True
                 m.append((x, y))
-            else: a = min(a, x); b = max(b, y)
-        if not placed: m.append((a, b))
+            else: a_ = min(a_, x); b_ = max(b_, y)
+        if not placed: m.append((a_, b_))
         cov[key] = m
         eff = int(new > 0 and adec in ("AN", "AS")); part = int(eff and new < L)
     n2 += 1
     exp = (pnew if tag >= 0 and L > 0 else 0, peff if tag >= 0 and L > 0 else 0, ppart if tag >= 0 and L > 0 else 0, plen)
     if (new, eff, part, L) != exp:
         bad2 += 1
-        if len(ex2) < 6: ex2.append(((t, tag, so, adec, pdec), (new, eff, part, L), exp))
-print(f"P2a 分段 PDU：lastOffset − segOffset ≠ 資料長度：{segbad}")
-if segbad: fails.append("P2a")
-print(f"P2  獨立重算（新位元組／有效／部分重疊／長度）≠ ns-3 預測：{bad2}／{n2}（D 行含非統計回呼實體；untagged 者只比長度）")
+        if len(ex2) < 6: ex2.append(((r[0], tag, so, adec, pdec), (new, eff, part, L), exp))
+print(f"P2a 非 AS 之分段：封包大小 − 標頭長 ≠ lastOffset − segOffset：{chk_bad}／{chk_seg}（分段 {nseg}、整包 {nwhole}）")
+if chk_bad: fails.append("P2a")
+print(f"P2  獨立重算（新位元組／有效／部分重疊／長度）≠ ns-3 預測：{bad2}／{n2}")
 for e in ex2: print("    P2 例 (t,tag,so,實際,預測碼)", e[0], "重算(new,eff,part,L)", e[1], "ns-3", e[2])
 if bad2: fails.append("P2")
 # P3
@@ -112,7 +110,7 @@ for r, d in pair:
     w = r[0] // 10**9
     if w >= 5: continue
     a = pe[((r[1], r[2], r[4]), w)]; a[0] += 1
-    imsi, adec, pdec, peff, ppart, plen, pnew, payload = d
+    imsi, adec, pdec, peff, ppart, plen, pnew, payload = d[:8]
     a[1] += 1; a[2] += (r[7] == 0); a[3] += (plen == 0)
     if peff == 1: a[4] += 1; a[5] += r[6]
     if ppart == 1: a[6] += 1; a[7] += r[6]
