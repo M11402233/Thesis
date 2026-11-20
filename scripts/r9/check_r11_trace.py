@@ -28,9 +28,10 @@ DL = collections.defaultdict(list); C = collections.defaultdict(list); trunc = 0
 for ln in open(f"{D}/R10_trace.txt"):
     p = ln.split()
     if p[0] != "D": continue
-    if len(p) != 18: trunc += 1; continue
+    if len(p) != 19: trunc += 1; continue
     t, rnti, lcid, imsi, sn, tag, seg, so, lo, last = map(int, p[1:11])
-    pdec, peff, ppart, plen, pnew, payload = map(int, p[12:18])
+    pdec, peff, ppart, plen, pnew, payload, hdr = map(int, p[12:19])
+    payload -= hdr           # p.size は標頭を含む；実際に除去された標頭長で差し引く
     DL[(t, rnti, lcid, sn, so, tag)].append((imsi, p[11], pdec, peff, ppart, plen, pnew, payload))
 for ln in open(f"{D}/R10_trace_calc.txt"):
     p = ln.split()
@@ -70,10 +71,13 @@ allD = [(k, v) for k, vs in ((k, [x for x in vs]) for k, vs in DL.items()) for v
 ev = []
 for ln in open(f"{D}/R10_trace.txt"):
     p = ln.split()
-    if p[0] == "D" and len(p) == 18:
-        t, rnti, lcid, imsi, sn, tag, seg, so, lo, last_ = map(int, p[1:11]); ev.append((t, rnti, lcid, imsi, sn, tag, so, p[11], *map(int, p[12:18])))
-cov = {}; bad2 = 0; n2 = 0
-for (t, rnti, lcid, imsi, sn, tag, so, adec, pdec, peff, ppart, plen, pnew, payload) in ev:
+    if p[0] == "D" and len(p) == 19:
+        t, rnti, lcid, imsi, sn, tag, seg, so, lo, last_ = map(int, p[1:11]); q = list(map(int, p[12:19])); q[5] -= q[6]
+        ev.append((t, rnti, lcid, imsi, sn, tag, so, p[11], *q[:6], seg, lo))
+cov = {}; bad2 = 0; n2 = 0; ex2 = []
+segbad = 0
+for (t, rnti, lcid, imsi, sn, tag, so, adec, pdec, peff, ppart, plen, pnew, payload, seg, lo) in ev:
+    if seg == 1 and lo - so != payload: segbad += 1      # 分段：標頭之 lastOffset 為獨立來源
     L = payload; new = 0; eff = 0; part = 0
     if tag >= 0 and L > 0:
         key = (imsi, rnti, lcid, sn, tag); iv = cov.get(key, [])
@@ -89,11 +93,17 @@ for (t, rnti, lcid, imsi, sn, tag, so, adec, pdec, peff, ppart, plen, pnew, payl
         cov[key] = m
         eff = int(new > 0 and adec in ("AN", "AS")); part = int(eff and new < L)
     n2 += 1
-    if (new, eff, part, L) != (pnew if tag >= 0 and L > 0 else 0, peff if tag >= 0 and L > 0 else 0, ppart if tag >= 0 and L > 0 else 0, plen): bad2 += 1
+    exp = (pnew if tag >= 0 and L > 0 else 0, peff if tag >= 0 and L > 0 else 0, ppart if tag >= 0 and L > 0 else 0, plen)
+    if (new, eff, part, L) != exp:
+        bad2 += 1
+        if len(ex2) < 6: ex2.append(((t, tag, so, adec, pdec), (new, eff, part, L), exp))
+print(f"P2a 分段 PDU：lastOffset − segOffset ≠ 資料長度：{segbad}")
+if segbad: fails.append("P2a")
 print(f"P2  獨立重算（新位元組／有效／部分重疊／長度）≠ ns-3 預測：{bad2}／{n2}（D 行含非統計回呼實體；untagged 者只比長度）")
+for e in ex2: print("    P2 例 (t,tag,so,實際,預測碼)", e[0], "重算(new,eff,part,L)", e[1], "ns-3", e[2])
 if bad2: fails.append("P2")
 # P3
-pe = collections.defaultdict(lambda: [0] * 14)
+pe = collections.defaultdict(lambda: [0] * 15)
 for r, d in pair:
     if r[9] < 0 or d is None: 
         w = r[0] // 10**9
@@ -106,15 +116,15 @@ for r, d in pair:
     a[1] += 1; a[2] += (r[7] == 0); a[3] += (plen == 0)
     if peff == 1: a[4] += 1; a[5] += r[6]
     if ppart == 1: a[6] += 1; a[7] += r[6]
-    a[8 + pdec] += 1 if pdec < 7 else 0
+    if 0 <= pdec < 7: a[8 + pdec] += 1
 lastv = {}; bad3 = 0; n3 = 0
 for r in ef:
     k = (int(r[2]), int(r[3]), int(r[4])); w = int(r[0]) // 10**9
     cur = [int(x) for x in r[5:]]            # nRx nData nNoTag nEmpty nEff sumEff nPart sumPart dec×7
     pv = lastv.get(k, [0] * len(cur)); lastv[k] = cur; d = [a - b for a, b in zip(cur, pv)]
     if w >= 5: continue
-    n3 += 1; g = pe.get((k, w), [0] * 14)
-    if d != g[:15]: bad3 += 1
+    n3 += 1; g = pe.get((k, w), [0] * 15)
+    if d != g: bad3 += 1
 print(f"P3  (cell,IMSI,lcid,窗) {n3} 組：新統計檔窗增量 ≠ 追蹤重算：{bad3}")
 if bad3: fails.append("P3")
 # P4 / P5
