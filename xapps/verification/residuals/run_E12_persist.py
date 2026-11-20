@@ -112,9 +112,10 @@ def rq3_metrics(files, L_S):
                     for consumer in RQ3.CONSUMERS:
                         a = acc[(atk_name, consumer)]
                         a["win"] += 1; a["ann"] += len(anns)
-                        adm = RQ3.admitted(consumer, anns, rep[k])
+                        present_k = {c for c, u in mod[k][1].items() if c != RQ3.X.LTE_CELL and u}   # RQ3 同口徑（有上報之 cell）
+                        adm = RQ3.admitted(consumer, anns, present_k)
                         a["usable_ann"] += len(adm)
-                        a["cap_base"] += sum(RQ3.RESOURCE_INVENTORY[j] for j in rep[k])
+                        a["cap_base"] += sum(RQ3.RESOURCE_INVENTORY[j] for j in present_k)
                         a["cap_kept"] += sum(RQ3.RESOURCE_INVENTORY[j] for j in adm)
                         if opt not in adm:
                             a["opt_excluded"] += 1
