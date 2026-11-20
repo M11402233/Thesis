@@ -87,6 +87,8 @@ def inject(windows, kind, target, k0, T, mean):
             if target in c:
                 w = out[k][0]
                 for i in c[target]:
+                    if c[target][i] is None:                  # 第二階段：缺值不可竄改
+                        continue
                     c[target][i] = (c[target][i] + DRIFT_RATE * (w - out[k0][0]) * mean
                                     if kind == "Si_drift" else c[target][i] * STEP_AF)
     elif kind == "D1_overtime":

@@ -298,7 +298,7 @@ def main():
                         mask_fh.write(json.dumps({
                             "seed": os.path.basename(test), "ann_policy": ann_name,
                             "attack": atk_name, "atk_cell": atk_cell, "k": k,
-                            "A": sorted(rep[k]),
+                            "A": sorted(present_k),
                             "action": {str(j): x["action"] for j, x in anns.items()},
                             "admitted": masks}) + "\n")
         print(f"完成 {os.path.basename(test)}")

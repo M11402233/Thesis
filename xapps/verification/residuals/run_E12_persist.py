@@ -200,6 +200,8 @@ def main():
                     c = att[k][1]
                     if sm.cell in c:
                         for i in c[sm.cell]:
+                            if c[sm.cell][i] is None:             # 第二階段：缺值不可竄改
+                                continue
                             c[sm.cell][i] = (c[sm.cell][i] + prm * (k - sm.w_on) * sm.mean if kind == "drift"
                                              else c[sm.cell][i] * prm)
                 a_base = xapp_ann(att, anchor)
