@@ -78,12 +78,15 @@ class LearnedAttacker:
 
 
 class LearnedDetector:
-    """訓練好之偵測端模型 → det_policy(ep, j)（決定性；以 action mask 保證只能更嚴）。"""
+    """訓練好之偵測端模型 → det_policy(ep, j)（決定性；以 action mask 保證只能更嚴）。
+    det_mode：F＝E19 之 V-escalate（Discrete(3)）；T／TL＝E30 動態門檻（Discrete(9)／Discrete(27)）。"""
 
-    def __init__(self, model, name):
-        self.model, self.name = model, name
+    def __init__(self, model, name, det_mode="F"):
+        self.model, self.name, self.det_mode = model, name, det_mode
 
     def __call__(self, ep, j):
+        if self.det_mode != "F":
+            return int(self.batch(ep.det_obs_th(j)[None, :], ep.mask_th(j)[None, :])[0])
         return int(self.batch(ep.det_obs(j)[None, :], ep.mask(j)[None, :])[0])
 
     def batch(self, obs, masks):
@@ -119,12 +122,18 @@ class _Base(gym.Env):
 
 
 class DetectorEnv(_Base):
-    """pool = 攻擊者池（ScriptedAttack／LearnedAttacker），probs = σ_A。"""
+    """pool = 攻擊者池（ScriptedAttack／LearnedAttacker），probs = σ_A。det_mode：F（E19）｜T｜TL（E30 §2）。"""
 
-    def __init__(self, ds, seed_paths, test_path, attacker_pool, probs, seed=0):
+    def __init__(self, ds, seed_paths, test_path, attacker_pool, probs, seed=0, det_mode="F"):
         super().__init__(ds, seed_paths, test_path, attacker_pool, probs, seed)
-        self.observation_space = spaces.Box(-10, 10, (G.Episode.OBS_DIM,), np.float32)
-        self.action_space = spaces.Discrete(3)
+        assert det_mode in G.DET_MODES
+        self.det_mode = det_mode
+        self.obs_dim = G.Episode.OBS_DIM if det_mode == "F" else G.Episode.OBS_DIM_TH
+        self.observation_space = spaces.Box(-10, 10, (self.obs_dim,), np.float32)
+        self.action_space = spaces.Discrete({"F": 3, "T": len(G.MOVES), "TL": 3 * len(G.MOVES)}[det_mode])
+
+    def _obs(self):
+        return self.ep.det_obs(self.j) if self.det_mode == "F" else self.ep.det_obs_th(self.j)
 
     def _advance(self):
         """推進至下一個需要偵測端決定之 (節點, 秒)；回傳 False 表示 episode 結束"""
@@ -143,25 +152,26 @@ class DetectorEnv(_Base):
         super().reset(seed=seed)
         sd, cell, self.atk = self._pick()
         self.ep = new_episode(sd, cell)
+        self.ep.det_mode = self.det_mode
         self.queue, self.in_window = [], False
         self._advance()
         self.j = self.queue[0]
-        return self.ep.det_obs(self.j), {"seed": sd.seed, "cell": cell, "attacker": self.atk.name}
+        return self._obs(), {"seed": sd.seed, "cell": cell, "attacker": self.atk.name}
 
     def action_masks(self):
-        return self.ep.mask(self.j)
+        return self.ep.mask(self.j) if self.det_mode == "F" else self.ep.mask_th(self.j)
 
     def step(self, action):
         ep, j = self.ep, self.j
-        dec = ep.decide_node(j, int(action))
+        dec = ep.decide_node(j, int(action)) if self.det_mode == "F" else ep.decide_node_th(j, int(action))
         r = ep.det_reward(j, dec)
         info = {"tampered": ep.is_tampered(j), "decision": dec, "floor": ep.floor[j][0]}
         self.queue.pop(0)
         done = not self._advance()
         if done:
-            return np.zeros(G.Episode.OBS_DIM, np.float32), r, True, False, info
+            return np.zeros(self.obs_dim, np.float32), r, True, False, info
         self.j = self.queue[0]
-        return ep.det_obs(self.j), r, False, False, info
+        return self._obs(), r, False, False, info
 
 
 class AttackerEnv(_Base):

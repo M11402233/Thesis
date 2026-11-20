@@ -25,8 +25,10 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "residuals"))
-if os.environ.get("ZT_DATASET") != "d30" or os.environ.get("ZT_FUSION_ORDER") != "severity":
-    raise SystemExit("E19 環境須在 ZT_DATASET=d30 與 ZT_FUSION_ORDER=severity 下執行")
+_DSN = os.environ.get("ZT_DATASET")
+if _DSN not in ("d30", "d30p") or os.environ.get("ZT_FUSION_ORDER") != "severity" or \
+        (_DSN == "d30p") != os.environ.get("ZT_DELAY_SOURCE", "cumulative").startswith("percell"):
+    raise SystemExit("E19／E30 環境須在 ZT_FUSION_ORDER=severity 且 ZT_DATASET=d30（累計）或 d30p（ZT_DELAY_SOURCE=percell*）下執行")
 import zt_kpm_xapp as X                                   # noqa: E402
 import datasets as DS                                     # noqa: E402
 from run_E10_D1_policy_ablation import load_windows       # noqa: E402
@@ -48,6 +50,25 @@ C_L, C_R = 0.1, 1.0
 # 預設 None：行為與 E19 逐位相同（檢查 S4-0）。
 FLOOR_FN = None
 
+# E30 §2（docs/thesis/E30_coevolution_spec.md）：動態門檻。格點事先登錄；凍結值 (τ_S, τ_H^reject) = (4.0, 3.0)。
+TS_GRID = [2.0 + 0.5 * i for i in range(9)]               # τ_S ∈ [2, 6]，步 0.5
+TH_GRID = [2.0 + 0.5 * i for i in range(5)]               # τ_H^reject ∈ [2, 4]，步 0.5；τ_H^warn = τ_H^reject − 1
+TAU_S0, TAU_HW0, TAU_HR0 = X.TAU_S, X.TAU_H_WARN, X.TAU_H_REJECT
+FROZEN = (TS_GRID.index(TAU_S0), TH_GRID.index(TAU_HR0))
+assert TAU_HW0 == TAU_HR0 - 1.0
+DET_MODES = ("F", "T", "TL")                              # F = 規則／舊 V-escalate（門檻凍結）；T、TL 見 E30 §2
+MOVES = [(ds, dh) for ds in (-1, 0, 1) for dh in (-1, 0, 1)]   # 每秒至多一格；索引 4 = 不動
+
+
+def _vals(v):
+    """第二階段延遲缺值為 None（percell_source.xapp_windows）；D-30 無 None，與 list(v.values()) 相同"""
+    return [x for x in v.values() if x is not None]
+
+
+def _mean(v):
+    xs = _vals(v)
+    return float(np.mean(xs)) if xs else None
+
 
 def seed_files():
     f = DS.files()
@@ -66,12 +87,19 @@ class SeedData:
         self.windows = load_windows(path)
         assert [w for w, _ in self.windows] == list(range(len(self.windows)))
         self.n = len(self.windows)
-        ann = X.run_xapp(ListSource(self.windows), self.anchor, "all", binding="uebound",
-                         admission="strict")[0]
-        # ci_run 不在註記中：以 verify_ci 依序重算，並核對 C_i 與註記一致
+        self.ci_lists = None
+        if _DSN == "d30p":                                # 第二階段 C_i (A)：RRC 名單（與 TraceReplaySource 相同來源）
+            import interval_source as _IS
+            self.ci_lists = _IS.ci_lists(path)
+        ann = X.run_xapp(self._src(), self.anchor, "all", binding="uebound", admission="strict")[0]
+        # ci_run 不在註記中：依序重算（與 run_xapp 同一函式），並核對 C_i 與註記一致
         ci_run, ci_of = 0, {}
         for k, (w, cells) in enumerate(self.windows):
-            ci, ci_run, _ = X.verify_ci(cells, ci_run)
+            if self.ci_lists is not None:
+                mm, anc = self.ci_lists.get(w, ({}, set()))
+                ci, ci_run, _ = X.verify_ci_ref(mm, anc, ci_run, X.CI_REF_MODE)
+            else:
+                ci, ci_run, _ = X.verify_ci(cells, ci_run)
             ci_of[k] = (ci, ci_run)
         self.ev = {}                                      # (k, node) → (ci, ci_run, d2, d1, d1_ev)
         self.clean_ann = {}
@@ -82,10 +110,35 @@ class SeedData:
             self.ev[(k, j)] = (ci, run, a["H_i_D2"], a["H_i_D1"], a["evidence"].get("D1"))
             self.clean_ann[(k, j)] = (a["decision"], a["rule_id"])
         self.nodes = {k: sorted(c for c in cells if c != LTE) for k, (w, cells) in enumerate(self.windows)}
-        self.truth = [{c: float(np.mean(list(v.values()))) for c, v in cells.items() if c != LTE and v}
+        self.truth = [{c: _mean(v) for c, v in cells.items() if c != LTE and _vals(v)}
                       for _, cells in self.windows]
         self.cells_all = sorted({c for d in self.truth for c in d})
         self.t0 = self.n // 2                             # 與 RQ3 相同之注入起點
+        self._ev_h = None
+
+    def _src(self):
+        src = ListSource(self.windows)
+        src.ci_lists = self.ci_lists                      # None 時 run_xapp 行為不變
+        return src
+
+    @property
+    def ev_h(self):
+        """E30：各 τ_H^reject 格點下之 D1 證據 {(k, node): [(d1, d1_ev) × len(TH_GRID)]}。
+        D1 只依成員關係（攻擊者只改 delay），故於乾淨資料以 run_xapp 各跑一次即得；凍結格點須與 self.ev 相同。"""
+        if self._ev_h is None:
+            out = collections.defaultdict(list)
+            try:
+                for th in TH_GRID:
+                    X.TAU_H_REJECT, X.TAU_H_WARN = th, th - 1.0
+                    ann = X.run_xapp(self._src(), self.anchor, "all", binding="uebound", admission="strict")[0]
+                    for a in ann:
+                        out[(a["window"], a["node"])].append((a["H_i_D1"], a["evidence"].get("D1")))
+            finally:
+                X.TAU_H_REJECT, X.TAU_H_WARN = TAU_HR0, TAU_HW0
+            for key, (ci, run, d2, d1, d1_ev) in self.ev.items():
+                assert out[key][FROZEN[1]] == (d1, d1_ev), ("E30 C-1：凍結 τ_H 之 D1 與 E19 不同", key)
+            self._ev_h = dict(out)
+        return self._ev_h
 
 
 class DataStore:
@@ -108,8 +161,10 @@ class Episode:
     """一個 episode：一個 seed、一個被攻陷 cell、0–299 窗。
     攻擊以 modifier(k, cells_of_atk_cell) 表示：就地修改受攻擊 cell 之 {imsi: delay}；None 表示不修改。"""
 
-    def __init__(self, sd, atk_cell):
+    def __init__(self, sd, atk_cell, det_mode="F"):
         self.sd, self.atk = sd, atk_cell
+        self.det_mode = det_mode                          # E30：F（預設，E19 行為）｜T｜TL
+        self.th = {}                                      # E30：node → (τ_S 索引, τ_H 索引)；缺 = FROZEN
         self.k = 0
         self.hist = collections.defaultdict(dict)        # node → {k: feature tuple}
         self.final = {}                                   # (k, node) → (decision, rule_id, source)
@@ -128,28 +183,81 @@ class Episode:
                 modifier(k, w, ues)
             else:
                 for i in list(ues):
-                    ues[i] *= multiplier
+                    if ues[i] is not None:                # 缺值（None）不可竄改、亦非上報值
+                        ues[i] *= multiplier
             tampered = any(ues[i] != cells[self.atk][i] for i in ues)
             mod[self.atk] = ues
         self.cells = mod
         self.tampered = tampered
-        self.reported = {c: float(np.mean(list(v.values()))) for c, v in mod.items() if c != LTE and v}
+        self.reported = {c: _mean(v) for c, v in mod.items() if c != LTE and _vals(v)}
         self.floor, self.info, self.pending = {}, {}, []
+        self._fc = {}
         for j in sd.nodes[k]:
-            ci, run, d2, d1, d1_ev = sd.ev[(k, j)]
-            si, z, peer = X.verify_si(mod, j, sd.anchor.scale)
-            dec, rid, also = X.fuse_detail(ci, run, si, d2, d1, d1_ev, j)
-            if FLOOR_FN is not None:
-                dec, rid = FLOOR_FN(dec, rid, also, si, z)
+            dec, rid, inf = self.floor_at(j, *self.th.get(j, FROZEN))
             self.floor[j] = (dec, rid)
-            self.info[j] = {"si": si, "z": z, "peer": peer, "ci_pending": ci == "violated" and run < X.L_C,
-                            "d1": d1, "d1_z": (d1_ev or {}).get("z", 0.0) if d1 in ("weak", "strong") else 0.0,
-                            "rid": rid, "also": also}
-            if dec in ("trusted", "low-trust"):
+            self.info[j] = inf
+            if self.det_mode != "F" or dec in ("trusted", "low-trust"):   # T／TL：每個節點每秒皆為決策點（選門檻）
                 self.pending.append(j)
             else:
                 self.final[(k, j)] = (dec, rid, "rule")
         return self.pending
+
+    def floor_at(self, j, si_idx, hi_idx):
+        """節點 j 於門檻格點 (si_idx, hi_idx) 下之規則下限 (dec, rid, info)。只呼叫既有函式（verify_si、fuse_detail）；
+        門檻以暫時設定 zt_kpm_xapp 之模組常數實現，結束即還原。FROZEN 格點與 E19 逐位相同。"""
+        key = (j, si_idx, hi_idx)
+        if key in self._fc:
+            return self._fc[key]
+        sd, k = self.sd, self.k
+        ci, run, d2, d1, d1_ev = sd.ev[(k, j)]
+        if hi_idx != FROZEN[1]:
+            d1, d1_ev = sd.ev_h[(k, j)][hi_idx]
+        try:
+            X.TAU_S = TS_GRID[si_idx]
+            si, z, peer = X.verify_si(self.cells, j, sd.anchor.scale)
+        finally:
+            X.TAU_S = TAU_S0
+        dec, rid, also = X.fuse_detail(ci, run, si, d2, d1, d1_ev, j)
+        if FLOOR_FN is not None:
+            dec, rid = FLOOR_FN(dec, rid, also, si, z)
+        inf = {"si": si, "z": z, "peer": peer, "ci_pending": ci == "violated" and run < X.L_C,
+               "d1": d1, "d1_z": (d1_ev or {}).get("z", 0.0) if d1 in ("weak", "strong") else 0.0,
+               "rid": rid, "also": also}
+        self._fc[key] = (dec, rid, inf)
+        return self._fc[key]
+
+    # ---- E30 T／TL：動作 = 門檻移動（9）［× 標籤（3）：0 = 依下限、1 = low-trust、2 = rejected］----
+    def _moved(self, j, m):
+        s0, h0 = self.th.get(j, FROZEN)
+        ds, dh = MOVES[m]
+        s1, h1 = s0 + ds, h0 + dh
+        return (s1, h1) if 0 <= s1 < len(TS_GRID) and 0 <= h1 < len(TH_GRID) else None
+
+    def mask_th(self, j):
+        out = []
+        for m in range(len(MOVES)):
+            nh = self._moved(j, m)
+            if self.det_mode == "T":
+                out.append(nh is not None)
+                continue
+            f = self.floor_at(j, *nh)[0] if nh is not None else None
+            out += [nh is not None, f == "trusted", f in ("trusted", "low-trust")]
+        return np.array(out, dtype=bool)
+
+    def decide_node_th(self, j, action):
+        m, lab = (action, 0) if self.det_mode == "T" else divmod(action, 3)
+        nh = self._moved(j, m)
+        assert nh is not None and self.mask_th(j)[action], (j, action)
+        self.th[j] = nh
+        dec, rid, inf = self.floor_at(j, *nh)
+        self.floor[j], self.info[j] = (dec, rid), inf
+        s = self.stats
+        s["th_changes"] += m != 4; s["th_n"] += 1
+        s[f"th_s{nh[0]}"] += 1; s[f"th_h{nh[1]}"] += 1
+        if lab:
+            dec, rid = ("low-trust", "rejected")[lab - 1], "DRL_ESCALATE"
+        self.final[(self.k, j)] = (dec, rid, "rule" if rid != "DRL_ESCALATE" else "drl")
+        return dec
 
     def is_tampered(self, j):
         return j == self.atk and self.tampered
@@ -200,7 +308,7 @@ class Episode:
             dec = self.final[(k, j)][0]
             decs[j] = dec
             inf = self.info[j]
-            self.hist[j][k] = (inf["si"] != "unavailable", min(inf["z"] or 0.0, 4 * X.TAU_S) / X.TAU_S,
+            self.hist[j][k] = (inf["si"] != "unavailable", min(inf["z"] or 0.0, 4 * TAU_S0) / TAU_S0,
                                (inf["peer"] or 0) / 6.0, min(inf["d1_z"], 10.0) / 10.0,
                                {"weak": 0.5, "strong": 1.0}.get(inf["d1"], 0.0), float(inf["ci_pending"]), DI[dec])
         ch, opt, reg, ncand = self.steer(decs)
@@ -238,7 +346,7 @@ class Episode:
     def det_obs(self, j):
         k, h, v = self.k, self.hist[j], []
         inf = self.info[j]
-        cur = (inf["si"] != "unavailable", min(inf["z"] or 0.0, 4 * X.TAU_S) / X.TAU_S, (inf["peer"] or 0) / 6.0,
+        cur = (inf["si"] != "unavailable", min(inf["z"] or 0.0, 4 * TAU_S0) / TAU_S0, (inf["peer"] or 0) / 6.0,
                min(inf["d1_z"], 10.0) / 10.0, {"weak": 0.5, "strong": 1.0}.get(inf["d1"], 0.0),
                float(inf["ci_pending"]), None)
         for t, rec in [(k, cur)] + [(k - i, h.get(k - i)) for i in range(1, K_HIST + 1)]:
@@ -250,6 +358,14 @@ class Episode:
                 onehot[rec[6]] = 1.0
             v += [1.0, float(rec[0]), rec[1], rec[2], rec[3], rec[4], rec[5]] + onehot
         return np.asarray(v, dtype=np.float32)
+
+    OBS_DIM_TH = OBS_DIM + 2
+
+    def det_obs_th(self, j):
+        """E30 T／TL：det_obs ＋ 目前門檻（正規化至 [0, 1]）。注意 det_obs 之 z 為凍結 τ_S 尺度，不隨所選門檻變。"""
+        s0, h0 = self.th.get(j, FROZEN)
+        return np.concatenate([self.det_obs(j), np.asarray([s0 / (len(TS_GRID) - 1), h0 / (len(TH_GRID) - 1)],
+                                                           dtype=np.float32)])
 
 
 # ----------------------------------------------------------------------------
@@ -264,6 +380,15 @@ def decide_pending(ep, det_policy):
     此等價由 check_speedup.py 逐位驗證）。"""
     pend = list(ep.pending)
     if not pend:
+        return
+    if ep.det_mode != "F":                                # E30 T／TL
+        if hasattr(det_policy, "batch"):
+            acts = det_policy.batch(np.stack([ep.det_obs_th(j) for j in pend]),
+                                    np.stack([ep.mask_th(j) for j in pend]))
+        else:
+            acts = [det_policy(ep, j) for j in pend]
+        for j, a in zip(pend, acts):
+            ep.decide_node_th(j, int(a))
         return
     if hasattr(det_policy, "batch"):
         acts = det_policy.batch(np.stack([ep.det_obs(j) for j in pend]), np.stack([ep.mask(j) for j in pend]))
@@ -283,6 +408,9 @@ def step_window(ep, det_policy, multiplier=None):
 def run_episode(ep, det_policy, attacker=None):
     """以給定之偵測端策略與攻擊者跑完整個 episode。
     det_policy(ep, j) → action（可另有 batch）；attacker：具 .multiplier(ep) 或 .modifier 之物件，或 None。"""
+    if ep.k == 0:
+        ep.det_mode = getattr(det_policy, "det_mode", "F")
+    assert ep.det_mode == getattr(det_policy, "det_mode", "F"), "episode 與偵測端之 det_mode 不同"
     while ep.k < ep.sd.n:
         if attacker is None:
             ep.begin()
@@ -303,9 +431,10 @@ class T0Cache:
         self._c, self.maxsize = {}, maxsize
 
     def get(self, sd, cell, det, make):
-        key = (id(sd), cell, det.name)
+        key = (id(sd), cell, det.name, getattr(det, "det_mode", "F"))
         if key not in self._c:
             ep = make(sd, cell)
+            ep.det_mode = getattr(det, "det_mode", "F")
             while ep.k < sd.t0:
                 step_window(ep, det)
             if len(self._c) < self.maxsize:

@@ -24,8 +24,13 @@ import multiprocessing as mp
 import numpy as np
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
-OUT_BASE = os.path.join(ROOT, "data", "results", "d30", "drl", "psro")
-SEV = os.path.join(ROOT, "data", "results", "d30_fusion_order", "severity")
+_DSN = os.environ.get("ZT_DATASET")
+if _DSN == "d30p":                                           # 第二階段（E30 §8）：D-30P，G4 對步 4–5 之輸出
+    OUT_BASE = os.path.join(ROOT, "data", "results", "d30p", "drl", "psro")
+    SEV = os.path.join(ROOT, "data", "results", "d30p_delay_" + os.environ.get("ZT_DELAY_SOURCE", ""))
+else:
+    OUT_BASE = os.path.join(ROOT, "data", "results", "d30", "drl", "psro")
+    SEV = os.path.join(ROOT, "data", "results", "d30_fusion_order", "severity")
 REL_STOP, MAX_ROUNDS = 0.05, 6                              # R-d（2026-11-09）：NashConv ≤ 0.05 × 第 1 輪 NashConv
 HP = {"n_steps": 2048, "batch_size": 256, "learning_rate": 3e-4, "n_epochs": 10, "gamma": 0.99,
       "gae_lambda": 0.95, "clip_range": 0.2, "ent_coef": 0.0, "policy": "MlpPolicy (SB3 預設 64×64)"}
@@ -54,9 +59,12 @@ def _load(strat, fold, role):
     path = strat["paths"][str(fold)]
     key = (path, role)
     if key not in _W["models"]:
-        if strat["kind"] == "maskppo":
+        if strat["kind"] == "maskppo" and os.path.exists(path + ".floor.json"):
+            _W["models"][key] = E.FloorDetector()             # E30 §2：無合格存檔（誤拒上限）→ 該 fold 之最佳回應為 F
+        elif strat["kind"] == "maskppo":
             from sb3_contrib import MaskablePPO
-            _W["models"][key] = E.LearnedDetector(MaskablePPO.load(path, device="cpu"), f"{strat['name']}@f{fold}")
+            _W["models"][key] = E.LearnedDetector(MaskablePPO.load(path, device="cpu"), f"{strat['name']}@f{fold}",
+                                                  strat.get("det_mode", "F"))
         else:
             from stable_baselines3 import PPO
             _W["models"][key] = E.LearnedAttacker(PPO.load(path, device="cpu"), strat["level"], f"{strat['name']}@f{fold}")
@@ -86,30 +94,35 @@ def _eval_job(args):
 BR_MAX, BR_EVERY = 300_000, 50_000                          # R-f 事後修正（2026-11-09，E19 §2b）
 
 
-def _val_score(role, model, train, test, opps, probs):
-    """決定性策略於該 fold 之訓練 seed（全部 cell）對對手混合之期望每步 reward（依機率加權，不抽樣）"""
+def _val_score(role, model, train, test, opps, probs, det_mode="F", with_frr=False):
+    """決定性策略於該 fold 之訓練 seed（全部 cell）對對手混合之期望每步 reward（依機率加權，不抽樣）。
+    with_frr（E30 §2 誤拒上限）：另回傳同口徑之乾淨誤拒率（clean_rej／clean_n，依機率加權）。model=None → F（規則版）"""
     G, E, ds = _W["G"], _W["E"], _W["ds"]
-    total = 0.0
+    total = frr = 0.0
     for opp, p in zip(opps, probs):
-        R = n = 0.0
+        R = n = cr = cn = 0.0
         for f in train:
             sd = ds.get(f, test)
             for cell in sd.cells_all:
                 if role == "det":
-                    ep = G.run_episode(E.new_episode(sd, cell), E.LearnedDetector(model, "val"), opp)
+                    det = E.FloorDetector() if model is None else E.LearnedDetector(model, "val", det_mode)
+                    ep = G.run_episode(E.new_episode(sd, cell), det, opp)
                     R += ep.stats["det_R"]; n += ep.stats["det_n"]
+                    cr += ep.stats["clean_rej"]; cn += ep.stats["clean_n"]
                 else:
                     ep = _W["cache"].get(sd, cell, opp, E.new_episode)
                     G.run_episode(ep, opp, E.LearnedAttacker(model, model._zt_level, "val"))
                     R += ep.stats["atk_R"]; n += ep.stats["atk_n"]
         total += p * (R / n if n else 0.0)
-    return total
+        frr += p * (cr / cn if cn else 0.0)
+    return (total, frr) if with_frr else total
 
 
 def _train_job(args):
     """一個最佳回應之一個 fold：對另一方之混合訓練至多 BR_MAX 步，每 BR_EVERY 步以訓練 seed 驗證，保留最佳存檔"""
-    role, fold, opp_pool, sigma, level, br_max, br_every, seed, path = args
-    if os.path.exists(path + ".zip"):
+    role, fold, opp_pool, sigma, level, br_max, br_every, seed, path = args[:9]
+    det_mode = args[9] if len(args) > 9 else "F"
+    if os.path.exists(path + ".zip") or os.path.exists(path + ".floor.json"):
         return path
     E, ds = _W["E"], _W["ds"]
     test = ds.files[fold]
@@ -120,7 +133,7 @@ def _train_job(args):
     probs = list(np.asarray(probs) / sum(probs))
     if role == "det":
         from sb3_contrib import MaskablePPO
-        env = E.DetectorEnv(ds, train, test, opps, probs, seed=seed)
+        env = E.DetectorEnv(ds, train, test, opps, probs, seed=seed, det_mode=det_mode)
         algo = MaskablePPO
     else:
         from stable_baselines3 import PPO
@@ -131,18 +144,31 @@ def _train_job(args):
     m = algo("MlpPolicy", env, seed=seed, verbose=0, device="cpu", **hp)
     m._zt_level = level
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    cap = role == "det" and det_mode != "F"                  # E30 §2：只在乾淨誤拒率 ≤ F 之存檔中選
+    frr_F = _val_score("det", None, train, test, opps, probs, with_frr=True)[1] if cap else None
     curve, best = [], (-np.inf, None)
     while m.num_timesteps < br_max:
         m.learn(br_every, reset_num_timesteps=False)
-        sc = _val_score(role, m, train, test, opps, probs)
-        curve.append([int(m.num_timesteps), sc])
+        if cap:
+            sc, frr = _val_score(role, m, train, test, opps, probs, det_mode, with_frr=True)
+            curve.append([int(m.num_timesteps), sc, frr])
+            if frr > frr_F:
+                continue
+        else:
+            sc = _val_score(role, m, train, test, opps, probs)
+            curve.append([int(m.num_timesteps), sc])
         if sc > best[0]:                                     # 同分取較早者
             best = (sc, int(m.num_timesteps))
             m.save(path + "_best_tmp")
-    os.replace(path + "_best_tmp.zip", path + ".zip")
-    json.dump({"role": role, "fold": fold, "seed": seed, "curve": curve, "best_step": best[1], "best_score": best[0],
-               "opponents": [s["name"] for s in opp_pool], "sigma": sigma},
-              open(path + "_curve.json", "w"), indent=1)
+    info = {"role": role, "fold": fold, "seed": seed, "curve": curve, "best_step": best[1], "best_score": best[0],
+            "opponents": [s["name"] for s in opp_pool], "sigma": sigma, "det_mode": det_mode if role == "det" else None,
+            "frr_cap_F": frr_F}
+    if best[1] is None:                                      # 無合格存檔（僅 cap 時可能）→ F
+        assert cap
+        json.dump(dict(info, fallback="F（無存檔之乾淨誤拒率 ≤ F）"), open(path + ".floor.json", "w"), indent=1)
+    else:
+        os.replace(path + "_best_tmp.zip", path + ".zip")
+    json.dump(info, open(path + "_curve.json", "w"), indent=1)
     return path
 
 
@@ -180,18 +206,21 @@ def solve(A, B):
 class PSRO:
     def __init__(self, args):
         self.a = args
-        base = OUT_BASE + ("_e30" if args.payoff_split == "train" else "")   # E30 不與 E19 輸出混用
+        base = OUT_BASE + ("_e30" if args.payoff_split == "train" else "") \
+            + ("" if args.det_mode == "F" else f"_{args.det_mode}")          # E30 不與 E19 輸出混用；T／TL 各自一目錄
         self.dir = os.path.join(base, args.level, f"t{args.train_seed}")
         self.state_path = os.path.join(self.dir, "state.json")
         if os.path.exists(self.state_path):
             self.st = json.load(open(self.state_path, encoding="utf-8"))
             if self.st.get("payoff_split", "test") != args.payoff_split:
                 raise SystemExit(f"✗ 既有 state 之 payoff_split = {self.st.get('payoff_split', 'test')} ≠ {args.payoff_split}；停止")
+            if self.st.get("det_mode", "F") != args.det_mode:
+                raise SystemExit(f"✗ 既有 state 之 det_mode = {self.st.get('det_mode', 'F')} ≠ {args.det_mode}；停止")
             print(f"續跑：{self.state_path}（round {self.st['round']}）")
         else:
             self.st = {"round": 0, "D": [{"name": "D0", "kind": "floor"}],
                        "A": [{"name": f"A0_{k}_{p}", "kind": "scripted", "attack": k, "param": p} for k, p in A0_SPEC],
-                       "payoff": {}, "history": [], "payoff_split": args.payoff_split}
+                       "payoff": {}, "history": [], "payoff_split": args.payoff_split, "det_mode": args.det_mode}
         self.pool = mp.Pool(args.workers, initializer=_init_worker)
 
     def save(self):
@@ -243,13 +272,18 @@ class PSRO:
             print(f"  G4 {a['name']}：誘導率 {got:.4%}（RQ3 {exp:.4%}）")
             if abs(got - exp) > 1e-12:
                 bad.append(a["name"])
-        # 乾淨（無攻擊）：D0 之誤拒須為 159／15,534（4.9.6）
+        # 乾淨（無攻擊）：D0 之誤拒須為 159／15,534（4.9.6）；D-30P：= 步 4 之 xApp 註記（E30 C-2）
+        if _DSN == "d30p":
+            ann = [json.loads(l) for l in open(os.path.join(SEV, "xapp_trust_annotations_bound_all_uebound_strict_severity.jsonl"))]
+            exp_clean = (sum(x["decision"] == "rejected" for x in ann), len(ann))
+        else:
+            exp_clean = (159, 15534)
         tot = {}
         for r in self.pool.map(_clean_job, range(8)):
             for k, v in r.items():
                 tot[k] = tot.get(k, 0) + v
-        print(f"  G4 乾淨 D0：rejected {tot['clean_rej']}／{tot['clean_n']}（第四章 159／15,534）")
-        if (tot["clean_rej"], tot["clean_n"]) != (159, 15534):
+        print(f"  G4 乾淨 D0：rejected {tot['clean_rej']}／{tot['clean_n']}（期望 {exp_clean[0]}／{exp_clean[1]}）")
+        if (tot["clean_rej"], tot["clean_n"]) != exp_clean:
             bad.append("clean")
         if bad:
             raise SystemExit(f"G4 ✗ {bad}；停止，請回報，勿調參數。")
@@ -279,12 +313,15 @@ class PSRO:
             dpaths = {str(f): os.path.join(mdir, f"{dname}_f{f}") for f in FOLDS}
             apaths = {str(f): os.path.join(mdir, f"{aname}_f{f}") for f in FOLDS}
             seed_of = lambda role, f: 100000 * a.train_seed + 1000 * r + 10 * f + (0 if role == "det" else 1)
-            jobs = ([("det", f, st["A"], sig["A"], a.level, a.br_max, a.br_every, seed_of("det", f), dpaths[str(f)]) for f in FOLDS]
+            jobs = ([("det", f, st["A"], sig["A"], a.level, a.br_max, a.br_every, seed_of("det", f), dpaths[str(f)], a.det_mode)
+                     for f in FOLDS]
                     + [("atk", f, st["D"], sig["D"], a.level, a.br_max, a.br_every, seed_of("atk", f), apaths[str(f)]) for f in FOLDS])
             t = time.time()
             self.pool.map(_train_job, jobs, chunksize=1)
             print(f"Round {r}：最佳回應訓練完成（{time.time() - t:.0f} s）")
             newD = {"name": dname, "kind": "maskppo", "paths": dpaths, "br_max": a.br_max, "br_every": a.br_every}
+            if a.det_mode != "F":
+                newD["det_mode"] = a.det_mode
             newA = {"name": aname, "kind": "ppo", "level": a.level, "paths": apaths, "br_max": a.br_max, "br_every": a.br_every}
             if not any(d["name"] == dname for d in st["D"]):
                 st["D"].append(newD); st["A"].append(newA)
@@ -341,13 +378,18 @@ def main():
     ap.add_argument("--payoff-split", choices=["test", "train"], default="test",
                     help="選擇用報酬表之資料：test＝E19 原行為；train＝E30（測試 seed 只作評估，審稿 A2）")
     ap.add_argument("--max-rounds", type=int, default=MAX_ROUNDS, help="E19＝6；E30＝12")
+    ap.add_argument("--det-mode", choices=["F", "T", "TL"], default="F",
+                    help="偵測端最佳回應之型態：F＝E19 之 V-escalate；T／TL＝E30 §2 動態門檻（須 --payoff-split train）")
     args = ap.parse_args()
-    if os.environ.get("ZT_DATASET") != "d30" or os.environ.get("ZT_FUSION_ORDER") != "severity":
-        raise SystemExit("須在 ZT_DATASET=d30 與 ZT_FUSION_ORDER=severity 下執行")
+    if _DSN not in ("d30", "d30p") or os.environ.get("ZT_FUSION_ORDER") != "severity":
+        raise SystemExit("須在 ZT_DATASET=d30／d30p 與 ZT_FUSION_ORDER=severity 下執行")
+    if args.det_mode != "F" and args.payoff_split != "train":
+        raise SystemExit("--det-mode T／TL 屬 E30，須 --payoff-split train")
     import importlib.metadata as md
     meta = {"git_commit": subprocess.run(["git", "-C", ROOT, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip(),
             "packages": {p: md.version(p) for p in ("torch", "gymnasium", "stable-baselines3", "sb3-contrib", "numpy", "nashpy")},
-            "hyperparameters": HP, "br_max": args.br_max, "br_every": args.br_every, "smoke": args.smoke, "stop_rule": f"NashConv <= {REL_STOP} x round-1 NashConv", "max_rounds": args.max_rounds, "payoff_split": args.payoff_split}
+            "hyperparameters": HP, "br_max": args.br_max, "br_every": args.br_every, "smoke": args.smoke, "stop_rule": f"NashConv <= {REL_STOP} x round-1 NashConv", "max_rounds": args.max_rounds, "payoff_split": args.payoff_split, "det_mode": args.det_mode,
+            "dataset": _DSN, "delay_source": os.environ.get("ZT_DELAY_SOURCE", "cumulative")}
     global FOLDS, OUT_BASE
     if args.smoke:
         FOLDS, OUT_BASE = [0], OUT_BASE + "_smoke"
