@@ -65,7 +65,7 @@ s = once(s, '        if (!IsInsideReceivingWindow(seqNumber))\n        {\n      
  '                *tf << "D\\t" << Simulator::Now().GetNanoSeconds() << "\\t" << m_rnti << "\\t" << (uint32_t)m_lcid << "\\t" << m_imsi\n'
  '                    << "\\t" << seqNumber.GetValue() << "\\t" << (r7bFound ? rlcTag.GetSenderTimestamp().GetNanoSeconds() : -1)\n'
  '                    << "\\t" << (uint32_t)rlcAmHeader.GetResegmentationFlag() << "\\t" << rlcAmHeader.GetSegmentOffset()\n'
- '                    << "\\t" << rlcAmHeader.GetLastOffset() << "\\t" << (uint32_t)rlcAmHeader.GetLastSegmentFlag() << "\\t" << r10dec << "\\n";\n'
+ '                    << "\\t" << rlcAmHeader.GetLastOffset() << "\\t" << (uint32_t)rlcAmHeader.GetLastSegmentFlag() << "\\t" << r10dec << "\\t" << g_r11Dec << "\\t" << g_r11Eff << "\\t" << g_r11Part << "\\t" << g_r11Len << "\\t" << g_r11New << "\\t" << rxPduParams.p->GetSize() << "\\n";\n'
  '            }\n        };\n'
  '        if (!IsInsideReceivingWindow(seqNumber))\n        {\n            NS_LOG_LOGIC("PDU discarded");\n            r10dec = "W"; r10emit();\n            return;\n        }\n')
 s = once(s, '                NS_LOG_LOGIC("Received duplicate SN");\n',
