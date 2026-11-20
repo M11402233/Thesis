@@ -158,7 +158,8 @@ def check_baseline(name, values, set_baseline=False, note=""):
     if not set_baseline:
         print(f"  ⚠ 尚無回歸基準 {name}：本次輸出為「未核對」，須人工核對後以 --set-baseline 建立")
         return "missing (unverified)"
-    base[name] = {"values": values, "note": note}
+    _extra = _os.environ.get("ZT_BASELINE_NOTE", "")      # 例：「2026-11-20 建立，結果未經作者審閱」
+    base[name] = {"values": values, "note": (note + "；" if note and _extra else note) + _extra}
     with open(BASELINE_PATH, "w", encoding="utf-8") as fh:
         _json.dump(base, fh, indent=2, ensure_ascii=False)
     return "set"

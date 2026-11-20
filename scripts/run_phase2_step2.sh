@@ -44,12 +44,13 @@ echo "GATE PASSED $(date -u '+%F %T') UTC" >> $ST
 run 01_cv_interval   cv_interval.py
 run 02_Si_ablation   run_Si_reference_ablation.py
 run 03_E9            run_E9_operating_regime.py
-run 04_E9_rt         run_E9_rt.py
-run 05_E9b_rt        run_E9b_rt.py
-run 06_E9c_rt        run_E9c_rt.py
-run 07_E9d_rt        run_E9d_rt.py
+SB=""; [ "${SETBASE:-0}" = 1 ] && SB="--set-baseline"   # 回歸基準：SETBASE=1 時建立（須同時設 ZT_BASELINE_NOTE；結果是否經作者審閱由註記說明）
+run 04_E9_rt         run_E9_rt.py $SB
+run 05_E9b_rt        run_E9b_rt.py $SB
+run 06_E9c_rt        run_E9c_rt.py $SB
+run 07_E9d_rt        run_E9d_rt.py $SB
 run 08_slow          run_slow_poisoning_suite.py
-run 09_slow_rt       run_slow_poisoning_rt.py
+run 09_slow_rt       run_slow_poisoning_rt.py $SB
 run 10_E17           run_slow_poisoning_rt.py --q6-k 1,2,3,4,5
 run 11_msweep        run_adversarial_msweep.py
 echo "ALLDONE $(date -u '+%F %T') UTC" >> $ST
