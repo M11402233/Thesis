@@ -55,6 +55,29 @@ s = once(s, '    g_r9RlcRxTagFound = -1; // R9 O-4\n',
  '            << (isData ? (int)r10h.GetSequenceNumber().GetValue() : -1) << "\\t"\n'
  '            << (isData ? (int)r10h.GetResegmentationFlag() : -1) << "\\t" << (isData ? (int)r10h.GetLastSegmentFlag() : -1) << "\\t"\n'
  '            << (isData ? (int)r10h.GetSegmentOffset() : -1) << "\\t" << rxPduParams.p->GetUid() << "\\n";\n    }\n')
+# 接收端判定（只讀；2026-11-20 使用者要求先確認分段與部分重疊之判定）：
+#  W 窗外丟棄｜DW 整包重複（SN 已在緩衝區，非分段）｜AS 分段接續（offset == 前段 lastOffset）
+#  OE 分段不接續且 PDU 未完整 → 清除該 SN 之緩衝｜OI 分段不接續且 PDU 已完整 → 忽略
+#  AN 新 SN 且 offset 0 → 放入緩衝｜DO 新 SN 但 offset > 0 → 忽略
+s = once(s, '        if (!IsInsideReceivingWindow(seqNumber))\n        {\n            NS_LOG_LOGIC("PDU discarded");\n            return;\n        }\n',
+ '        const char* r10dec = "?";\n'
+ '        auto r10emit = [&]() {\n            if (auto* tf = R10Trace())\n            {\n'
+ '                *tf << "D\\t" << Simulator::Now().GetNanoSeconds() << "\\t" << m_rnti << "\\t" << (uint32_t)m_lcid << "\\t" << m_imsi\n'
+ '                    << "\\t" << seqNumber.GetValue() << "\\t" << (r7bFound ? rlcTag.GetSenderTimestamp().GetNanoSeconds() : -1)\n'
+ '                    << "\\t" << (uint32_t)rlcAmHeader.GetResegmentationFlag() << "\\t" << rlcAmHeader.GetSegmentOffset()\n'
+ '                    << "\\t" << rlcAmHeader.GetLastOffset() << "\\t" << (uint32_t)rlcAmHeader.GetLastSegmentFlag() << "\\t" << r10dec << "\\n";\n'
+ '            }\n        };\n'
+ '        if (!IsInsideReceivingWindow(seqNumber))\n        {\n            NS_LOG_LOGIC("PDU discarded");\n            r10dec = "W"; r10emit();\n            return;\n        }\n')
+s = once(s, '                NS_LOG_LOGIC("Received duplicate SN");\n',
+ '                NS_LOG_LOGIC("Received duplicate SN");\n                r10dec = "DW";\n')
+s = once(s, '                        // segment is next in sequence\n',
+ '                        // segment is next in sequence\n                        r10dec = "AS";\n')
+s = once(s, '                        if (it->second.m_pduComplete == false)\n                        {\n                            m_rxonBuffer.erase(it);\n',
+ '                        r10dec = "OI";\n                        if (it->second.m_pduComplete == false)\n                        {\n                            r10dec = "OE";\n                            m_rxonBuffer.erase(it);\n')
+s = once(s, '                if (rlcAmHeader.GetSegmentOffset() == 0)\n                {\n                    NS_LOG_LOGIC("Place PDU in the reception buffer',
+ '                r10dec = "DO";\n                if (rlcAmHeader.GetSegmentOffset() == 0)\n                {\n                    r10dec = "AN";\n                    NS_LOG_LOGIC("Place PDU in the reception buffer')
+s = once(s, '        // 5.1.3.2.3 Actions when a RLC data PDU is placed in the reception buffer\n',
+ '        r10emit();\n\n        // 5.1.3.2.3 Actions when a RLC data PDU is placed in the reception buffer\n')
 wr(n, s)
 n = 'lte/helper/mmwave-bearer-stats-calculator.cc'; s = rd(n)
 s = once(s, 'extern int g_r9RlcRxTagFound; // R9 O-4 (defined in lte-rlc-am.cc)\n',
