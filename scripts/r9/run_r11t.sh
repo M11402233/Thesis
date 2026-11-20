@@ -14,6 +14,11 @@ for v in on off; do
 done
 wait
 echo "ALLDONE $(date '+%F %T')" > "$OUT/DONE"
-# 對照：r11t 關閉追蹤之輸出須與 r10t 關閉追蹤（同長度、模式 1）逐位相同，僅多 _r11eff.txt
+# 對照：r11t 關閉追蹤之輸出須與 r10t 關閉追蹤（同長度、模式 1）逐位相同（移除掛鐘欄，同 P-2），僅多 _r11eff 檔
 REF=$HOME/oran-zt-kpm-verification/data/r10_trace_v4_dec/off
-cd "$OUT/off" && for f in $(ls | grep -v "^run.log$" | grep -v r11eff); do cmp -s "$f" "$REF/$f" || echo "DIFF_VS_R10T $f"; done > "$OUT/cmp_vs_r10t.txt"; echo "cmp done: $(wc -l < $OUT/cmp_vs_r10t.txt) differing; files $(ls | grep -vc '^run.log$') vs ref $(ls $REF | grep -vc '^run.log$')" >> "$OUT/cmp_vs_r10t.txt"
+cd "$OUT/off"; n=0
+for f in $(ls | grep -v "^run.log$" | grep -v r11eff); do
+  case $f in bsState.txt) ca='awk {$2="";print}';; cu-*|du-cell-*) ca='cut -d, -f2-';; *) ca=cat;; esac
+  cmp -s <($ca "$f") <($ca "$REF/$f") || { echo "REAL_DIFF_VS_R10T $f"; n=$((n+1)); }
+done > "$OUT/cmp_vs_r10t.txt"
+echo "real diffs vs r10t: $n; files $(ls | grep -vc '^run.log$') (r11eff $(ls | grep -c r11eff)) vs ref $(ls $REF | grep -vc '^run.log$')" >> "$OUT/cmp_vs_r10t.txt"

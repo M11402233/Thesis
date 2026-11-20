@@ -61,7 +61,7 @@ left = sum(len(v) for v in DL.values())
 print(f"J   KPM 資料 RX {sum(1 for r,d in pair if r[9]>=0)}；對不上 {len(unm)}（發生於最後時刻 {len(late)}）；未被 KPM 消耗之 D 行 {left}（非統計回呼之實體，僅報告）")
 if len(unm) != len(late): fails.append("J")
 # P1
-bad1 = sum(1 for r, d in pair if d and NAMES[d[2]] != d[1])
+bad1 = sum(1 for r, d in pair if d and not (0 <= d[2] < 7 and NAMES[d[2]] == d[1]))   # 預測碼須在 0–6；-1 不得以負索引蒙混
 print(f"P1  預測判定碼 ≠ 實際分支：{bad1}／{sum(1 for r,d in pair if d)}")
 if bad1: fails.append("P1")
 # 全部 D 行（含非 KPM 實體）之 P1
@@ -121,7 +121,7 @@ if bad3: fails.append("P3")
 tot_rx = sum(1 for r, d in pair if r[0] < 5 * 10**9); eff = [(r, d) for r, d in pair if d and d[3] == 1 and r[0] < 5 * 10**9]
 data = [(r, d) for r, d in pair if d and r[0] < 5 * 10**9]
 sd = sum(r[6] for r, d in eff); nE = len(eff); part = [(r, d) for r, d in eff if d[4] == 1]
-cnt = collections.Counter(NAMES[d[2]] for r, d in data)
+cnt = collections.Counter((NAMES[d[2]] if 0 <= d[2] < 7 else 'INVALID') for r, d in data)
 print(f"P4  窗 0–4：nRx {tot_rx}；資料 {len(data)}；有效 {nE}；判定計數 {dict(cnt)}；Σ判定 {sum(cnt.values())} == 資料 {len(data)}")
 if sum(cnt.values()) != len(data): fails.append("P4")
 allt = [r[6] for r, d in data if r[7] == 1]

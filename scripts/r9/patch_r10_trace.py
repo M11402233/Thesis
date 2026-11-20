@@ -39,6 +39,7 @@ s = once(s, '                    nextSeg->AddHeader(nextSegHdr);\n',
  '                            << (has ? q.GetSenderTimestamp().GetNanoSeconds() : -1) << "\\t" << firstSeg->GetUid() << "\\t" << m_imsi << "\\n";\n                    }\n')
 # RX (calculator-level, with cell / IMSI): globals valid only during m_rxPdu
 s = once(s, '    g_r9RlcRxTagFound = r7bFound ? 1 : 0; // R9 O-4 (read-only)\n',
+ '    const int r10cDec = g_r11Dec, r10cEff = g_r11Eff, r10cPart = g_r11Part, r10cLen = g_r11Len, r10cNew = g_r11New; // r11 預測值（m_rxPdu 後被重置）\n'
  '    if (R10Trace())\n    {\n        LteRlcAmHeader r10g;\n        rxPduParams.p->PeekHeader(r10g);\n'
  '        g_r10RxTagT = r7bFound ? rlcTag.GetSenderTimestamp().GetNanoSeconds() : -1;\n'
  '        g_r10RxSn = r10g.IsDataPdu() ? (int)r10g.GetSequenceNumber().GetValue() : -1;\n'
@@ -65,7 +66,7 @@ s = once(s, '        if (!IsInsideReceivingWindow(seqNumber))\n        {\n      
  '                *tf << "D\\t" << Simulator::Now().GetNanoSeconds() << "\\t" << m_rnti << "\\t" << (uint32_t)m_lcid << "\\t" << m_imsi\n'
  '                    << "\\t" << seqNumber.GetValue() << "\\t" << (r7bFound ? rlcTag.GetSenderTimestamp().GetNanoSeconds() : -1)\n'
  '                    << "\\t" << (uint32_t)rlcAmHeader.GetResegmentationFlag() << "\\t" << rlcAmHeader.GetSegmentOffset()\n'
- '                    << "\\t" << rlcAmHeader.GetLastOffset() << "\\t" << (uint32_t)rlcAmHeader.GetLastSegmentFlag() << "\\t" << r10dec << "\\t" << g_r11Dec << "\\t" << g_r11Eff << "\\t" << g_r11Part << "\\t" << g_r11Len << "\\t" << g_r11New << "\\t" << rxPduParams.p->GetSize() << "\\n";\n'
+ '                    << "\\t" << rlcAmHeader.GetLastOffset() << "\\t" << (uint32_t)rlcAmHeader.GetLastSegmentFlag() << "\\t" << r10dec << "\\t" << r10cDec << "\\t" << r10cEff << "\\t" << r10cPart << "\\t" << r10cLen << "\\t" << r10cNew << "\\t" << rxPduParams.p->GetSize() << "\\n";\n'
  '            }\n        };\n'
  '        if (!IsInsideReceivingWindow(seqNumber))\n        {\n            NS_LOG_LOGIC("PDU discarded");\n            r10dec = "W"; r10emit();\n            return;\n        }\n')
 s = once(s, '                NS_LOG_LOGIC("Received duplicate SN");\n',

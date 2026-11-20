@@ -4,7 +4,7 @@ set -u
 SRC=$HOME/ns-3-mmwave-oran-r10; LOG=$HOME/build_r11.log
 exec > "$LOG" 2>&1
 echo "start $(date '+%F %T')"
-for V in r11 r11t; do
+for V in ${VARS:-r11 r11t}; do
   DST=$HOME/ns-3-mmwave-oran-$V
   [ -e "$DST" ] && { echo "$DST exists, abort"; echo FAIL > $HOME/build_r11.status; exit 1; }
   rsync -a --exclude=/build --exclude=/cmake-cache --exclude='/.lock-ns3*' "$SRC/" "$DST/"
