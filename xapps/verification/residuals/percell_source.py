@@ -136,6 +136,66 @@ def serving(aux, max_window=299):
     return out
 
 
+def xapp_windows(aux, zero=False, max_window=299):
+    """融合層用之單一歸屬視圖（phase2_percell_spec_v0.md §4 H_i-D1；步 3／4）：[(k, {cell: {imsi: delay_ms | None}})]。
+    每個已連線（D-c，mmState = 9）之 UE 每窗恰屬一個 cell：
+      * 當窗有 mmWave Rx PDU（任何 cell ≠ 1，ΔnRx > 0）→ 該 mmWave cell；須唯一且 = D-c serving cell，否則報錯；
+      * 已連線但當窗無 mmWave Rx → LTE 錨點 cell 1（= 新 D1 定義之「mmWave 缺席」）。
+    延遲 = 該 (cell, UE) 之區間平均（同 si_windows）；分母 0（例：Rx 全為零延遲 PDU、zero=False）→ None（缺值，D-f）。
+    未連線之 UE 不出現（D-f）；未連線卻有 Rx → 報錯。mmWave cell 之非 None 值與 si_windows 逐值相同（check_xapp_view）。"""
+    pc = percell_delta(aux, max_window); z = zero_delta(aux, max_window); sv = serving(aux, max_window)
+    out = []
+    for k in sorted(pc):
+        acc = collections.defaultdict(lambda: [0, 0, 0])      # (cell, imsi) → [sumNs, n_valid, nRx]
+        for (c, i, l), d in pc[k].items():
+            n = d[2] - (0 if zero else z.get(k, {}).get((c, i, l), (0, 0))[1])
+            a = acc[(c, i)]; a[0] += d[4]; a[1] += n; a[2] += d[2]
+        S = sv.get(k)
+        if S is None:
+            raise ValueError(f"{aux}: 窗 {k} 無 UE RRC 時點")
+        cells = collections.defaultdict(dict)
+        for i, (mc, ms) in sorted(S.items()):
+            mm = sorted(c for (c, j), a in acc.items() if j == i and c != 1 and a[2] > 0)
+            if ms != 9:
+                if any(j == i and a[2] > 0 for (c, j), a in acc.items()):
+                    raise ValueError(f"{aux}: 窗 {k} IMSI {i} 未連線卻有 Rx")
+                continue
+            if len(mm) > 1 or (mm and mm[0] != mc):
+                raise ValueError(f"{aux}: 窗 {k} IMSI {i} mmWave Rx 於 {mm}，serving {mc}")
+            c = mm[0] if mm else 1
+            sm, n, _ = acc.get((c, i), (0, 0, 0))
+            cells[c][i] = sm / n / 1e6 if n > 0 else None
+        for (c, j), a in acc.items():
+            if a[2] > 0 and j not in S:
+                raise ValueError(f"{aux}: 窗 {k} IMSI {j} 有 Rx 但無 RRC 列")
+        out.append((k, {c: cells[c] for c in sorted(cells)}))
+    return out
+
+
+def ci_lists(aux, max_window=299):
+    """C_i (A)：{k: ({mmWave cell: set(IMSI)}, 錨點 cell 1 之 set)}（enb_lists 之 RRC 名單）"""
+    out = {}
+    for k, L in enb_lists(aux, max_window).items():
+        out[k] = ({c: set(v) for c, v in L.items() if c != 1}, set(L.get(1, set())))
+    return out
+
+
+def check_xapp_view(aux, zero=False, max_window=299):
+    """xapp_windows 之 mmWave 非 None 值須與 si_windows 之 mmWave 值（集合與數值）逐位相同"""
+    a = dict(si_windows(aux, zero, max_window)); b = dict(xapp_windows(aux, zero, max_window))
+    bad = 0; n_none = 0; n_lte = 0
+    for k in a:
+        for c in set(a[k]) | set(b.get(k, {})):
+            if c == 1:
+                n_lte += len(b.get(k, {}).get(1, {}))
+                continue
+            va = a[k].get(c, {}); vb = b.get(k, {}).get(c, {})
+            n_none += sum(v is None for v in vb.values())
+            if {i: v for i, v in vb.items() if v is not None} != va:
+                bad += 1
+    return {"mismatch_cell_windows": bad, "mm_none_ue_windows": n_none, "lte_ue_windows": n_lte, "PASS": bad == 0}
+
+
 def check(aux, max_window=299):
     rep = {}
     pc = percell_delta(aux, max_window)

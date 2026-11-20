@@ -9,7 +9,8 @@
   percell        第二階段（phase2_percell_spec_v0.md §4、§9.1 Q-P5）：r9 之 _percell／_r9rx，cell = 事件自身 cell（D-b），
                  排除零延遲 PDU；分母 0 → 該 (cell, UE) 缺值（D-f，不出現、不報錯）。僅限登錄 r9 aux 之資料集（d30p）
   percell_zero   同上但含零延遲 PDU（Q-P5 之對照版本）
-  percell*：融合層（H_i／C_i，zt_kpm_xapp.run_xapp、E10）之新輸入屬步 4，未實作前遇此模式即停止（require_fusion_input）。
+  percell*：parse_interval（→ TraceReplaySource、融合層）回傳 percell_source.xapp_windows 之單一歸屬視圖
+           （延遲缺值為 None；mmWave 非 None 值 = si_windows）；cell_delay_means（S_i／E9 族）與 si_cells 直接用 si_windows。
 共同約定：
   * cell 歸屬**沿用主檔列之 cell**（= 最後一筆 PDU 所在 cell；規格 F1）。每 cell 拆分屬第二階段，本模組不改歸屬。
   * 當窗無新 Rx PDU（ΔN = 0）時延遲為缺值（D-f）。缺值時**直接報錯（fail-closed）**，不填 0、不沿用舊值；
@@ -70,18 +71,31 @@ def is_percell(m=None):
     return (m or mode()).startswith("percell")
 
 
-def require_fusion_input(where):
-    """融合層尚未接上第二階段輸入：percell 模式下停止，避免以每事件 cell 之字典誤算 H_i／C_i。"""
-    if is_percell():
-        raise SystemExit(f"{where}：ZT_DELAY_SOURCE={mode()} 之融合層輸入屬第二階段步 4，尚未實作；停止。")
+def percell_aux(path, m=None):
+    import datasets as DS
+    m = m or mode()
+    if not DS.CFG.get("percell"):
+        raise SystemExit(f"ZT_DELAY_SOURCE={m} 只適用登錄 r9 aux 之資料集（目前 ZT_DATASET={DS.NAME}）")
+    return os.path.dirname(DS.aux_path(DS.seed_of(path), "x")), DS.CFG["max_window"] - 1
+
+
+def si_cells(path, m=None):
+    """S_i 用：每事件 cell 之區間平均（含 LTE cell 1），[(w, {cell: {imsi: ms}})]"""
+    import percell_source as PS
+    m = m or mode(); aux, mw = percell_aux(path, m)
+    return PS.si_windows(aux, zero=(m == "percell_zero"), max_window=mw)
+
+
+def ci_lists(path, m=None):
+    import percell_source as PS
+    aux, mw = percell_aux(path, m)
+    return PS.ci_lists(aux, mw)
 
 
 def parse_percell(path, m):
-    import datasets as DS, percell_source as PS
-    if not DS.CFG.get("percell"):
-        raise SystemExit(f"ZT_DELAY_SOURCE={m} 只適用登錄 r9 aux 之資料集（目前 ZT_DATASET={DS.NAME}）")
-    aux = os.path.dirname(DS.aux_path(DS.seed_of(path), "x"))
-    return PS.si_windows(aux, zero=(m == "percell_zero"), max_window=DS.CFG["max_window"] - 1)
+    import percell_source as PS
+    aux, mw = percell_aux(path, m)
+    return PS.xapp_windows(aux, zero=(m == "percell_zero"), max_window=mw)
 
 
 def parse_interval(path, m=None):
@@ -140,6 +154,6 @@ def cell_delay_means(path, m=None):
     """與 run_E9_operating_regime／run_Si_reference_ablation／run_adversarial_msweep 之 load_cell_delay 同形：
     {w: {cell: 該 cell 當窗各 UE 延遲之平均 (ms)}}，排除 LTE 錨點（cell 1）。延遲語意依 mode。"""
     out = {}
-    for w, cells in parse_interval(path, m):
+    for w, cells in (si_cells(path, m) if is_percell(m) else parse_interval(path, m)):
         out[w] = {c: float(sum(u.values()) / len(u)) for c, u in cells.items() if c != 1 and u}
     return out

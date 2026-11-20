@@ -84,8 +84,6 @@ INV_LEVEL = {0: "normal", 1: "weak", 2: "strong"}
 # ==========================================================================
 def load_windows(path):
     """[(w, {cell: {imsi: delay_ms}})]，與 TraceReplaySource 相同之解析"""
-    import interval_source as _IS
-    _IS.require_fusion_input("run_E10.load_windows")
     return list(X.TraceReplaySource(path).windows())
 
 

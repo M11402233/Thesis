@@ -180,6 +180,10 @@ class TraceReplaySource(IndicationSource):
     def __init__(self, path, preload=True):
         self.path = path
         self._cache = None
+        self.ci_lists = None
+        if os.environ.get("ZT_DELAY_SOURCE", "cumulative").startswith("percell"):
+            import interval_source                      # 第二階段：C_i (A) 之 RRC 名單（不隨窗字典之注入改變）
+            self.ci_lists = interval_source.ci_lists(path)
         if preload:
             self._cache = self._parse()   # 預載:使 runtime 量測不含檔案 I/O
 
@@ -235,7 +239,7 @@ class TrustAnchor:
             for w, cells in wins:
                 for c, ues in cells.items():
                     if c != LTE_CELL:
-                        vals += list(ues.values())
+                        vals += [v for v in ues.values() if v is not None]   # None：第二階段延遲缺值（無則逐位不變）
                 present = {i: ("mmw" if any(c != LTE_CELL for c in cells if i in cells[c])
                                else "lte")
                            for c in cells for i in cells[c]}
@@ -308,14 +312,19 @@ def verify_si(cells, target, scale):
     註:MIN_PEER=2 表示本 xApp 僅在 full-consensus 窗判定 S_i,
     第 4.7.2 節定義的 weak evidence(peer=1)在此併入 unavailable。
     """
-    mmw = [c for c in cells if c != LTE_CELL]
     if target is None or target not in cells or target == LTE_CELL:
         return "n/a", None, None
+    # 第二階段：延遲缺值為 None（percell_source.xapp_windows）；無有效值之 cell 不可作 target 或 peer。
+    # 無 None 時 _vals 與 list(values()) 相同，輸出逐位不變。
+    _vals = {c: [v for v in cells[c].values() if v is not None] for c in cells if c != LTE_CELL}
+    mmw = [c for c in cells if c != LTE_CELL and _vals[c]]
+    if not _vals[target]:
+        return "unavailable", None, len([c for c in mmw if c != target])
     peers = [c for c in mmw if c != target]
     if len(peers) < MIN_PEER:
         return "unavailable", None, len(peers)
-    tgt = float(np.mean(list(cells[target].values())))
-    ref = float(np.median([np.mean(list(cells[c].values())) for c in peers]))
+    tgt = float(np.mean(_vals[target]))
+    ref = float(np.median([np.mean(_vals[c]) for c in peers]))
     z = abs(tgt - ref) / scale
     return ("violated" if z > TAU_S else "normal"), round(z, 2), len(peers)
 
@@ -332,6 +341,7 @@ def verify_hi_d2(prev_map, cur_map):
 
 # H_i-D3(E22,docs/thesis/E22_dual_report_rule_spec.md):預設關閉,關閉時行為與輸出格式逐位不變。
 # 只在「LTE 錨點只回報 anchor-only UE」之設定下成立(乾淨校準期錨點 ∩ mmWave = 0 才可啟用)。
+CI_REF_MODE = os.environ.get("ZT_CI_REF_MODE", "set")   # 第二階段 C_i (A)：set（主）｜card（對照）
 D3_ENABLED = os.environ.get("ZT_D3", "off") == "on"
 
 
@@ -567,9 +577,8 @@ def run_xapp(source, anchor, eval_mode="all", node_of_interest=None, collect=Tru
     後,其他 xApp(合作消費端、可用資源評估 xApp)於同一窗讀取之時點。於 P1–P3 計時結束後呼叫,
     不計入 C-ZT 之延遲;預設 None 時行為與先前完全相同。
     """
-    import interval_source as _IS
-    _IS.require_fusion_input("zt_kpm_xapp.run_xapp")
     binding = binding or D1_BINDING
+    _ci_lists = getattr(source, "ci_lists", None)     # 第二階段：TraceReplaySource 於 percell 模式提供；其餘為 None（行為不變）
     annotations, latencies, recs, exec_recs = [], [], [], []
     prev_map, ci_run = {}, 0
     dwell_runs = collections.defaultdict(int)
@@ -607,7 +616,11 @@ def run_xapp(source, anchor, eval_mode="all", node_of_interest=None, collect=Tru
         if not targets and legacy_none:
             targets = [None]
 
-        ci, ci_run, ci_ev = verify_ci(cells, ci_run)
+        if _ci_lists is not None:                     # 第二階段 C_i (A)：錨點 RRC 名單為參照集合（Q-C1 = a）
+            _mm, _anc = _ci_lists.get(w, ({}, set()))
+            ci, ci_run, ci_ev = verify_ci_ref(_mm, _anc, ci_run, CI_REF_MODE)
+        else:
+            ci, ci_run, ci_ev = verify_ci(cells, ci_run)
         d2, d2_ev = verify_hi_d2(prev_map, cur_map)
         if binding == "window":
             d1_win, d1_ev_win = verify_hi_d1(dwell_runs, anchor, cur_map)

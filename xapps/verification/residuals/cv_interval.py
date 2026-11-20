@@ -13,7 +13,7 @@ ap = argparse.ArgumentParser(); ap.add_argument("files", nargs="*"); ap.add_argu
 files = a.files or DS.files(); m = IS.mode()
 cvs = []
 for f in files:
-    for w, cells in X.TraceReplaySource(f).windows():
+    for w, cells in (IS.si_cells(f) if IS.is_percell() else X.TraceReplaySource(f).windows()):
         mm = [c for c in cells if c != X.LTE_CELL]
         if len(mm) >= 2:
             d = np.array([np.mean(list(cells[c].values())) for c in mm])
