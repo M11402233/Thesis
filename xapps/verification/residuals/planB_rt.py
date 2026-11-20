@@ -158,8 +158,10 @@ def check_baseline(name, values, set_baseline=False, note=""):
     if not set_baseline:
         print(f"  ⚠ 尚無回歸基準 {name}：本次輸出為「未核對」，須人工核對後以 --set-baseline 建立")
         return "missing (unverified)"
-    _extra = _os.environ.get("ZT_BASELINE_NOTE", "")      # 例：「2026-11-20 建立，結果未經作者審閱」
-    base[name] = {"values": values, "note": (note + "；" if note and _extra else note) + _extra}
+    # ZT_BASELINE_NOTE（例：「2026-11-20 建立，結果未經作者審閱」）設定時，取代腳本內寫死之註記——
+    # 後者記載的是 D-30 於 2026-10-06 之人工核對，不可沿用於其他資料集。
+    _extra = _os.environ.get("ZT_BASELINE_NOTE", "")
+    base[name] = {"values": values, "note": _extra if _extra else note}
     with open(BASELINE_PATH, "w", encoding="utf-8") as fh:
         _json.dump(base, fh, indent=2, ensure_ascii=False)
     return "set"
