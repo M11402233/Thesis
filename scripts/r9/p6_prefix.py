@@ -24,3 +24,5 @@ for fn in sorted(os.listdir(S)):
     res[base]=st if st!='PREFIX' else f'PREFIX ({n} lines)'
 bad={k:v for k,v in res.items() if not v.startswith('PREFIX')}
 print(json.dumps({"n_files":len(res),"n_not_prefix":len(bad),"not_prefix":bad},ensure_ascii=False,indent=1))
+# 失敗時須回傳非零（d30p1_chain.sh 以結束碼判斷 P-6）：有任何非前綴／缺檔，或完全沒有可比對之檔案
+sys.exit(0 if (res and not bad) else 1)

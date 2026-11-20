@@ -13,7 +13,7 @@ REPO=~/oran-zt-kpm-verification; CODE="${CODE:-$HOME/zt_dev/phase2/residuals}"; 
 # D30P1_r10_recollection_spec.md F5：DATASET=d30p（預設，行為不變）｜d30p1
 DATASET="${DATASET:-d30p}"
 case "$DATASET" in d30p) P0=$REPO/data/results/phase2/D30P_g13_phase0; GK="P2 P3" ;;
-                  d30p1) P0=$REPO/data/results/phase2/D30P1_phase0; GK="Q0 Q2 Q2C P3" ;; *) echo "DATASET 不合法"; exit 2 ;; esac
+                  d30p1) P0=$REPO/data/results/phase2/D30P1_phase0; GK="Q0 Q2 Q2C Q4 P3" ;; *) echo "DATASET 不合法"; exit 2 ;; esac
 export ZT_DATASET=$DATASET ZT_DELAY_SOURCE=$VARIANT ZT_FUSION_ORDER=severity MPLBACKEND=Agg OMP_NUM_THREADS=4
 unset ZT_RESULTS_DIR
 OUT=$REPO/data/results/${DATASET}_delay_$VARIANT; L=$OUT/_pipeline_logs; mkdir -p $L; ST=$L/status.txt

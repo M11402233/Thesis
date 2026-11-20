@@ -9,8 +9,8 @@ set -uo pipefail
 
 NS3_DIR="${NS3_DIR:-${HOME}/ns-3-mmwave-oran-r9}"
 export ZT_R7_S2=1
-# D-30P1（D30P1_r10_recollection_spec.md F1）：r10 必須明設 ZT_R10_RETX_TAG，並寫入 meta
-case "$(basename "${NS3_DIR}")" in *r10*) [ -n "${ZT_R10_RETX_TAG:-}" ] || { echo "r10 須設定 ZT_R10_RETX_TAG"; exit 2; }; export ZT_R10_RETX_TAG ;; esac
+# D-30P1（D30P1_r10_recollection_spec.md F1）：r10／r11 必須明設 ZT_R10_RETX_TAG，並寫入 meta
+case "$(basename "${NS3_DIR}")" in *r10*|*r11*) [ -n "${ZT_R10_RETX_TAG:-}" ] || { echo "r10 須設定 ZT_R10_RETX_TAG"; exit 2; }; export ZT_R10_RETX_TAG ;; esac
 VARIANT=${VARIANT:-D30P}; N_KNOWN=30                    # D-30P：D-30 之命令列，r9 ＋ S2
 OUT_DIR="${OUT_DIR:-${HOME}/oran-zt-kpm-verification/data/ues30_p_r9_seeds}"
 case "$(realpath -m "${OUT_DIR}")" in */data/ues30_seeds|*/data/ues30_seeds/*|*/data/ues30_ho_seeds|*/data/ues30_ho_seeds/*|*/data/ues30_ho_r8*_seeds|*/data/ues30_ho_r8*_seeds/*|*/data/game_stage3*|*/data/si_lstm_seeds*|*/data/batchFinal_seeds*|*/data/ues30_p_r9_seeds|*/data/ues30_p_r9_seeds/*|*/data/ues30_p_r9g13_seeds|*/data/ues30_p_r9g13_seeds/*) echo "拒絕寫入既有資料目錄"; exit 2 ;; esac
@@ -31,7 +31,7 @@ MON_S=${MON_S:-60}
 RATE=600                                    # 秒(真實)/秒(模擬)；校準約 384，35 UE 長跑後段變慢，取保守值
 RUN_TIMEOUT=$(awk -v r=${RATE} -v t=${SIMTIME} 'BEGIN{printf "%d", r*t*1.5+600}')
 
-KEEP_PLAIN=(DlE2RlcStats.txt UlE2RlcStats.txt DlE2RlcStats_exact.txt DlE2RlcStats_percell.txt DlE2RlcStatsLte_exact.txt DlE2RlcStatsLte_percell.txt R9_enb_uemap.txt R9_ue_rrc.txt R9_pdcp_split.txt DlE2RlcStats_r9rx.txt DlE2RlcStats_r9lastset.txt DlE2RlcStatsLte_r9rx.txt DlE2RlcStatsLte_r9lastset.txt ues.txt enbs.txt CellIdStats.txt UeFailures.txt MmWaveSwitchStats.txt CellIdStatsHandover.txt UeHandoverStartStats.txt UeHandoverEndStats.txt EnbHandoverStartStats.txt EnbHandoverEndStats.txt)
+KEEP_PLAIN=(DlE2RlcStats.txt UlE2RlcStats.txt DlE2RlcStats_exact.txt DlE2RlcStats_percell.txt DlE2RlcStats_r11eff.txt DlE2RlcStatsLte_r11eff.txt DlE2RlcStatsLte_exact.txt DlE2RlcStatsLte_percell.txt R9_enb_uemap.txt R9_ue_rrc.txt R9_pdcp_split.txt DlE2RlcStats_r9rx.txt DlE2RlcStats_r9lastset.txt DlE2RlcStatsLte_r9rx.txt DlE2RlcStatsLte_r9lastset.txt ues.txt enbs.txt CellIdStats.txt UeFailures.txt MmWaveSwitchStats.txt CellIdStatsHandover.txt UeHandoverStartStats.txt UeHandoverEndStats.txt EnbHandoverStartStats.txt EnbHandoverEndStats.txt)
 KEEP_GZ=(RxPacketTrace.txt DlMacStats.txt DlTxPhyStats.txt DlE2PdcpStats.txt cu-cp-cell-1.txt cu-up-cell-1.txt du-cell-2.txt du-cell-3.txt du-cell-4.txt du-cell-5.txt du-cell-6.txt du-cell-7.txt du-cell-8.txt cu-cp-cell-2.txt cu-cp-cell-3.txt cu-cp-cell-4.txt cu-cp-cell-5.txt cu-cp-cell-6.txt cu-cp-cell-7.txt cu-cp-cell-8.txt cu-up-cell-2.txt cu-up-cell-3.txt cu-up-cell-4.txt cu-up-cell-5.txt cu-up-cell-6.txt cu-up-cell-7.txt cu-up-cell-8.txt)
 
 fmt_hms() { local s=$1; printf '%dh%02dm' $((s/3600)) $(((s%3600)/60)); }

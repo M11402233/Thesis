@@ -8,6 +8,9 @@
         b  allowlist files: same line count and same non-delay fields; only the listed delay fields may differ.
         d  DlE2RlcStats_percell.txt: delaySumNs (cumulative) never smaller than D-30P; a row where it is larger must have
            D-30P cumulative nRxZeroDelay > 0 for that key.
+  q4  <p1_aux>                            Q-4（r11；規格 §6.1）：DlE2RlcStats{,Lte}_r11eff.txt 與同批 _percell 一致：每鍵每列 nRx 相同（r11eff 無之鍵其 percell nRx 須為 0）；
+                                          累計值不下降；nEff ≤ nData ≤ nRx；nNoTag、nEmpty ≤ nData；Σ判定 = nData；delaySumEff ≤ percell delaySum；
+                                          nPart ≤ nEff 且 delaySumPart ≤ delaySumEff；LTE（cell 1）之有效樣本與部分重疊須可報告（不設上限，只報告）。
   q2c <p1_analysis_main> <d30_analysis_main>   Q-2c: same rows; only columns 11-14 (delay, stdDev, min, max) may differ."""
 import os, sys, json, hashlib, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -20,6 +23,7 @@ RLC_DELAY = {  # file -> set of allowed differing 0-based tab columns (data rows
     "DlE2RlcStats_r9rx.txt": {6, 7}, "DlE2RlcStatsLte_r9rx.txt": {6, 7},
 }
 DU_ALLOWED = {"DRB.UEThpDl.UEID"}
+R11EFF = {"DlE2RlcStats_r11eff.txt", "DlE2RlcStatsLte_r11eff.txt", "DlE2PdcpStats_r11eff.txt", "DlE2PdcpStatsLte_r11eff.txt"}  # r11 新增（D-30P 無）；由 q4 驗證
 ALLOW = set(RLC_DELAY) | {"R7b_rlc_rx_tag_hist.txt"} | {f"du-cell-{c}.txt" for c in range(2, 9)}
 
 
@@ -31,6 +35,14 @@ def md5(p):
     return h.hexdigest()
 
 
+def lines1(d, n):
+    """C.lines 之修正版：bsState.txt 之掛鐘欄為第二欄（UNIX，ms），C.lines 去掉的是第一欄（舊檢查 P-2 因 D-30 無此檔而未暴露）。其餘同 C.lines。"""
+    if n != "bsState.txt":
+        return C.lines(d, n)
+    f = C.opn(d, n); L = f.read().split(b"\n"); f.close()
+    return [b" ".join(l.split()[:1] + l.split()[2:]) for l in L]
+
+
 def raw_lines(d, n):
     f = C.opn(d, n); L = f.read().decode().split("\n"); f.close(); return L
 
@@ -40,8 +52,11 @@ def q0(aux, ns3, tag):
     bad = []
     if "ZT_R7_S2=1 " not in m: bad.append("ZT_R7_S2")
     if f"ZT_R10_RETX_TAG={tag} " not in m: bad.append("ZT_R10_RETX_TAG")
-    want = {os.path.join(ns3, "build/scratch/ns3.38.rc1-scenario-three-optimized"), os.path.join(ns3, "src/lte/model/lte-rlc-am.cc")} | \
+    want = {os.path.join(ns3, "build/scratch/ns3.38.rc1-scenario-three-optimized"),
+            os.path.join(ns3, "src/lte/model/lte-rlc-am.cc"), os.path.join(ns3, "src/lte/model/lte-rlc-am.h"),
+            os.path.join(ns3, "src/lte/helper/mmwave-bearer-stats-calculator.cc"), os.path.join(ns3, "src/lte/helper/mmwave-bearer-stats-calculator.h")} | \
         {os.path.join(ns3, f"build/lib/libns3.38.rc1-{m}-optimized.so") for m in ("network", "lte", "mmwave")}   # 修補編入 lte 函式庫
+    if f"ns3_dir={ns3} " not in m: bad.append("ns3_dir")
     rec = {l.split()[1]: l.split()[0] for l in m.splitlines() if len(l.split()) == 2 and l.split()[1].startswith("/")}
     for p in want:
         if rec.get(p) != md5(p): bad.append(f"md5 {os.path.basename(p)}")
@@ -51,11 +66,15 @@ def q0(aux, ns3, tag):
 def q2(pa1, pa):
     res = {}; bad = []
     n1 = set(C.names(pa1)) - C.SKIP; n0 = set(C.names(pa)) - C.SKIP
+    only_r11 = {n for n in n1 if n in R11EFF or n.endswith("_r11eff.txt")}
+    res["r11eff_files_only_in_p1"] = sorted(only_r11)
+    if not {"DlE2RlcStats_r11eff.txt"} <= only_r11: bad.append("missing DlE2RlcStats_r11eff.txt")
+    n1 -= only_r11
     if n1 != n0:
         bad.append("file set"); res["only_in_p1"] = sorted(n1 - n0); res["only_in_p"] = sorted(n0 - n1)
     for n in sorted(n0 & n1):
         if n not in ALLOW:
-            ok = C.lines(pa1, n) == C.lines(pa, n); res[n] = "identical" if ok else "DIFF"
+            ok = lines1(pa1, n) == lines1(pa, n); res[n] = "identical" if ok else "DIFF"
             ok or bad.append(n); continue
         A = raw_lines(pa1, n); B = raw_lines(pa, n)
         if n == "R7b_rlc_rx_tag_hist.txt":                      # 區間數依設計會變（無時間戳之區間消失）；只比總數
@@ -97,6 +116,37 @@ def q2(pa1, pa):
     return {"check": "Q-2", "pass": not bad, "failed": bad, "files": res}
 
 
+def q4(pa1):
+    bad = []; res = {}
+    for stem in ("DlE2RlcStats", "DlE2RlcStatsLte"):
+        f = f"{stem}_r11eff.txt"
+        if f not in set(C.names(pa1)): bad.append(f"missing {f}"); continue
+        E = [l.split("\t") for l in raw_lines(pa1, f) if l and not l.startswith("%")]
+        P = {(r[0], r[2], r[3], r[4]): r for r in (l.split("\t") for l in raw_lines(pa1, f"{stem}_percell.txt") if l and not l.startswith("%"))}
+        n = nrx_mis = order = decsum = sumgt = partbad = mono = 0; last = {}; seen = set()
+        eff_tot = data_tot = part_tot = rx_tot = 0
+        for r in E:
+            k = (r[0], r[2], r[3], r[4]); seen.add(k)
+            v = [int(x) for x in r[5:]]                    # nRx nData nNoTag nEmpty nEff sumEff nPart sumPart dec×7
+            nRx, nData, nNo, nEmp, nEff, sEff, nPart, sPart = v[:8]; dec = v[8:15]; n += 1
+            pr = P.get(k)
+            if pr is None or int(pr[7]) != nRx: nrx_mis += 1
+            if not (nEff <= nData <= nRx and nNo <= nData and nEmp <= nData): order += 1
+            if sum(dec) != nData: decsum += 1
+            if pr is not None and sEff > int(pr[9]): sumgt += 1
+            if not (nPart <= nEff and sPart <= sEff): partbad += 1
+            kk = k[1:]
+            if kk in last and any(a < b for a, b in zip(v, last[kk])): mono += 1
+            last[kk] = v
+        extra = sum(1 for k, r in P.items() if k not in seen and int(r[7]) != 0)       # percell 有接收而 r11eff 無列
+        fin = list(last.values()); eff_tot = sum(x[4] for x in fin); data_tot = sum(x[1] for x in fin); rx_tot = sum(x[0] for x in fin); part_tot = sum(x[6] for x in fin)
+        res[stem] = {"rows": n, "nRx_mismatch": nrx_mis, "percell_rx_rows_without_r11eff": extra, "order_violation": order,
+                     "dec_sum_ne_nData": decsum, "sumEff_gt_sum": sumgt, "partial_violation": partbad, "non_monotone": mono,
+                     "final": {"nRx": rx_tot, "nData": data_tot, "nEff": eff_tot, "nPartial": part_tot}}
+        if nrx_mis or extra or order or decsum or sumgt or partbad or mono or n == 0: bad.append(stem)
+    return {"check": "Q-4", "pass": not bad, "failed": bad, "files": res}
+
+
 def q2c(m1, m0):
     A = open(m1).read().split("\n"); B = open(m0).read().split("\n")
     if len(A) != len(B): return {"check": "Q-2c", "pass": False, "failed": [f"lines {len(A)} vs {len(B)}"]}
@@ -112,5 +162,5 @@ def q2c(m1, m0):
 
 if __name__ == "__main__":
     cmd = sys.argv[1]
-    r = {"q0": lambda: q0(*sys.argv[2:5]), "q2": lambda: q2(*sys.argv[2:4]), "q2c": lambda: q2c(*sys.argv[2:4])}[cmd]()
+    r = {"q0": lambda: q0(*sys.argv[2:5]), "q2": lambda: q2(*sys.argv[2:4]), "q4": lambda: q4(sys.argv[2]), "q2c": lambda: q2c(*sys.argv[2:4])}[cmd]()
     print(json.dumps(r, indent=1, ensure_ascii=False)); sys.exit(0 if r["pass"] else 1)
