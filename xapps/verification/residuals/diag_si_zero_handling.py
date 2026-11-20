@@ -92,9 +92,9 @@ def measurement(pc, z):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default=os.path.join(DS.ROOT, "results", "d30p_diag_zero"))
+    ap.add_argument("--out", default=os.path.join(DS.ROOT, "results", f"{DS.NAME}_diag_zero"))
     a = ap.parse_args()
-    if DS.NAME != "d30p":
+    if DS.NAME not in DS.PHASE2:
         raise SystemExit("只適用 ZT_DATASET=d30p")
     os.makedirs(a.out, exist_ok=True)
     files = sorted(glob.glob(os.path.join(DS.DATA_DIR, DS.PATTERN)))
@@ -121,7 +121,7 @@ def main():
             for sm in smp[v][ts].values():
                 acc.append((ts, P.rate(P.flags_from_z(P.z_spatial(sm, sm.own, S[v][ts])), P.own_set(sm, "spatial"))))
         got = P.agg_seed([(sd, x) for sd, x in acc if x is not None])["mean"]
-        ref = json.load(open(os.path.join(DS.ROOT, "results", f"d30p_delay_{v}", "E9_operating_regime_rt.json"),
+        ref = json.load(open(os.path.join(DS.ROOT, "results", f"{DS.NAME}_delay_{v}", "E9_operating_regime_rt.json"),
                              encoding="utf-8"))["own"]["spatial"]["clean_fpr"]["mean"]
         print(f"D2 {v}：空間乾淨誤報 {got:.6f}（步 2：{ref:.6f}）")
         if got != ref:

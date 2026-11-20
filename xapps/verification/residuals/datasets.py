@@ -39,7 +39,14 @@ REGISTRY = {
              "ues": None, "raw_dir": os.path.join(ROOT, "ues30_p_r9g13_seeds"),
              "aux_dir": os.path.join(ROOT, "ues30_p_r9g13_seeds"), "aux_fmt": "D30P_ues30_t300_seed{seed}_aux",
              "results": os.path.join(ROOT, "results", "d30p"), "max_window": 300, "percell": True},
+    # D-30P1（D30P1_r10_recollection_spec.md；r10 模式 1 ＋ S2）：延遲欄依設計與 D-30／D-30P 不同，故主檔用自身截斷版
+    # （prepare_d30.py，ZT_DATASET=d30p1），非延遲欄與 D-30 之一致性由 Q-2c 另行核對。
+    "d30p1": {"dir": os.path.join(ROOT, "ues30_p_r10_seeds", "analysis"), "pattern": "D30P1_ues30_t300_seed*.txt",
+              "n_known": 30, "ues": None, "raw_dir": os.path.join(ROOT, "ues30_p_r10_seeds"),
+              "aux_dir": os.path.join(ROOT, "ues30_p_r10_seeds"), "aux_fmt": "D30P1_ues30_t300_seed{seed}_aux",
+              "results": os.path.join(ROOT, "results", "d30p1"), "max_window": 300, "percell": True},
 }
+PHASE2 = ("d30p", "d30p1")          # 第二階段（逐 cell 輸入）資料集
 
 NAME = os.environ.get("ZT_DATASET", "dsh")
 if NAME not in REGISTRY:

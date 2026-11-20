@@ -26,8 +26,9 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "residuals"))
 _DSN = os.environ.get("ZT_DATASET")
-if _DSN not in ("d30", "d30p") or os.environ.get("ZT_FUSION_ORDER") != "severity" or \
-        (_DSN == "d30p") != os.environ.get("ZT_DELAY_SOURCE", "cumulative").startswith("percell"):
+PHASE2 = ("d30p", "d30p1")                                    # 第二階段資料集（與 datasets.PHASE2 相同）
+if _DSN not in ("d30",) + PHASE2 or os.environ.get("ZT_FUSION_ORDER") != "severity" or \
+        (_DSN in PHASE2) != os.environ.get("ZT_DELAY_SOURCE", "cumulative").startswith("percell"):
     raise SystemExit("E19／E30 環境須在 ZT_FUSION_ORDER=severity 且 ZT_DATASET=d30（累計）或 d30p（ZT_DELAY_SOURCE=percell*）下執行")
 import zt_kpm_xapp as X                                   # noqa: E402
 import datasets as DS                                     # noqa: E402
@@ -88,7 +89,7 @@ class SeedData:
         assert [w for w, _ in self.windows] == list(range(len(self.windows)))
         self.n = len(self.windows)
         self.ci_lists = None
-        if _DSN == "d30p":                                # 第二階段 C_i (A)：RRC 名單（與 TraceReplaySource 相同來源）
+        if _DSN in PHASE2:                               # 第二階段 C_i (A)：RRC 名單（與 TraceReplaySource 相同來源）
             import interval_source as _IS
             self.ci_lists = _IS.ci_lists(path)
         ann = X.run_xapp(self._src(), self.anchor, "all", binding="uebound", admission="strict")[0]

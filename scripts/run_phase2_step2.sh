@@ -10,11 +10,14 @@ set -u
 VARIANT="${VARIANT:?VARIANT=percell|percell_zero}"
 case "$VARIANT" in percell|percell_zero) ;; *) echo "VARIANT 不合法"; exit 2 ;; esac
 REPO=~/oran-zt-kpm-verification; CODE="${CODE:-$HOME/zt_dev/phase2/residuals}"; PY="${PY:-$HOME/venvs/drl/bin/python}"
-P0=$REPO/data/results/phase2/D30P_g13_phase0
-export ZT_DATASET=d30p ZT_DELAY_SOURCE=$VARIANT ZT_FUSION_ORDER=severity MPLBACKEND=Agg OMP_NUM_THREADS=4
+# D30P1_r10_recollection_spec.md F5：DATASET=d30p（預設，行為不變）｜d30p1
+DATASET="${DATASET:-d30p}"
+case "$DATASET" in d30p) P0=$REPO/data/results/phase2/D30P_g13_phase0; GK="P2 P3" ;;
+                  d30p1) P0=$REPO/data/results/phase2/D30P1_phase0; GK="Q0 Q2 Q2C P3" ;; *) echo "DATASET 不合法"; exit 2 ;; esac
+export ZT_DATASET=$DATASET ZT_DELAY_SOURCE=$VARIANT ZT_FUSION_ORDER=severity MPLBACKEND=Agg OMP_NUM_THREADS=4
 unset ZT_RESULTS_DIR
-OUT=$REPO/data/results/d30p_delay_$VARIANT; L=$OUT/_pipeline_logs; mkdir -p $L; ST=$L/status.txt
-echo "# step2 VARIANT=$VARIANT 開始 $(date -u '+%F %T') UTC host=$(hostname) code=$CODE code_md5=$(cd $CODE && find . -name '*.py' -not -path '*/__pycache__/*' | sort | xargs md5sum | md5sum | cut -c1-12)" > $ST
+OUT=$REPO/data/results/${DATASET}_delay_$VARIANT; L=$OUT/_pipeline_logs; mkdir -p $L; ST=$L/status.txt
+echo "# step2 DATASET=$DATASET VARIANT=$VARIANT 開始 $(date -u '+%F %T') UTC host=$(hostname) code=$CODE code_md5=$(cd $CODE && find . -name '*.py' -not -path '*/__pycache__/*' | sort | xargs md5sum | md5sum | cut -c1-12)" > $ST
 [ -n "${ZT_CODE_COMMIT:-}" ] && echo "# code = repo commit $ZT_CODE_COMMIT（鏡像）" >> $ST
 stop() { echo "STOPPED: $1 $(date -u '+%F %T') UTC" >> $ST; exit 1; }
 run() { n=$1; shift; s=$(date +%s); (cd $CODE && nice -n 10 $PY "$@") > $L/$n.log 2>&1; rc=$?
@@ -22,10 +25,10 @@ run() { n=$1; shift; s=$(date +%s); (cd $CODE && nice -n 10 $PY "$@") > $L/$n.lo
 
 # ---- 閘門：第零階段與新輸入層 ----
 [ -e $P0/DONE ] || stop "第零階段未完成"
-$PY - $P0 >> $ST <<'PY' || stop "第零階段 P-2／P-3 未全數通過"
+$PY - $P0 $GK >> $ST <<'PY' || stop "第零階段檢查（$GK）未全數通過"
 import json, glob, sys
 d = sys.argv[1]; r = {}
-for p in ("P2", "P3"):
+for p in sys.argv[2:]:
     fs = sorted(glob.glob(f"{d}/{p}_42*.json")); r[p] = [json.load(open(f))["pass"] for f in fs]
 print("GATE phase0", {k: f"{sum(v)}/{len(v)}" for k, v in r.items()})
 sys.exit(0 if all(len(v) == 8 and all(v) for v in r.values()) else 1)

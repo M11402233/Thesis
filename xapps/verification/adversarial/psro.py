@@ -25,9 +25,10 @@ import numpy as np
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 _DSN = os.environ.get("ZT_DATASET")
-if _DSN == "d30p":                                           # 第二階段（E30 §8）：D-30P，G4 對步 4–5 之輸出
-    OUT_BASE = os.path.join(ROOT, "data", "results", "d30p", "drl", "psro")
-    SEV = os.path.join(ROOT, "data", "results", "d30p_delay_" + os.environ.get("ZT_DELAY_SOURCE", ""))
+PHASE2 = ("d30p", "d30p1")                                    # 第二階段資料集（與 datasets.PHASE2 相同）
+if _DSN in PHASE2:                                           # 第二階段（E30 §8）：D-30P／D-30P1，G4 對步 4–5 之輸出
+    OUT_BASE = os.path.join(ROOT, "data", "results", _DSN, "drl", "psro")
+    SEV = os.path.join(ROOT, "data", "results", _DSN + "_delay_" + os.environ.get("ZT_DELAY_SOURCE", ""))
 else:
     OUT_BASE = os.path.join(ROOT, "data", "results", "d30", "drl", "psro")
     SEV = os.path.join(ROOT, "data", "results", "d30_fusion_order", "severity")
@@ -302,7 +303,7 @@ class PSRO:
             if abs(got - exp) > 1e-12:
                 bad.append(a["name"])
         # 乾淨（無攻擊）：D0 之誤拒須為 159／15,534（4.9.6）；D-30P：= 步 4 之 xApp 註記（E30 C-2）
-        if _DSN == "d30p":
+        if _DSN in PHASE2:
             ann = [json.loads(l) for l in open(os.path.join(SEV, "xapp_trust_annotations_bound_all_uebound_strict_severity.jsonl"))]
             exp_clean = (sum(x["decision"] == "rejected" for x in ann), len(ann))
         else:
@@ -410,7 +411,7 @@ def main():
     ap.add_argument("--det-mode", choices=["F", "T", "TL"], default="F",
                     help="偵測端最佳回應之型態：F＝E19 之 V-escalate；T／TL＝E30 §2 動態門檻（須 --payoff-split train）")
     args = ap.parse_args()
-    if _DSN not in ("d30", "d30p") or os.environ.get("ZT_FUSION_ORDER") != "severity":
+    if _DSN not in ("d30",) + PHASE2 or os.environ.get("ZT_FUSION_ORDER") != "severity":
         raise SystemExit("須在 ZT_DATASET=d30／d30p 與 ZT_FUSION_ORDER=severity 下執行")
     if args.det_mode != "F" and args.payoff_split != "train":
         raise SystemExit("--det-mode T／TL 屬 E30，須 --payoff-split train")

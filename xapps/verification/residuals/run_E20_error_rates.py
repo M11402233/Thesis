@@ -27,7 +27,7 @@ import argparse
 import collections
 import numpy as np
 
-if os.environ.get("ZT_DATASET") not in ("d30", "d30p") or os.environ.get("ZT_FUSION_ORDER") != "severity":
+if os.environ.get("ZT_DATASET") not in ("d30", "d30p", "d30p1") or os.environ.get("ZT_FUSION_ORDER") != "severity":
     raise SystemExit("E20 須在 ZT_DATASET=d30 與 ZT_FUSION_ORDER=severity 下執行")
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -41,7 +41,7 @@ X.FUSION_MODE = "bound"
 assert X.FUSION_ORDER == "severity" and X.D1_BINDING == "uebound"
 
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
-SEV_DIR = (DS.results_dir() if DS.NAME == "d30p"            # 第二階段：參照＝同資料集之 severity xApp 輸出（步 4）
+SEV_DIR = (DS.results_dir() if DS.NAME in DS.PHASE2            # 第二階段：參照＝同資料集之 severity xApp 輸出（步 4）
            else os.path.join(REPO, "data", "results", "d30_fusion_order", "severity"))
 REF_ANN = os.path.join(SEV_DIR, "xapp_trust_annotations_bound_all_uebound_strict_severity.jsonl")
 RQ3_JSON = os.path.join(SEV_DIR, "RQ3_decision_replay.json")

@@ -13,6 +13,7 @@ n = 'lte/model/lte-rlc-am.cc'; s = rd(n); assert 'R10RetxTagMode' in s and 'R10T
 s = once(s, '#include <cstdlib>\n', '#include <cstdlib>\n#include <fstream>\n')
 s = once(s, 'static int\nR10RetxTagMode()',
  'static std::ofstream*\nR10Trace()\n{\n    static std::ofstream* f = std::getenv("ZT_R10_TRACE") ? new std::ofstream("R10_trace.txt") : nullptr;\n    return f;\n}\n\n'
+ 'int64_t g_r10RxTagT = -1;\nint g_r10RxSn = -1, g_r10RxSeg = -1, g_r10RxSegOff = -1;\n\n'
  'static int\nR10RetxTagMode()')
 # TX new
 s = once(s, '        packet->AddByteTag(rlcTag);\n    }\n    m_txPdu(m_rnti, m_lcid, packet->GetSize());\n',
@@ -20,14 +21,14 @@ s = once(s, '        packet->AddByteTag(rlcTag);\n    }\n    m_txPdu(m_rnti, m_l
  '    if (auto* tf = R10Trace())\n    {\n        RlcTag q;\n        bool has = packet->FindFirstMatchingByteTag(q);\n'
  '        *tf << "T\\t" << Simulator::Now().GetNanoSeconds() << "\\t" << m_rnti << "\\t" << (uint32_t)m_lcid << "\\tN\\t"\n'
  '            << rlcAmHeader.GetSequenceNumber().GetValue() << "\\t" << packet->GetSize() << "\\t" << has << "\\t"\n'
- '            << (has ? q.GetSenderTimestamp().GetNanoSeconds() : -1) << "\\t" << packet->GetUid() << "\\n";\n    }\n'
+ '            << (has ? q.GetSenderTimestamp().GetNanoSeconds() : -1) << "\\t" << packet->GetUid() << "\\t" << m_imsi << "\\n";\n    }\n'
  '    m_txPdu(m_rnti, m_lcid, packet->GetSize());\n')
 # TX retx whole
 s = once(s, '                    m_macSapProvider->TransmitPdu(params);\n\n                    m_retxBuffer.at(seqNumberValue).m_retxCount++;\n',
  '                    if (auto* tf = R10Trace())\n                    {\n                        RlcTag q;\n                        bool has = packet->FindFirstMatchingByteTag(q);\n'
  '                        *tf << "T\\t" << Simulator::Now().GetNanoSeconds() << "\\t" << m_rnti << "\\t" << (uint32_t)m_lcid << "\\tR\\t"\n'
  '                            << seqNumberValue << "\\t" << packet->GetSize() << "\\t" << has << "\\t"\n'
- '                            << (has ? q.GetSenderTimestamp().GetNanoSeconds() : -1) << "\\t" << packet->GetUid() << "\\n";\n                    }\n'
+ '                            << (has ? q.GetSenderTimestamp().GetNanoSeconds() : -1) << "\\t" << packet->GetUid() << "\\t" << m_imsi << "\\n";\n                    }\n'
  '                    m_macSapProvider->TransmitPdu(params);\n\n                    m_retxBuffer.at(seqNumberValue).m_retxCount++;\n')
 # TX retx first segment
 s = once(s, '                    nextSeg->AddHeader(nextSegHdr);\n',
@@ -35,10 +36,18 @@ s = once(s, '                    nextSeg->AddHeader(nextSegHdr);\n',
  '                    if (auto* tf = R10Trace())\n                    {\n                        RlcTag q;\n                        bool has = firstSeg->FindFirstMatchingByteTag(q);\n'
  '                        *tf << "T\\t" << Simulator::Now().GetNanoSeconds() << "\\t" << m_rnti << "\\t" << (uint32_t)m_lcid << "\\tS\\t"\n'
  '                            << seqNumberValue << "\\t" << firstSeg->GetSize() << "\\t" << has << "\\t"\n'
- '                            << (has ? q.GetSenderTimestamp().GetNanoSeconds() : -1) << "\\t" << firstSeg->GetUid() << "\\n";\n                    }\n')
+ '                            << (has ? q.GetSenderTimestamp().GetNanoSeconds() : -1) << "\\t" << firstSeg->GetUid() << "\\t" << m_imsi << "\\n";\n                    }\n')
+# RX (calculator-level, with cell / IMSI): globals valid only during m_rxPdu
+s = once(s, '    g_r9RlcRxTagFound = r7bFound ? 1 : 0; // R9 O-4 (read-only)\n',
+ '    if (R10Trace())\n    {\n        LteRlcAmHeader r10g;\n        rxPduParams.p->PeekHeader(r10g);\n'
+ '        g_r10RxTagT = r7bFound ? rlcTag.GetSenderTimestamp().GetNanoSeconds() : -1;\n'
+ '        g_r10RxSn = r10g.IsDataPdu() ? (int)r10g.GetSequenceNumber().GetValue() : -1;\n'
+ '        g_r10RxSeg = r10g.IsDataPdu() ? (int)r10g.GetResegmentationFlag() : -1;\n'
+ '        g_r10RxSegOff = r10g.IsDataPdu() ? (int)r10g.GetSegmentOffset() : -1;\n    }\n'
+ '    g_r9RlcRxTagFound = r7bFound ? 1 : 0; // R9 O-4 (read-only)\n')
 # RX
 s = once(s, '    g_r9RlcRxTagFound = -1; // R9 O-4\n',
- '    g_r9RlcRxTagFound = -1; // R9 O-4\n'
+ '    g_r9RlcRxTagFound = -1; // R9 O-4\n    g_r10RxTagT = -1; g_r10RxSn = g_r10RxSeg = g_r10RxSegOff = -1;\n'
  '    if (auto* tf = R10Trace())\n    {\n        LteRlcAmHeader r10h;\n        rxPduParams.p->PeekHeader(r10h);\n        bool isData = r10h.IsDataPdu();\n'
  '        *tf << "R\\t" << Simulator::Now().GetNanoSeconds() << "\\t" << m_rnti << "\\t" << (uint32_t)m_lcid << "\\t"\n'
  '            << rxPduParams.p->GetSize() << "\\t" << r7bFound << "\\t" << (r7bFound ? rlcTag.GetSenderTimestamp().GetNanoSeconds() : -1)\n'
@@ -46,4 +55,18 @@ s = once(s, '    g_r9RlcRxTagFound = -1; // R9 O-4\n',
  '            << (isData ? (int)r10h.GetSequenceNumber().GetValue() : -1) << "\\t"\n'
  '            << (isData ? (int)r10h.GetResegmentationFlag() : -1) << "\\t" << (isData ? (int)r10h.GetLastSegmentFlag() : -1) << "\\t"\n'
  '            << (isData ? (int)r10h.GetSegmentOffset() : -1) << "\\t" << rxPduParams.p->GetUid() << "\\n";\n    }\n')
+wr(n, s)
+n = 'lte/helper/mmwave-bearer-stats-calculator.cc'; s = rd(n)
+s = once(s, 'extern int g_r9RlcRxTagFound; // R9 O-4 (defined in lte-rlc-am.cc)\n',
+ 'extern int g_r9RlcRxTagFound; // R9 O-4 (defined in lte-rlc-am.cc)\n'
+ 'extern int64_t g_r10RxTagT; // R10 trace (defined in lte-rlc-am.cc)\nextern int g_r10RxSn, g_r10RxSeg, g_r10RxSegOff;\n'
+ 'static std::ofstream*\nR10CalcTrace()\n{\n    static std::ofstream* f = std::getenv("ZT_R10_TRACE") ? new std::ofstream("R10_trace_calc.txt") : nullptr;\n    return f;\n}\n')
+s = once(s, '              if (g_r9RlcRxTagFound == 0) a.nNoTag++; else if (g_r9RlcRxTagFound < 0) a.nUnknown++; } // R9 O-4\n',
+ '              if (g_r9RlcRxTagFound == 0) a.nNoTag++; else if (g_r9RlcRxTagFound < 0) a.nUnknown++; } // R9 O-4\n'
+ '            if (auto* tf = R10CalcTrace())\n            {\n'
+ '                *tf << "C\\t" << this << "\\t" << Simulator::Now().GetNanoSeconds() << "\\t" << cellId << "\\t" << imsi << "\\t" << rnti\n'
+ '                    << "\\t" << (uint32_t)lcid << "\\t" << packetSize << "\\t" << delay << "\\t" << g_r9RlcRxTagFound << "\\t" << g_r10RxTagT\n'
+ '                    << "\\t" << g_r10RxSn << "\\t" << g_r10RxSeg << "\\t" << g_r10RxSegOff << "\\n";\n            }\n')
+if '#include <fstream>' not in s:
+    s = once(s, '#include <algorithm>\n', '#include <algorithm>\n#include <cstdlib>\n#include <fstream>\n')
 wr(n, s); print("r10 trace patch applied")

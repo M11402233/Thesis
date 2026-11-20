@@ -9,9 +9,11 @@ set -uo pipefail
 
 NS3_DIR="${NS3_DIR:-${HOME}/ns-3-mmwave-oran-r9}"
 export ZT_R7_S2=1
-VARIANT=D30P; N_KNOWN=30                    # D-30P：D-30 之命令列，r9 ＋ S2
+# D-30P1（D30P1_r10_recollection_spec.md F1）：r10 必須明設 ZT_R10_RETX_TAG，並寫入 meta
+case "$(basename "${NS3_DIR}")" in *r10*) [ -n "${ZT_R10_RETX_TAG:-}" ] || { echo "r10 須設定 ZT_R10_RETX_TAG"; exit 2; }; export ZT_R10_RETX_TAG ;; esac
+VARIANT=${VARIANT:-D30P}; N_KNOWN=30                    # D-30P：D-30 之命令列，r9 ＋ S2
 OUT_DIR="${OUT_DIR:-${HOME}/oran-zt-kpm-verification/data/ues30_p_r9_seeds}"
-case "$(realpath -m "${OUT_DIR}")" in */data/ues30_seeds|*/data/ues30_seeds/*|*/data/ues30_ho_seeds|*/data/ues30_ho_seeds/*|*/data/ues30_ho_r8*_seeds|*/data/ues30_ho_r8*_seeds/*|*/data/game_stage3*|*/data/si_lstm_seeds*|*/data/batchFinal_seeds*) echo "拒絕寫入既有資料目錄"; exit 2 ;; esac
+case "$(realpath -m "${OUT_DIR}")" in */data/ues30_seeds|*/data/ues30_seeds/*|*/data/ues30_ho_seeds|*/data/ues30_ho_seeds/*|*/data/ues30_ho_r8*_seeds|*/data/ues30_ho_r8*_seeds/*|*/data/game_stage3*|*/data/si_lstm_seeds*|*/data/batchFinal_seeds*|*/data/ues30_p_r9_seeds|*/data/ues30_p_r9_seeds/*|*/data/ues30_p_r9g13_seeds|*/data/ues30_p_r9g13_seeds/*) echo "拒絕寫入既有資料目錄"; exit 2 ;; esac
 mkdir -p "${OUT_DIR}"
 
 CONFIG=1
@@ -99,7 +101,7 @@ for SEED in "${SEEDS[@]}"; do
   cp "${wd}/DlE2RlcStats.txt" "${main_out}"
   for f in "${KEEP_PLAIN[@]}"; do [ -e "${wd}/${f}" ] && cp "${wd}/${f}" "${aux}/${f}"; done
   for f in "${wd}"/*.txt; do b=$(basename "$f"); [ -e "${aux}/${b}" ] || gzip -c "$f" > "${aux}/${b}.gz"; done
-  { echo "ZT_R7_S2=${ZT_R7_S2} ns3_dir=${NS3_DIR} host=$(hostname) end=$(date '+%F %T')"; md5sum "${BIN}" "${NS3_DIR}"/build/lib/libns3.38.rc1-{network,lte,mmwave}-*.so "${NS3_DIR}"/src/lte/model/{lte-rlc-am.cc,lte-rlc-am.h,lte-enb-rrc.cc,lte-enb-rrc.h,lte-enb-net-device.cc,mc-enb-pdcp.cc,mc-enb-pdcp.h} "${NS3_DIR}"/src/lte/helper/mmwave-bearer-stats-calculator.{cc,h} "${NS3_DIR}"/src/mmwave/model/mmwave-enb-net-device.cc "${NS3_DIR}"/scratch/scenario-three.cc; } > "${aux}/meta.txt"
+  { echo "ZT_R7_S2=${ZT_R7_S2} ZT_R10_RETX_TAG=${ZT_R10_RETX_TAG:-unset} ns3_dir=${NS3_DIR} host=$(hostname) end=$(date '+%F %T')"; md5sum "${BIN}" "${NS3_DIR}"/build/lib/libns3.38.rc1-{network,lte,mmwave}-*.so "${NS3_DIR}"/src/lte/model/{lte-rlc-am.cc,lte-rlc-am.h,lte-enb-rrc.cc,lte-enb-rrc.h,lte-enb-net-device.cc,mc-enb-pdcp.cc,mc-enb-pdcp.h} "${NS3_DIR}"/src/lte/helper/mmwave-bearer-stats-calculator.{cc,h} "${NS3_DIR}"/src/mmwave/model/mmwave-enb-net-device.cc "${NS3_DIR}"/scratch/scenario-three.cc; } > "${aux}/meta.txt"
   cp "${wd}/run.log" "${aux}/run.log" 2>/dev/null
   echo "  完成 [${tag}]（耗時 $(fmt_hms ${el})，exit=${ec}）RLC $(wc -l < "${main_out}") 行"
 

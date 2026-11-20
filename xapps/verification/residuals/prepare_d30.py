@@ -34,7 +34,7 @@ def sha(p):
 
 
 def main():
-    cfg = DS.REGISTRY["d30"]
+    cfg = DS.CFG                       # 預設 ZT_DATASET=d30（行為不變）；d30p1 亦適用
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=cfg["raw_dir"])
     ap.add_argument("--dst", default=cfg["dir"])
