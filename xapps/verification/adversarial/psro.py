@@ -180,7 +180,23 @@ def summarize(tot):
     g = lambda a, b: (tot.get(a, 0) / tot[b]) if tot.get(b) else None
     return {"u_det": g(*DET_KEYS), "u_atk": g("atk_R", "atk_n"), "TPR_rejected": g("tam_rej", "tam_n"),
             "TPR_nontrusted": g("tam_nontrust", "tam_n"), "clean_false_reject": g("clean_rej", "clean_n"), "clean_nontrusted": g("clean_nontrust", "clean_n"),
-            "lure_rate_C_strict": g("lure", "lure_opp"), "behaviour": behaviour(tot), "counts": tot}
+            "lure_rate_C_strict": g("lure", "lure_opp"), "behaviour": behaviour(tot),
+            "decisions": decision_report(tot), "u_det_keys": list(DET_KEYS), "counts": tot}
+
+
+def decision_report(tot):
+    """審查意見 2：不只看分數，另報 abstain 比例、乾淨資料被擋比例、無法做決策比例（對全部 (節點, 秒)）"""
+    g = lambda a, b: (a / b) if b else None
+    cl = {d: tot.get(f"dc_clean_{d}", 0) for d in ("trusted", "low-trust", "rejected", "abstain")}
+    tm = {d: tot.get(f"dc_tam_{d}", 0) for d in cl}
+    nc, nt = sum(cl.values()), sum(tm.values())
+    nall = nc + nt
+    return {"clean": {"n": nc, **{d: g(v, nc) for d, v in cl.items()},
+                      "not_admitted": g(nc - cl["trusted"], nc)},          # C_strict 下被擋（= 1 − 可用率）
+            "tampered": {"n": nt, **{d: g(v, nt) for d, v in tm.items()}},
+            "abstain_share_all": g(cl["abstain"] + tm["abstain"], nall),
+            "si_unavailable_share_all": g(tot.get("si_unavail", 0), nall),
+            "floor": {k[6:]: g(v, nall) for k, v in tot.items() if k.startswith("floor_")}}
 
 
 def behaviour(tot):
@@ -404,7 +420,7 @@ def main():
             "hyperparameters": HP, "br_max": args.br_max, "br_every": args.br_every, "smoke": args.smoke, "stop_rule": f"NashConv <= {REL_STOP} x round-1 NashConv", "max_rounds": args.max_rounds, "payoff_split": args.payoff_split, "det_mode": args.det_mode,
             "dataset": _DSN, "delay_source": os.environ.get("ZT_DELAY_SOURCE", "cumulative")}
     global FOLDS, OUT_BASE, DET_KEYS
-    if args.det_mode != "F":
+    if args.payoff_split == "train":                        # E30 之 F、T、TL 一律以全部 (節點, 秒) 為 u_det 分母（審查意見 1）
         DET_KEYS = ("det_R_all", "det_n_all")
     if args.smoke:
         FOLDS, OUT_BASE = [0], OUT_BASE + "_smoke"

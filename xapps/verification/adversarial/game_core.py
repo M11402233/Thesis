@@ -325,7 +325,15 @@ class Episode:
             if j in self.pending:                         # 偵測端之一步（下限為 trusted／low-trust）
                 s["det_R"] += self.det_reward(j, dec); s["det_n"] += 1
             # E30 T／TL 之 u_det：全部 (節點, 秒)（規則決定者亦計，使 F 與 T／TL 同分母可比）；F 之 det_R／det_n 不變
-            s["det_R_all"] += self.det_reward(j, dec); s["det_n_all"] += 1
+            r_all = self.det_reward(j, dec)
+            s["det_R_all"] += r_all; s["det_n_all"] += 1
+            # 審查意見（2026-11-20）：決策類別計數與 reward 分項，使 abstain 之 reward 假設可離線重算、並檢查「少做事」
+            grp = "tam" if self.is_tampered(j) else "clean"
+            s[f"dc_{grp}_{dec}"] += 1
+            if grp == "tam" and dec == "trusted":
+                s["R_tam_trusted"] += r_all                    # 竄改且判 trusted：steering 成本項（不可由計數推得）
+            s["si_unavail"] += self.info[j]["si"] == "unavailable"
+            s["floor_" + self.floor[j][0].replace("-", "_")] += 1
             if self.is_tampered(j):
                 s["tam_n"] += 1; s["tam_rej"] += dec == "rejected"; s["tam_nontrust"] += dec != "trusted"
             else:
