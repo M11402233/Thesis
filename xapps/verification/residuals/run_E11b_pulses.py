@@ -43,7 +43,7 @@ def inject_pulses(windows, target, k0, g):
             break
         c = out[k][1]
         if target in c and c[target]:
-            c[target][E.FAKE_IMSI] = sum(c[target].values()) / len(c[target])
+            c[target][E.FAKE_IMSI] = E._IS.mean_valid(c[target])
             pulses.append(k)
         else:
             missed.append(k)

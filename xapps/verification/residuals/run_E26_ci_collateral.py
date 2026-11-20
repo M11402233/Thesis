@@ -13,6 +13,8 @@ import json
 import time
 import collections
 import numpy as np
+import interval_source as _IS                    # 第二階段：延遲缺值（None）輔助
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -35,7 +37,7 @@ def inflate(wins, j, t0, k):
             nmod.append(0)
             continue
         c2 = {c: dict(u) for c, u in cells.items()}
-        m = float(np.mean(list(cells[j].values())))
+        m = float(np.mean(_IS.valid_vals(cells[j])))
         for f in range(9001, 9001 + k):
             c2[j][f] = m
         out[t] = (w, c2)

@@ -30,12 +30,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import run_E10_D1_policy_ablation as E10
 import planB_rt as P
 import datasets as DS
+import interval_source as _IS                    # 第二階段：延遲缺值（None）輔助
+
 X = E10.X
 
 OUT_DIR = DS.results_dir()
+_SFX = "_severity" if os.environ.get("ZT_FUSION_ORDER") == "severity" else ""   # 第二階段（severity 序）之 xApp 輸出檔名多此後綴
 RUNTIME_ANN = (os.path.join(OUT_DIR, "runtime_20261006", "xapp_trust_annotations_bound_all_uebound_strict.jsonl")
                if DS.is_reference() else
-               os.path.join(OUT_DIR, "xapp_trust_annotations_bound_all_uebound_strict.jsonl"))   # 非 D-SH：須先跑 xApp
+               os.path.join(OUT_DIR, f"xapp_trust_annotations_bound_all_uebound_strict{_SFX}.jsonl"))   # 非 D-SH：須先跑 xApp
 T_LIST = [10, 30]
 TRACK = 60
 FAKE_IMSI = 9001
@@ -66,7 +69,7 @@ def inject(windows, kind, target, k0, T, mean):
         for k in ks:
             c = out[k][1]
             if target in c:
-                c[target][FAKE_IMSI] = float(np.mean(list(c[target].values())))
+                c[target][FAKE_IMSI] = float(np.mean(_IS.valid_vals(c[target])))
     elif kind == "Ci_deflate":
         ues = ue_on(out[k0][1], target)
         if not ues:
@@ -163,8 +166,8 @@ def trace(windows, anchor, n_known):
             if len(peers) < X.MIN_PEER:
                 si, z = "unavailable", None
             else:
-                tgt = float(np.mean(list(cells[j].values())))
-                ref = float(np.median([np.mean(list(cells[c].values())) for c in peers]))
+                tgt = float(np.mean(_IS.valid_vals(cells[j])))
+                ref = float(np.median([np.mean(_IS.valid_vals(cells[c])) for c in peers]))
                 z = abs(tgt - ref) / anchor.scale
                 si = "violated" if z > X.TAU_S else "normal"
             mine = {i: lv for i, lv in lev.items() if last_srv.get(i) == j}

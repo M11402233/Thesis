@@ -27,7 +27,7 @@ import argparse
 import collections
 import numpy as np
 
-if os.environ.get("ZT_DATASET") != "d30" or os.environ.get("ZT_FUSION_ORDER") != "severity":
+if os.environ.get("ZT_DATASET") not in ("d30", "d30p") or os.environ.get("ZT_FUSION_ORDER") != "severity":
     raise SystemExit("E20 須在 ZT_DATASET=d30 與 ZT_FUSION_ORDER=severity 下執行")
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)

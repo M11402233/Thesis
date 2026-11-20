@@ -138,8 +138,9 @@ def true_delays(windows):
     """每窗每 cell 之真實平均延遲（ms）"""
     out = []
     for w, cells in windows:
-        out.append({c: float(np.mean(list(v.values())))
-                    for c, v in cells.items() if c != X.LTE_CELL and v})
+        import interval_source as _IS
+        out.append({c: float(np.mean(_IS.valid_vals(v)))
+                    for c, v in cells.items() if c != X.LTE_CELL and _IS.valid_vals(v)})
     return out
 
 
@@ -154,7 +155,8 @@ def apply_attack(windows, atk_cell, kind, param, t0):
             continue
         f = param if kind == "step" else max(0.05, 1.0 - param * (k - t0))
         for i in list(cells[atk_cell]):
-            cells[atk_cell][i] *= f
+            if cells[atk_cell][i] is not None:               # 第二階段：缺值不可竄改
+                cells[atk_cell][i] *= f
     return out
 
 

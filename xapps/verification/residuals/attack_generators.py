@@ -118,7 +118,8 @@ def apply(windows, gen):
         for k in range(min(len(out), len(m))):
             if m[k] != 1.0 and c in out[k][1]:
                 for i in list(out[k][1][c]):
-                    out[k][1][c][i] *= m[k]
+                    if out[k][1][c][i] is not None:             # 第二階段：缺值不可竄改
+                        out[k][1][c][i] *= m[k]
     return out
 
 

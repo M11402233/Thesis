@@ -71,6 +71,16 @@ def is_percell(m=None):
     return (m or mode()).startswith("percell")
 
 
+def valid_vals(v):
+    """第二階段：延遲缺值為 None（percell_source.xapp_windows）。回傳非缺值之列表；無 None 時與 list(v.values()) 相同。"""
+    return [x for x in v.values() if x is not None]
+
+
+def mean_valid(v):
+    xs = valid_vals(v)
+    return float(sum(xs) / len(xs)) if xs else None
+
+
 def percell_aux(path, m=None):
     import datasets as DS
     m = m or mode()

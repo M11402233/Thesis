@@ -111,7 +111,7 @@ def main():
     W = dict(wins)
     # 偽造成員所用之「正常 delay」:training seeds 之 mmWave delay 全域中位數
     med_g = float(np.median([d for f in files[1:] for _, cells in X.TraceReplaySource(f).windows()
-                             for c, u in cells.items() if c != X.LTE_CELL for d in u.values()]))
+                             for c, u in cells.items() if c != X.LTE_CELL for d in u.values() if d is not None]))
 
     tw = next(w for w, cells in wins[10:] if len([c for c in cells if c != X.LTE_CELL]) >= 3)
     prev_w = tw - 1 if tw - 1 in W else tw

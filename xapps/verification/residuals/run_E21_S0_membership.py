@@ -18,8 +18,10 @@ import json
 import time
 import collections
 import numpy as np
+import interval_source as _IS                    # 第二階段：延遲缺值（None）輔助
 
-if os.environ.get("ZT_DATASET") != "d30" or os.environ.get("ZT_FUSION_ORDER") != "severity":
+
+if os.environ.get("ZT_DATASET") not in ("d30", "d30p") or os.environ.get("ZT_FUSION_ORDER") != "severity":
     raise SystemExit("E21-S0 須在 ZT_DATASET=d30 與 ZT_FUSION_ORDER=severity 下執行")
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -101,7 +103,7 @@ def inject(wins, j, t0, k, atk):
             if not mine:
                 del c2[j]
         else:
-            m = float(np.mean(list(cells[j].values())))
+            m = float(np.mean(_IS.valid_vals(cells[j])))
             for i in sel:
                 mine[i] = m
         prev = sel
