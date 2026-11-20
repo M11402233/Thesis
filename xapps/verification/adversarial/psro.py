@@ -107,7 +107,7 @@ def _val_score(role, model, train, test, opps, probs, det_mode="F", with_frr=Fal
                 if role == "det":
                     det = E.FloorDetector() if model is None else E.LearnedDetector(model, "val", det_mode)
                     ep = G.run_episode(E.new_episode(sd, cell), det, opp)
-                    R += ep.stats["det_R"]; n += ep.stats["det_n"]
+                    R += ep.stats[DET_KEYS[0]]; n += ep.stats[DET_KEYS[1]]
                     cr += ep.stats["clean_rej"]; cn += ep.stats["clean_n"]
                 else:
                     ep = _W["cache"].get(sd, cell, opp, E.new_episode)
@@ -173,11 +173,24 @@ def _train_job(args):
 
 
 # ----------------------------------------------------------------------------
+DET_KEYS = ("det_R", "det_n")      # E30 T／TL：改為 ("det_R_all", "det_n_all")（main 依 --det-mode 設定）
+
+
 def summarize(tot):
     g = lambda a, b: (tot.get(a, 0) / tot[b]) if tot.get(b) else None
-    return {"u_det": g("det_R", "det_n"), "u_atk": g("atk_R", "atk_n"), "TPR_rejected": g("tam_rej", "tam_n"),
+    return {"u_det": g(*DET_KEYS), "u_atk": g("atk_R", "atk_n"), "TPR_rejected": g("tam_rej", "tam_n"),
             "TPR_nontrusted": g("tam_nontrust", "tam_n"), "clean_false_reject": g("clean_rej", "clean_n"), "clean_nontrusted": g("clean_nontrust", "clean_n"),
-            "lure_rate_C_strict": g("lure", "lure_opp"), "counts": tot}
+            "lure_rate_C_strict": g("lure", "lure_opp"), "behaviour": behaviour(tot), "counts": tot}
+
+
+def behaviour(tot):
+    """E30 §4 行為特徵 (m, g, p, L, v)；由可加總累計量導出。無被攻陷窗（f_n = 0）→ None"""
+    n = tot.get("f_n", 0)
+    if not n:
+        return None
+    return {"m": tot["f_sum"] / n, "g": tot["f_abs"] / n, "p": tot["f_act"] / n,
+            "L": (tot["f_act"] / tot["f_seg"]) if tot.get("f_seg") else 0.0,
+            "v": (tot["f_dv"] / tot["f_dn"]) if tot.get("f_dn") else 0.0, "n": n}
 
 
 def solve(A, B):
@@ -390,7 +403,9 @@ def main():
             "packages": {p: md.version(p) for p in ("torch", "gymnasium", "stable-baselines3", "sb3-contrib", "numpy", "nashpy")},
             "hyperparameters": HP, "br_max": args.br_max, "br_every": args.br_every, "smoke": args.smoke, "stop_rule": f"NashConv <= {REL_STOP} x round-1 NashConv", "max_rounds": args.max_rounds, "payoff_split": args.payoff_split, "det_mode": args.det_mode,
             "dataset": _DSN, "delay_source": os.environ.get("ZT_DELAY_SOURCE", "cumulative")}
-    global FOLDS, OUT_BASE
+    global FOLDS, OUT_BASE, DET_KEYS
+    if args.det_mode != "F":
+        DET_KEYS = ("det_R_all", "det_n_all")
     if args.smoke:
         FOLDS, OUT_BASE = [0], OUT_BASE + "_smoke"
     else:

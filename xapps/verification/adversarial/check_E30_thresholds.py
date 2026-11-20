@@ -44,11 +44,30 @@ def main():
                     if keep != kref:
                         print("✗ C-1 stats", sd.seed, cell, mode, keep, kref); sys.exit(2)
                     moved += ep.stats["th_changes"]; n += len(ep.final)
+    # C-3（E30 §4）：腳本攻擊之行為特徵 = 定義值，且與偵測端無關（開環）
+    from psro import behaviour
+    c3 = {}
+    for atk, exp in ((G.A0[0], {"m": -0.4, "p": 1.0}), (G.A0[1], {"m": -0.2, "p": 1.0})):
+        feats = {}
+        for mode, act, det in (("F", None, E.FloorDetector()), ("T", 4, Const("T", 4)), ("TL", 12, Const("TL", 12))):
+            tot = {}
+            for f in ds.files:
+                sd = ds.get(f)
+                for cell in sd.cells_all:
+                    ep = G.run_episode(E.new_episode(sd, cell), det, atk)
+                    for k, v in ep.stats.items():
+                        tot[k] = tot.get(k, 0) + v
+            feats[mode] = behaviour(tot)
+        for mode, b in feats.items():
+            if b is None or any(abs(b[k] - v) > 1e-9 for k, v in exp.items()) or b != feats["F"]:
+                print("✗ C-3", atk.name, mode, b, "期望", exp); sys.exit(2)
+        c3[atk.name] = feats["F"]
+    print("C-3 ✓ 腳本攻擊特徵 = 定義值（step×0.6：m = −0.4、p = 1；step×0.8：m = −0.2、p = 1），F／T／TL 下相同", c3)
     if moved:
         print("✗ 「不動」策略卻有門檻變更", moved); sys.exit(2)
     print(f"C-1 ✓ T／TL 恆選凍結門檻 = F：{n:,} 筆（{len(ds.files)} seed × 全部 cell × 4 情境 × 2 模式）")
     if a.json:
-        json.dump({"C-1": {"records": n, "pass": True}}, open(a.json, "w"), indent=1)
+        json.dump({"C-1": {"records": n, "pass": True}, "C-3": c3}, open(a.json, "w"), indent=1)
 
 
 if __name__ == "__main__":

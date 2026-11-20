@@ -177,6 +177,7 @@ class Episode:
         w, cells = sd.windows[k]
         mod = dict(cells)
         tampered = False
+        self.cur_mult = multiplier if modifier is None else None   # E30 §4：本窗實際乘數（modifier 型攻擊無單一乘數 → 不計特徵）
         if self.atk in cells and (multiplier is not None or modifier is not None):
             ues = dict(cells[self.atk])
             if modifier is not None:
@@ -289,6 +290,10 @@ class Episode:
         return ch, opt, float(reg), len(truth)
 
     def det_reward(self, j, dec):
+        # E30（D-30P）：abstain（S_i 不可得，fail-closed）在 C_strict 下與 low-trust 同為「不准入」，reward 同 low-trust。
+        # E19／D-30 之學習者步從不含 abstain（abstain = 0 或由規則決定），故此對應不影響既有數字。
+        if dec == "abstain":
+            dec = "low-trust"
         if self.is_tampered(j):
             if dec == "rejected":
                 return 1.0
@@ -319,11 +324,25 @@ class Episode:
             dec = decs[j]
             if j in self.pending:                         # 偵測端之一步（下限為 trusted／low-trust）
                 s["det_R"] += self.det_reward(j, dec); s["det_n"] += 1
+            # E30 T／TL 之 u_det：全部 (節點, 秒)（規則決定者亦計，使 F 與 T／TL 同分母可比）；F 之 det_R／det_n 不變
+            s["det_R_all"] += self.det_reward(j, dec); s["det_n_all"] += 1
             if self.is_tampered(j):
                 s["tam_n"] += 1; s["tam_rej"] += dec == "rejected"; s["tam_nontrust"] += dec != "trusted"
             else:
                 s["clean_n"] += 1; s["clean_rej"] += dec == "rejected"; s["clean_nontrust"] += dec != "trusted"
         a = self.atk
+        if a is not None and k >= self.sd.t0 and a in self.reported and self.cur_mult is not None:
+            # E30 §4 行為特徵之可加總累計（被攻陷窗 = t ≥ t0 且被攻陷 cell 有上報；乘數 = 本窗 multiplier）
+            am = self.cur_mult
+            act = abs(am - 1.0) > DELTA
+            s["f_n"] += 1; s["f_sum"] += am - 1.0; s["f_abs"] += abs(am - 1.0); s["f_act"] += act
+            prev = getattr(self, "_f_prev", None)
+            if prev is not None and prev[0] == k - 1:         # 連續窗才計變化度與作用段（缺報窗截斷段落）
+                s["f_dn"] += 1; s["f_dv"] += abs(am - prev[1])
+                s["f_seg"] += act and not prev[2]
+            else:
+                s["f_seg"] += act
+            self._f_prev = (k, am, act)
         if a is not None and k >= self.sd.t0 and a in self.reported:   # 攻擊者之一步
             truth = self.sd.truth[k]
             lured = ch is not None and ch == a and ch != opt
