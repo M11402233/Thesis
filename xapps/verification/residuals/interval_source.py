@@ -93,7 +93,8 @@ def si_cells(path, m=None):
     """S_i 用：每事件 cell 之區間平均（含 LTE cell 1），[(w, {cell: {imsi: ms}})]"""
     import percell_source as PS
     m = m or mode(); aux, mw = percell_aux(path, m)
-    return PS.si_windows(aux, zero=(m == "percell_zero"), max_window=mw)
+    import datasets as DS
+    return PS.si_windows(aux, zero=(m == "percell_zero"), max_window=mw, eff=bool(DS.CFG.get("eff")))
 
 
 def ci_lists(path, m=None):
@@ -105,7 +106,8 @@ def ci_lists(path, m=None):
 def parse_percell(path, m):
     import percell_source as PS
     aux, mw = percell_aux(path, m)
-    return PS.xapp_windows(aux, zero=(m == "percell_zero"), max_window=mw)
+    import datasets as DS
+    return PS.xapp_windows(aux, zero=(m == "percell_zero"), max_window=mw, eff=bool(DS.CFG.get("eff")))
 
 
 def parse_interval(path, m=None):

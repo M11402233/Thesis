@@ -44,7 +44,8 @@ REGISTRY = {
     "d30p1": {"dir": os.path.join(ROOT, "ues30_p_r10_seeds", "analysis"), "pattern": "D30P1_ues30_t300_seed*.txt",
               "n_known": 30, "ues": None, "raw_dir": os.path.join(ROOT, "ues30_p_r10_seeds"),
               "aux_dir": os.path.join(ROOT, "ues30_p_r10_seeds"), "aux_fmt": "D30P1_ues30_t300_seed{seed}_aux",
-              "results": os.path.join(ROOT, "results", "d30p1"), "max_window": 300, "percell": True},
+              "results": os.path.join(ROOT, "results", "d30p1"), "max_window": 300, "percell": True,
+             "eff": True},   # r11：延遲 = 有效延遲樣本平均（D30P1_r10_recollection_spec.md §6.1）
 }
 PHASE2 = ("d30p", "d30p1")          # 第二階段（逐 cell 輸入）資料集
 

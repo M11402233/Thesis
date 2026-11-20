@@ -69,15 +69,32 @@ def zero_delta(aux, max_window=299):
     return _diff_cum(os.path.join(aux, "DlE2RlcStats_r9rx.txt"), (2, 3, 4), (5, 6, 7, 8), max_window)
 
 
-def si_windows(aux, zero=False, max_window=299, _pc=None, _z=None):
+def eff_delta(aux, max_window=299):
+    """r11 有效延遲樣本（D-30P1；D30P1_r10_recollection_spec.md §6.1）：
+    {k: {(cell, imsi, lcid): (dnRx, dnData, dNoTag, dEmpty, dnEff, dSumEffNs, dnPart, dSumPartNs)}}"""
+    return _diff_cum(os.path.join(aux, "DlE2RlcStats_r11eff.txt"), (2, 3, 4), (5, 6, 7, 8, 9, 10, 11, 12), max_window)
+
+
+def _cell_sum_n(k, c, i, l, d, z, ef, zero):
+    """(分子 ns, 分母) — eff 模式：同一批有效延遲樣本（分子 = ΔdelaySumEff，分母 = ΔnEff）；否則舊式：Δ delaySum ÷（ΔnRx − ΔnZero）"""
+    if ef is not None and not zero:
+        e = ef.get(k, {}).get((c, i, l), (0,) * 8)
+        return e[5], e[4]
+    return d[4], d[2] - (0 if zero else z.get(k, {}).get((c, i, l), (0, 0))[1])
+
+
+def si_windows(aux, zero=False, max_window=299, _pc=None, _z=None, eff=False):
+    """eff=True（D-30P1 主版本）：延遲 = ΔdelaySumEff ÷ ΔnEff（有效延遲樣本：帶新位元組、接收端接受、有時間戳）；
+    eff=True 且 zero=True 為對照：沿用舊式（Δ delaySum ÷ ΔnRx，含重複與零值）。"""
     pc = _pc or percell_delta(aux, max_window)
-    z = _z or zero_delta(aux, max_window)
+    z = _z or (zero_delta(aux, max_window) if not eff else {})
+    ef = eff_delta(aux, max_window) if eff else None
     out = []
     for k in sorted(pc):
         acc = collections.defaultdict(lambda: [0, 0])          # (cell, imsi) → [sumNs, n]
         for (c, i, l), d in pc[k].items():
-            n = d[2] - (0 if zero else z.get(k, {}).get((c, i, l), (0, 0))[1])
-            acc[(c, i)][0] += d[4]; acc[(c, i)][1] += n
+            sm, n = _cell_sum_n(k, c, i, l, d, z, ef, zero)
+            acc[(c, i)][0] += sm; acc[(c, i)][1] += n
         cells = collections.defaultdict(dict)
         for (c, i), (s, n) in acc.items():
             if n > 0:
@@ -136,20 +153,21 @@ def serving(aux, max_window=299):
     return out
 
 
-def xapp_windows(aux, zero=False, max_window=299):
+def xapp_windows(aux, zero=False, max_window=299, eff=False):
     """融合層用之單一歸屬視圖（phase2_percell_spec_v0.md §4 H_i-D1；步 3／4）：[(k, {cell: {imsi: delay_ms | None}})]。
     每個已連線（D-c，mmState = 9）之 UE 每窗恰屬一個 cell：
       * 當窗有 mmWave Rx PDU（任何 cell ≠ 1，ΔnRx > 0）→ 該 mmWave cell；須唯一且 = D-c serving cell，否則報錯；
       * 已連線但當窗無 mmWave Rx → LTE 錨點 cell 1（= 新 D1 定義之「mmWave 缺席」）。
     延遲 = 該 (cell, UE) 之區間平均（同 si_windows）；分母 0（例：Rx 全為零延遲 PDU、zero=False）→ None（缺值，D-f）。
     未連線之 UE 不出現（D-f）；未連線卻有 Rx → 報錯。mmWave cell 之非 None 值與 si_windows 逐值相同（check_xapp_view）。"""
-    pc = percell_delta(aux, max_window); z = zero_delta(aux, max_window); sv = serving(aux, max_window)
+    pc = percell_delta(aux, max_window); z = zero_delta(aux, max_window) if not eff else {}; sv = serving(aux, max_window)
+    ef = eff_delta(aux, max_window) if eff else None
     out = []
     for k in sorted(pc):
         acc = collections.defaultdict(lambda: [0, 0, 0])      # (cell, imsi) → [sumNs, n_valid, nRx]
         for (c, i, l), d in pc[k].items():
-            n = d[2] - (0 if zero else z.get(k, {}).get((c, i, l), (0, 0))[1])
-            a = acc[(c, i)]; a[0] += d[4]; a[1] += n; a[2] += d[2]
+            sm, n = _cell_sum_n(k, c, i, l, d, z, ef, zero)
+            a = acc[(c, i)]; a[0] += sm; a[1] += n; a[2] += d[2]
         S = sv.get(k)
         if S is None:
             raise ValueError(f"{aux}: 窗 {k} 無 UE RRC 時點")
@@ -180,9 +198,9 @@ def ci_lists(aux, max_window=299):
     return out
 
 
-def check_xapp_view(aux, zero=False, max_window=299):
+def check_xapp_view(aux, zero=False, max_window=299, eff=False):
     """xapp_windows 之 mmWave 非 None 值須與 si_windows 之 mmWave 值（集合與數值）逐位相同"""
-    a = dict(si_windows(aux, zero, max_window)); b = dict(xapp_windows(aux, zero, max_window))
+    a = dict(si_windows(aux, zero, max_window, eff=eff)); b = dict(xapp_windows(aux, zero, max_window, eff=eff))
     bad = 0; n_none = 0; n_lte = 0
     for k in a:
         for c in set(a[k]) | set(b.get(k, {})):
@@ -194,6 +212,23 @@ def check_xapp_view(aux, zero=False, max_window=299):
             if {i: v for i, v in vb.items() if v is not None} != va:
                 bad += 1
     return {"mismatch_cell_windows": bad, "mm_none_ue_windows": n_none, "lte_ue_windows": n_lte, "PASS": bad == 0}
+
+
+def check_eff(aux, max_window=299):
+    """X4（r11；D-30P1）：r11eff 與既有檔同步——每鍵 ΔnRx 相同；nEff ≤ nData ≤ nRx；nData − nEff = 非有效資料；
+    delaySumEff ≤ delaySum（有效樣本為全部有時間戳資料接收之子集，延遲非負）。不符 → 呼叫端應停止。"""
+    pc = percell_delta(aux, max_window); ef = eff_delta(aux, max_window)
+    bad_rx = bad_order = bad_sum = 0; n = 0
+    for k in set(pc) | set(ef):
+        for key in set(pc.get(k, {})) | set(ef.get(k, {})):
+            d = pc.get(k, {}).get(key); e = ef.get(k, {}).get(key)
+            n += 1
+            if d is None or e is None or d[2] != e[0]:
+                bad_rx += 1; continue
+            if not (e[4] <= e[1] <= e[0]): bad_order += 1
+            if e[5] > d[4]: bad_sum += 1
+    return {"keys_windows": n, "X4_nRx_mismatch": bad_rx, "X4_order_violation": bad_order, "X4_sumEff_gt_sum": bad_sum,
+            "PASS": bad_rx == 0 and bad_order == 0 and bad_sum == 0}
 
 
 def check(aux, max_window=299):
