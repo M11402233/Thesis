@@ -25,7 +25,7 @@ log "gate: r11 build md5 == validated build"
 # RESUME_FROM=4（2026-11-21）：收集與逐 seed 驗收已完成且全過（summary 須有 "prepare + Q-2c 8/8"），只續跑第 4 步以後；不重收。
 if [ "${RESUME_FROM:-0}" = 4 ] || [ "${RESUME_FROM:-0}" = 5 ]; then
   grep -q "prepare + Q-2c 8/8" $OUT/summary.txt || stop "RESUME_FROM=4 但 summary 無 prepare + Q-2c 8/8"
-  [ -e $P6D ] && stop "$P6D exists"
+  if [ "${RESUME_FROM:-0}" = 4 ]; then [ -e $P6D ] && stop "$P6D exists"; else [ -d $P6D/D30P1_ues30_t300_seed4200_aux ] || stop "RESUME_FROM=5 但 $P6D 無短跑 aux"; fi
   rm -f $OUT/STOPPED; fail=0; log "RESUME from step 4 (code mirror md5 ${ZT_CODE_MD5:-unset})"
 else
 [ -e $P ] && [ -n "$(ls -A $P 2>/dev/null)" ] && stop "$P not empty"
