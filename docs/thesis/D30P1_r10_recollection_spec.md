@@ -107,3 +107,13 @@
 - 6 s 與 21 s 之覆蓋記錄記憶體上界尚未於 300 s 驗證；以 mem_trace 於重收時監看。
 - 跨 cell 之重複接收僅於 6 s 短跑觀察為 0，未於 300 s 驗證。
 - 按位元組比例加權之敏感度版本尚未實作。
+
+### 6.3 P-6 之判準（2026-11-22；事後記錄）
+
+收集與逐 seed 驗收後，鏈於 P-6 停止：31 s 短跑與 300 s 完整跑之 80 個輸出檔中有 23 個不是前綴（D-30P 為 76 個中 21 個，當時註記「已知結尾誤判」而未查）。依使用者要求先查原因：
+- **原因**：`scenario-three.cc:977` `clientApp.Stop(Seconds(simTime − 0.1))`。短跑之流量於 30.9 s 停止、完整跑於 300.9 s。短跑最後 0.1 s 無新流量，干擾與排程因而不同。
+- **證據**：6 個主要 trace 檔（RxPacketTrace、MmWaveSinrTime、X2Stats、RlcAmBufferSize、EnbSchedAllocTraces、DlPhyTransmissionTrace）之第一個差異行皆在 30.91–30.916 s（後兩者為訊框 3091，10 ms 一訊框）；RxPacketTrace 首差異僅為 SINR（3.84343 對 3.57173）。t < 30.9 s 之全部 trace 逐行相同；統計檔窗 0–29 逐位相同。`*Lte*` 統計檔之窗 30（30→31 s）含此最後 0.1 s，故不同；mmWave 之 DlE2RlcStats 無窗 30（E2 NR 報表遺失最後一窗之已知副作用），故看似前綴。
+- **判準（由程式碼推得，非由資料決定）**：短跑之第一個差異不得早於 simTime_short − 0.1 s（窗列檔：窗起點 ≥ simTime_short − 1 s）；4 個結尾彙總檔（DlPdcpStats、DlRlcStats、UlRlcStats、R7b_rlc_rx_tag_hist）依總模擬時間寫出，列為彙總檔、不做逐行前綴判定。實作於 `scripts/r9/p6_prefix.py`（第 3 參數為短跑 simTime）。
+- **驗證**：D-30P1 80 檔 → 23 個預期結尾效應、0 違規；D-30P 76 檔 → 21、0 違規；負向測試 2 項（t ≈ 0.12 s 之 trace 被改；統計檔窗 4 被改）皆判為違規；未竄改之對照通過。
+- **限制**：此判準是在看到失敗之後才訂定；訊框編號以 10 ms 換算為假設（與其他 trace 之 30.91 s 一致）；彙總檔未做逐行比對。
+- F10（`p6_prefix.py` 改為依結果回傳非零）使 D-30P 即已存在之現象第一次擋住鏈。

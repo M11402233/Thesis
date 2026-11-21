@@ -23,7 +23,7 @@ b7f8667b28d83750f86e1e2873c70b32 src/lte/helper/mmwave-bearer-stats-calculator.h
 while read -r h f; do [ "$(md5sum $NS/$f | cut -d' ' -f1)" = "$h" ] || stop "md5 $f differs from the validated build"; done <<< "$want"
 log "gate: r11 build md5 == validated build"
 # RESUME_FROM=4（2026-11-21）：收集與逐 seed 驗收已完成且全過（summary 須有 "prepare + Q-2c 8/8"），只續跑第 4 步以後；不重收。
-if [ "${RESUME_FROM:-0}" = 4 ]; then
+if [ "${RESUME_FROM:-0}" = 4 ] || [ "${RESUME_FROM:-0}" = 5 ]; then
   grep -q "prepare + Q-2c 8/8" $OUT/summary.txt || stop "RESUME_FROM=4 但 summary 無 prepare + Q-2c 8/8"
   [ -e $P6D ] && stop "$P6D exists"
   rm -f $OUT/STOPPED; fail=0; log "RESUME from step 4 (code mirror md5 ${ZT_CODE_MD5:-unset})"
@@ -73,8 +73,12 @@ raise SystemExit(0 if ok and len(DS.files()) == 8 else 1)
 PY
 log "X1-X3 + X4 + aux==main 8/8"
 # 5. P-6 (31 s short run, seed 4200)
+if [ "${RESUME_FROM:-0}" = 5 ]; then   # 短跑已完成（P6_collect.log 之 ✓ 通過）；只重判 P-6，不重跑
+  grep -q "✓ 通過" $OUT/P6_collect.log || stop "RESUME_FROM=5 但 P6_collect.log 無 ✓ 通過"
+else
 VARIANT=D30P1 ZT_R10_RETX_TAG=1 NS3_DIR=$NS OUT_DIR=$P6D SIMTIME=31 SEEDS=4200 bash scripts/collect_d30p_r9.sh > $OUT/P6_collect.log 2>&1
+fi
 [ -d $P6D/D30P1_ues30_t300_seed4200_aux ] || stop "P-6 short run produced no aux (see $OUT/P6_collect.log)"
-python3 $REPO/scripts/r9/p6_prefix.py $P6D/D30P1_ues30_t300_seed4200_aux $P/D30P1_ues30_t300_seed4200_aux > $OUT/P6_prefix_4200.json; r6=$?
+python3 $REPO/scripts/r9/p6_prefix.py $P6D/D30P1_ues30_t300_seed4200_aux $P/D30P1_ues30_t300_seed4200_aux 31 > $OUT/P6_prefix_4200.json; r6=$?
 log "P-6 prefix exit $r6"; [ $r6 -eq 0 ] || stop "P-6 failed"
 log "ALL DONE"; touch $OUT/DONE
