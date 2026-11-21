@@ -114,15 +114,15 @@ E19 之 PSRO 以 LOSO **測試 seed** 之報酬表求混合策略 σ，σ 再決
 ## 7. 一致性檢查（內建；任一失敗即停，不調參數）
 
 - C-1：T 偵測端恆選凍結門檻時，與 F 逐筆相同。
-- C-2：Round 0 重現步 4–5（D-30P）之 D0 × A_0 數字（同 E19 G4）。
+- C-2：Round 0 重現步 4–5（D-30P1；2026-11-22 主資料改為 D-30P1）之 D0 × A_0 數字（同 E19 G4）。
 - C-3：§4 特徵對腳本攻擊之計算值與其定義相符（step ×0.6：m = −0.4、p = 1），且於所有偵測端（F、T、TL）下相同（開環）。
-- C-4：J5 之 F 列重現 E29 正式 Rule 欄之 ΔDR（D-30P）。
+- C-4：J5 之 F 列重現 E29 正式 Rule 欄之 ΔDR（D-30P1）。
 - C-5：F 偵測端以 `det_R_all／det_n_all` 重算之 u_det 與 `det_R／det_n` 之差異，須可由「規則決定之 (節點, 秒) 之 reward」完全解釋（逐 fold 對帳）；E30 之 payoff 表中 u_det 之 `u_det_keys` 皆為 `det_*_all`。
 - C-6：`decisions` 之各類別計數相加 = 全部 (節點, 秒)；乾淨與竄改之 n 與 `clean_n`／`tam_n` 一致。
 
 ## 8. 執行位置與順序
 
-第二階段步 7（`phase2_percell_spec_v0.md`）：D-30P 通過且步 1–5 完成後，以本規格（數值凍結後）跑 PSRO（O-full、O-outcome × 3 seed；停止規則 R-d），再計算 J1–J6。修正前資料之 E19 產物**不**用來做初步結果（Q-M4）。
+第二階段步 7（`phase2_percell_spec_v0.md`）：D-30P1 通過且步 1–5 完成後，以本規格（數值凍結後）跑 PSRO（O-full、O-outcome × 3 seed；停止規則 R-d），再計算 J1–J6。修正前資料之 E19 產物**不**用來做初步結果（Q-M4）。
 
 ## 9. 待確認
 
