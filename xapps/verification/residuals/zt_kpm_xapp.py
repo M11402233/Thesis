@@ -323,8 +323,12 @@ def verify_si(cells, target, scale):
     peers = [c for c in mmw if c != target]
     if len(peers) < MIN_PEER:
         return "unavailable", None, len(peers)
-    tgt = float(np.mean(_vals[target]))
-    ref = float(np.median([np.mean(_vals[c]) for c in peers]))
+    if os.environ.get("ZT_DELAY_SOURCE") == "percell_uemed":     # UE 層級（D30P1_si_uemed_spec.md）：cell 代表值 = UE 延遲中位數
+        tgt = float(np.median(_vals[target]))
+        ref = float(np.median([np.median(_vals[c]) for c in peers]))
+    else:
+        tgt = float(np.mean(_vals[target]))
+        ref = float(np.median([np.mean(_vals[c]) for c in peers]))
     z = abs(tgt - ref) / scale
     return ("violated" if z > TAU_S else "normal"), round(z, 2), len(peers)
 

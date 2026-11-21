@@ -37,7 +37,7 @@ def inflate(wins, j, t0, k):
             nmod.append(0)
             continue
         c2 = {c: dict(u) for c, u in cells.items()}
-        m = float(np.mean(_IS.valid_vals(cells[j])))
+        m = float(_IS.node_value(_IS.valid_vals(cells[j]), np.mean))
         for f in range(9001, 9001 + k):
             c2[j][f] = m
         out[t] = (w, c2)

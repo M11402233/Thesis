@@ -9,6 +9,8 @@
   percell        第二階段（phase2_percell_spec_v0.md §4、§9.1 Q-P5）：r9 之 _percell／_r9rx，cell = 事件自身 cell（D-b），
                  排除零延遲 PDU；分母 0 → 該 (cell, UE) 缺值（D-f，不出現、不報錯）。僅限登錄 r9 aux 之資料集（d30p）
   percell_zero   同上但含零延遲 PDU（Q-P5 之對照版本）
+  percell_uemed  延遲資料同 percell；S_i 之 cell 代表值改為**該 cell 當窗各 UE 區間延遲之中位數**（原為平均）
+                 （使用者 2026-11-22 決定「UE 層級」；規格 docs/thesis/D30P1_si_uemed_spec.md）。其餘 mode 逐位不變
   percell*：parse_interval（→ TraceReplaySource、融合層）回傳 percell_source.xapp_windows 之單一歸屬視圖
            （延遲缺值為 None；mmWave 非 None 值 = si_windows）；cell_delay_means（S_i／E9 族）與 si_cells 直接用 si_windows。
 共同約定：
@@ -19,7 +21,7 @@
 """
 import os, collections
 
-MODES = ("cumulative", "reconstructed", "exact", "percell", "percell_zero")
+MODES = ("cumulative", "reconstructed", "exact", "percell", "percell_zero", "percell_uemed")
 
 
 def mode():
@@ -71,6 +73,18 @@ def is_percell(m=None):
     return (m or mode()).startswith("percell")
 
 
+def uemed(m=None):
+    return (m or mode()) == "percell_uemed"
+
+
+def node_value(xs, mean_fn):
+    """S_i 之 cell 代表值：percell_uemed → 各 UE 延遲之中位數；其餘 → 呼叫端原有之平均式 mean_fn（逐位不變）。xs 須無 None。"""
+    if uemed():
+        import numpy as np
+        return float(np.median(xs))
+    return mean_fn(xs)
+
+
 def valid_vals(v):
     """第二階段：延遲缺值為 None（percell_source.xapp_windows）。回傳非缺值之列表；無 None 時與 list(v.values()) 相同。"""
     return [x for x in v.values() if x is not None]
@@ -79,6 +93,12 @@ def valid_vals(v):
 def mean_valid(v):
     xs = valid_vals(v)
     return float(sum(xs) / len(xs)) if xs else None
+
+
+def median_valid(v):
+    import numpy as np
+    xs = valid_vals(v)
+    return float(np.median(xs)) if xs else None
 
 
 def percell_aux(path, m=None):
@@ -167,5 +187,5 @@ def cell_delay_means(path, m=None):
     {w: {cell: 該 cell 當窗各 UE 延遲之平均 (ms)}}，排除 LTE 錨點（cell 1）。延遲語意依 mode。"""
     out = {}
     for w, cells in (si_cells(path, m) if is_percell(m) else parse_interval(path, m)):
-        out[w] = {c: float(sum(u.values()) / len(u)) for c, u in cells.items() if c != 1 and u}
+        out[w] = {c: node_value(list(u.values()), lambda xs: float(sum(xs) / len(xs))) for c, u in cells.items() if c != 1 and u}
     return out

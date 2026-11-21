@@ -5,9 +5,9 @@
 # 任一步失敗即停（硬性規則 5），不調參數。
 # 用法：DATASET=d30p1 VARIANT=percell setsid nohup bash scripts/run_phase2_step345.sh > /dev/null 2>&1 < /dev/null &
 set -u
-DATASET="${DATASET:?DATASET=d30p|d30p1}"; VARIANT="${VARIANT:?VARIANT=percell|percell_zero}"
+DATASET="${DATASET:?DATASET=d30p|d30p1}"; VARIANT="${VARIANT:?VARIANT=percell|percell_zero|percell_uemed}"
 case "$DATASET" in d30p|d30p1) ;; *) echo "DATASET 不合法"; exit 2 ;; esac
-case "$VARIANT" in percell|percell_zero) ;; *) echo "VARIANT 不合法"; exit 2 ;; esac
+case "$VARIANT" in percell|percell_zero|percell_uemed) ;; *) echo "VARIANT 不合法"; exit 2 ;; esac
 REPO=~/oran-zt-kpm-verification; CODE="${CODE:-$HOME/zt_dev/p2/xapps/verification/residuals}"; PY="${PY:-$HOME/venvs/drl/bin/python}"
 export ZT_DATASET=$DATASET ZT_DELAY_SOURCE=$VARIANT ZT_FUSION_ORDER=severity MPLBACKEND=Agg OMP_NUM_THREADS=4
 unset ZT_RESULTS_DIR

@@ -104,7 +104,7 @@ def inject(wins, j, t0, k, atk):
             if not mine:
                 del c2[j]
         else:
-            m = float(np.mean(_IS.valid_vals(cells[j])))
+            m = float(_IS.node_value(_IS.valid_vals(cells[j]), np.mean))
             for i in sel:
                 mine[i] = m
         prev = sel

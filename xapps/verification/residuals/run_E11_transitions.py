@@ -69,7 +69,7 @@ def inject(windows, kind, target, k0, T, mean):
         for k in ks:
             c = out[k][1]
             if target in c:
-                c[target][FAKE_IMSI] = float(np.mean(_IS.valid_vals(c[target])))
+                c[target][FAKE_IMSI] = float(_IS.node_value(_IS.valid_vals(c[target]), np.mean))
     elif kind == "Ci_deflate":
         ues = ue_on(out[k0][1], target)
         if not ues:
@@ -169,8 +169,8 @@ def trace(windows, anchor, n_known):
             if len(peers) < X.MIN_PEER or not _IS.valid_vals(cells[j]):
                 si, z = "unavailable", None
             else:
-                tgt = float(np.mean(_IS.valid_vals(cells[j])))
-                ref = float(np.median([np.mean(_IS.valid_vals(cells[c])) for c in peers]))
+                tgt = float(_IS.node_value(_IS.valid_vals(cells[j]), np.mean))
+                ref = float(np.median([_IS.node_value(_IS.valid_vals(cells[c]), np.mean) for c in peers]))
                 z = abs(tgt - ref) / anchor.scale
                 si = "violated" if z > X.TAU_S else "normal"
             mine = {i: lv for i, lv in lev.items() if last_srv.get(i) == j}

@@ -16,7 +16,7 @@ for f in files:
     for w, cells in (IS.si_cells(f) if IS.is_percell() else X.TraceReplaySource(f).windows()):
         mm = [c for c in cells if c != X.LTE_CELL]
         if len(mm) >= 2:
-            d = np.array([np.mean(list(cells[c].values())) for c in mm])
+            d = np.array([IS.node_value(list(cells[c].values()), np.mean) for c in mm])
             if d.mean() > 0: cvs.append(float(d.std() / d.mean()))
 q = lambda x: dict(median=float(np.median(x)), q25=float(np.percentile(x, 25)), q75=float(np.percentile(x, 75)), n=len(x))
 out = {"delay_source": m, "files": [os.path.basename(f) for f in files], "delay_cv": q(cvs)}

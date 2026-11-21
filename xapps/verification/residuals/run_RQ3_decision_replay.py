@@ -139,7 +139,7 @@ def true_delays(windows):
     out = []
     for w, cells in windows:
         import interval_source as _IS
-        out.append({c: float(np.mean(_IS.valid_vals(v)))
+        out.append({c: float(_IS.node_value(_IS.valid_vals(v), np.mean))
                     for c, v in cells.items() if c != X.LTE_CELL and _IS.valid_vals(v)})
     return out
 

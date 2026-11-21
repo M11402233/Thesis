@@ -1,14 +1,14 @@
 #!/bin/bash
 # 第二階段步 2：S_i 於 D-30P 新輸入（規格 docs/thesis/phase2_percell_spec_v0.md §5 步 2、§4、§9.1 Q-P5）。
 # 新機器執行（D-30P 在新機器）。程式目錄 CODE（預設 ~/zt_dev/phase2/residuals，與 repo commit 同步之鏡像）。
-# VARIANT=percell（主：排除零延遲 PDU）｜percell_zero（對照：含零延遲）。輸出 data/results/d30p_delay_<VARIANT>/。
+# VARIANT=percell（主：排除零延遲 PDU）｜percell_zero（對照：含零延遲）｜percell_uemed（D-30P1：cell 代表值 = UE 延遲中位數，D30P1_si_uemed_spec.md）。輸出 data/results/d30p_delay_<VARIANT>/。
 # 門檻、注入、尺度公式皆不變（Q-P6）；尺度由各腳本依原定義於 D-30P 以 LOSO 重估。
 # E13 含融合層（E10.run_policy），移至步 4；E-i 只定義於 D-30（舊凍結尺度），第二階段不跑。
 # 任一步失敗即停（硬性規則 5），不調參數。
 # 用法：VARIANT=percell setsid nohup bash scripts/run_phase2_step2.sh > /dev/null 2>&1 < /dev/null &
 set -u
-VARIANT="${VARIANT:?VARIANT=percell|percell_zero}"
-case "$VARIANT" in percell|percell_zero) ;; *) echo "VARIANT 不合法"; exit 2 ;; esac
+VARIANT="${VARIANT:?VARIANT=percell|percell_zero|percell_uemed}"
+case "$VARIANT" in percell|percell_zero|percell_uemed) ;; *) echo "VARIANT 不合法"; exit 2 ;; esac
 REPO=~/oran-zt-kpm-verification; CODE="${CODE:-$HOME/zt_dev/phase2/residuals}"; PY="${PY:-$HOME/venvs/drl/bin/python}"
 # D30P1_r10_recollection_spec.md F5：DATASET=d30p（預設，行為不變）｜d30p1
 DATASET="${DATASET:-d30p}"
