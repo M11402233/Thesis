@@ -22,6 +22,12 @@ dc7458cac41d1d64c63c3ae14197a9a9 build/lib/libns3.38.rc1-mmwave-optimized.so
 b7f8667b28d83750f86e1e2873c70b32 src/lte/helper/mmwave-bearer-stats-calculator.h"
 while read -r h f; do [ "$(md5sum $NS/$f | cut -d' ' -f1)" = "$h" ] || stop "md5 $f differs from the validated build"; done <<< "$want"
 log "gate: r11 build md5 == validated build"
+# RESUME_FROM=4（2026-11-21）：收集與逐 seed 驗收已完成且全過（summary 須有 "prepare + Q-2c 8/8"），只續跑第 4 步以後；不重收。
+if [ "${RESUME_FROM:-0}" = 4 ]; then
+  grep -q "prepare + Q-2c 8/8" $OUT/summary.txt || stop "RESUME_FROM=4 但 summary 無 prepare + Q-2c 8/8"
+  [ -e $P6D ] && stop "$P6D exists"
+  rm -f $OUT/STOPPED; fail=0; log "RESUME from step 4 (code mirror md5 ${ZT_CODE_MD5:-unset})"
+else
 [ -e $P ] && [ -n "$(ls -A $P 2>/dev/null)" ] && stop "$P not empty"
 [ -e $P6D ] && stop "$P6D exists"
 # 1. collect
@@ -54,6 +60,7 @@ for s in 4200 4201 4202 4203 4204 4205 4206 4207; do
 done
 [ $fail -eq 0 ] || stop "Q-2c failed"
 log "prepare + Q-2c 8/8"
+fi   # end of RESUME_FROM guard
 # 4. new-input layer X1-X3 + aux_matches_main
 (cd $RES && ZT_DATASET=d30p1 $PY - ) > $OUT/X123.log 2>&1 <<'PY' || stop "X1-X3 / aux_matches_main failed"
 import os, datasets as DS, percell_source as PS

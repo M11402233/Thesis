@@ -223,8 +223,12 @@ def check_eff(aux, max_window=299):
         for key in set(pc.get(k, {})) | set(ef.get(k, {})):
             d = pc.get(k, {}).get(key); e = ef.get(k, {}).get(key)
             n += 1
-            if d is None or e is None or d[2] != e[0]:
+            # r11eff 只對「曾有接收」之鍵產生列；percell 該鍵該窗僅傳送（nRx = 0）而 r11eff 無列為正常（與 check_d30p1_phase0.q4 一致）。
+            # 任一方有 nRx > 0 而另一方無列或數值不同 → 不一致。
+            if (d is None and e[0] != 0) or (e is None and d[2] != 0) or (d is not None and e is not None and d[2] != e[0]):
                 bad_rx += 1; continue
+            if d is None or e is None:
+                continue
             if not (e[4] <= e[1] <= e[0]): bad_order += 1
             if e[5] > d[4]: bad_sum += 1
     return {"keys_windows": n, "X4_nRx_mismatch": bad_rx, "X4_order_violation": bad_order, "X4_sumEff_gt_sum": bad_sum,
