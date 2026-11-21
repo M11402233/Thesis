@@ -17,7 +17,12 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
-OUT = os.path.join(ROOT, "data", "results", "d30_fusion_order", "severity", "M2")
+_DSN = os.environ.get("ZT_DATASET")
+PHASE2 = ("d30p", "d30p1")          # 第二階段資料集（與 datasets.PHASE2 相同）；2026-11-22 加入（步 6）
+if _DSN in PHASE2:                  # 輸出至該資料集與延遲來源之結果目錄，不覆寫 D-30 之 M2
+    OUT = os.path.join(ROOT, "data", "results", f"{_DSN}_delay_{os.environ.get('ZT_DELAY_SOURCE', '')}", "M2")
+else:
+    OUT = os.path.join(ROOT, "data", "results", "d30_fusion_order", "severity", "M2")
 BK = os.path.join(ROOT, "data", "results", "d30", "drl", "psro_newmachine_20261111")
 NEW_PREFIX = "/home/cindy/oran-zt-kpm-verification/data/results/d30/drl/psro/"
 RUNS = [(lv, t) for lv in ("O-full", "O-outcome") for t in (0, 1, 2)]
@@ -148,10 +153,16 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     if a.part == "report":
         return report()
-    if os.environ.get("ZT_DATASET") != "d30" or os.environ.get("ZT_FUSION_ORDER") != "severity":
-        raise SystemExit("須 ZT_DATASET=d30 ZT_FUSION_ORDER=severity")
+    if os.environ.get("ZT_FUSION_ORDER") != "severity" or not (
+            _DSN == "d30" or (_DSN in PHASE2 and os.environ.get("ZT_DELAY_SOURCE", "").startswith("percell"))):
+        raise SystemExit("須 ZT_FUSION_ORDER=severity 且 ZT_DATASET=d30，或 ZT_DATASET=d30p／d30p1 且 ZT_DELAY_SOURCE=percell*")
+    if _DSN in PHASE2 and a.part == "L":   # part L 讀 D-30 之 PSRO 模型（BK／NEW_PREFIX）；第二階段之模型於步 7 才產生
+        raise SystemExit("第二階段資料集之 part L 須待步 7（E30）產生模型後另行指定模型路徑；目前只支援 part V")
+    envp = os.path.join(OUT, f"env_run{a.run}_{a.part}.txt")
+    if os.path.exists(envp) or os.path.exists(os.path.join(OUT, f"M2_{a.part}_run{a.run}.json")):   # 不覆寫既有量測紀錄（2026-11-22）
+        raise SystemExit(f"run {a.run} part {a.part} 之紀錄已存在於 {OUT}；換 --run 編號，不覆寫")
     ok, env = idle_check()
-    with open(os.path.join(OUT, f"env_run{a.run}_{a.part}.txt"), "w") as fh:
+    with open(envp, "w") as fh:
         fh.write(json.dumps(env, ensure_ascii=False, indent=1))
     if not ok:
         print(f"✗ M2-3 閒置條件不符：{env}\n停止。"); sys.exit(2)
