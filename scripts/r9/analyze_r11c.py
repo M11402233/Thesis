@@ -44,7 +44,7 @@ for s in SEEDS:
     Q = []; E = []; trunc_t = Co.Counter()
     for l in open(os.path.join(tr, 'R10_trace.txt')):
         f = l.rstrip('\n').split('\t'); t = f[0]
-        if len(f) != {'T': 11, 'D': 19, 'R': 14, 'Q': 6, 'E': 10}.get(t, -1): trunc_t[t] += 1; continue   # 截斷行／未知行
+        if len(f) != {'T': 11, 'D': 19, 'R': 14, 'Q': 7, 'E': 10}.get(t, -1): trunc_t[t] += 1; continue   # 截斷行／未知行
         if t == 'T':
             k = (int(f[10]), int(f[2]), int(f[3]), int(f[5]), int(f[8]))       # imsi, rnti, lcid, sn, tagT
             if f[4] == 'N': newk[k] = int(f[1])
