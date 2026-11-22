@@ -65,3 +65,12 @@
 - 2026-11-22 14:38:08 UTC：全部跑完（每 seed 約 1.7–2.0 h，maxRSS 約 0.6 GB）。**G0′ 通過（85 檔 0 差異）、G1′ 通過（85 檔 0 差異）；G2′ 4201 通過，4200／4202／4203 未通過** → 依 §6 停止，**未執行 §6 分析、未看任何換手指標**。
 - G2′ 未通過之內容（唯讀診斷，新機器 `/tmp/rxcmp.py`；逐列比對 `RxPacketTrace.txt` 至流量停止時間 30.9 s）：三個 seed 之 55 個比對檔中只有 `RxPacketTrace.txt` 不同；差異列 4200：7／2,314,127、4202：1,047／2,125,894、4203：1／2,402,086，4201：0；**差異只在第 13 欄 SINR(dB)**，最大絕對差 1e-4（輸出精度之末位）；其餘欄位（含 mcs、tbSize、corrupt、TBler）與列數全同。
 - 成因：參照資料 D-30H（`~/ns-3-mmwave-oran-r8d`）為 GCC 11.4.0 編譯；r11c 為 GCC 13.4.0（`strings libns3*-mmwave*.so`）。與 2026-11-19 D-30P 第 0 階段（P-2 只差 RxPacketTrace SINR 末位）同一現象。**本規格設計 G2′ 時未考慮此已知之編譯器差異，屬規格疏漏。** 未修改閘門、未調參數；處理方式待使用者決定。
+
+## 8a. 補做：同編譯器之比對基準（2026-11-22 使用者決定「依照建議執行」；結果出來前寫定）
+
+- 目的：G2′ 之參照（D-30H，r8d，GCC 11.4.0）與 r11c（GCC 13.4.0）編譯器不同。改以**同編譯器**之參照重做 G2′；**判準不變**（`p6_prefix.py`，同一排除清單，SIMTIME_SHORT = 31）。
+- 建置：`scripts/r9/build_r8d_g13.sh` 將 `~/ns-3-mmwave-oran-r8d` 原始碼複製到 `~/ns-3-mmwave-oran-r8d-g13`（不含 build；`diff -rq` 須相同），以 g++-13 configure，其餘 CMake 設定須與 r8d／r11c 相同（腳本列出比對）。r8d 原樹不動。
+- 執行：`scripts/r9/run_r8d_g13_ref.sh`，seed 4200–4203、`--simTime=31`，命令列與環境同 `collect_d30h_r8.sh`（`ZT_R7_S2=1`、`--totalUes=30 --e2nrEnabled=true --trafficModel=0 --handoverMode=FixedTtt --configuration=1 --minSpeed=3 --maxSpeed=10 --indicationPeriodicity=1.0 --heuristicType=-1`）。輸出 `data/r11c_ho/ref_g13_<seed>/`（僅診斷）。
+- **G2′-g13（閘門）**：`p6_prefix.py stage_<seed> ref_g13_<seed> 31`，四個 seed 皆須 exit 0。任一不通過 → 停止回報。
+- **I-c（資訊，不作閘門）**：`p6_prefix.py ref_g13_<seed>(排除同上) D-30H 31`，預期只有 `RxPacketTrace.txt` 之 SINR 末位不同；用以確認 G2′ 原失敗僅來自編譯器。若出現其他差異 → 停止回報。
+- 四個 seed 皆通過 G2′-g13 後，才依 §6 執行分析。
