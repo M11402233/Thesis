@@ -120,8 +120,12 @@ def hostats(x):
             'dur_median_ms': float(np.median(dur)) * 1e3, 'dur_p99_ms': float(np.percentile(dur, 99)) * 1e3}
 status = open(os.path.join(HO, 'status.txt')).read()
 if not os.environ.get('R11C_SKIPGATE'):
-    for g in ('G0 PASS', 'G1 PASS') + tuple(f'G2 {s} PASS' for s in SEEDS):
+    # G2′ 以規格 §8a 之同編譯器參照版（status_g13.txt 之 G2g13）為準；第一次 G2′（GCC 11 參照）失敗之紀錄保留於 status.txt
+    status13 = open(os.path.join(HO, 'status_g13.txt')).read()
+    for g in ('G0 PASS', 'G1 PASS'):
         if g not in status: raise SystemExit(f'gate missing: {g}')
+    for s in SEEDS:
+        if f'G2g13 {s} PASS' not in status13: raise SystemExit(f'gate missing: G2g13 {s} PASS')
 res = {'spec': 'D30P1_ho_pilot_spec.md v0', 'HO': {}, 'NoAuto': {}}
 pool = {'HO': Co.Counter(), 'NoAuto': Co.Counter()}
 for lab, D in (('HO', HO), ('NoAuto', NA)):
