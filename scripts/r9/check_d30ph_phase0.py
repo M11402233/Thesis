@@ -19,6 +19,7 @@ SKIP = {'mem_trace.tsv', 'run.log', 'meta.txt'}
 AGG = {'DlPdcpStats.txt', 'DlRlcStats.txt', 'UlRlcStats.txt', 'R7b_rlc_rx_tag_hist.txt'}
 FRAME = {'EnbSchedAllocTraces.txt', 'DlPhyTransmissionTrace.txt'}
 SINR_COL = 13
+TOL_SINR = True            # q2h：True（GCC 差異）；equal：False（同二進位，須逐位相同）
 
 
 def op(p):
@@ -35,7 +36,7 @@ def norm(name, l):
     if name.startswith('bsState'):
         f = l.split()
         return ' '.join(f[:1] + f[2:])
-    if name == 'RxPacketTrace.txt':
+    if name == 'RxPacketTrace.txt' and TOL_SINR:
         f = l.rstrip('\n').split('\t')
         if len(f) > SINR_COL:
             f[SINR_COL] = '*'
@@ -125,7 +126,30 @@ def q2h(ph, ref, prefix_simt=None):
     return {'check': 'Q-2H', 'pass': not bad, 'failed': bad, 'n_compared': len(res), 'notes': notes, 'files': res}
 
 
+def equal(a, b):
+    """確定性檢查：兩個 aux 目錄（同二進位、同命令列、同 seed）之全部檔案須逐位相同（同 q2h 之牆鐘欄處理，無 SINR 容忍、無排除清單）。"""
+    global TOL_SINR
+    TOL_SINR = False
+    res, bad = {}, []
+    names = {base(f) for f in os.listdir(a)} | {base(f) for f in os.listdir(b)}
+    for n in sorted(names):
+        if n in SKIP or n.startswith('check_r9'):
+            continue
+        pa, pb = find(a, n), find(b, n)
+        if pa is None or pb is None:
+            res[n] = 'MISSING_IN_' + ('A' if pa is None else 'B'); bad.append(n); continue
+        st, _, ok = compare(n, pa, pb, None)
+        res[n] = st
+        if not ok:
+            bad.append(n)
+    return {'check': 'EQUAL', 'pass': not bad, 'failed': bad, 'n_compared': len(res), 'files': res}
+
+
 if __name__ == '__main__':
+    if len(sys.argv) >= 4 and sys.argv[1] == 'equal':
+        r = equal(sys.argv[2], sys.argv[3])
+        print(json.dumps(r, ensure_ascii=False, indent=1))
+        sys.exit(0 if r['pass'] else 1)
     if len(sys.argv) < 4 or sys.argv[1] != 'q2h':
         raise SystemExit(__doc__)
     r = q2h(sys.argv[2], sys.argv[3], float(sys.argv[4]) if len(sys.argv) > 4 else None)

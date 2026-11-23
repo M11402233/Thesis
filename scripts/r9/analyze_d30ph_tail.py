@@ -56,8 +56,8 @@ def metrics(agg, nue, nwin):
 
 
 def find(d, s):
-    for v in ('D30PH', 'D30P1'):
-        p = os.path.join(d, f'{v}_ues30_t300_seed{s}_aux', 'DlE2RlcStats_r11eff.txt')
+    for v, n in (('D30PH', 30), ('D30P1', 30), ('D50PH', 50)):
+        p = os.path.join(d, f'{v}_ues{n}_t300_seed{s}_aux', 'DlE2RlcStats_r11eff.txt')
         if os.path.exists(p):
             return p
     raise SystemExit(f'找不到 seed {s} 之 r11eff 於 {d}')
@@ -68,6 +68,7 @@ def main():
     ap.add_argument('ph'); ap.add_argument('p1')
     ap.add_argument('--nwin', type=int, default=300); ap.add_argument('--seeds', default='4200,4201,4202,4203,4204,4205,4206,4207')
     ap.add_argument('--self', nargs=2, metavar=('PH_FILE_FMT', 'P1_FILE_FMT'), help='乾跑：以 {s} 代 seed 之完整路徑格式')
+    ap.add_argument('--nue', type=int, default=30, help='UE 數（覆蓋率分母；預設 30＝D-30 系列，與先前行為相同）')
     ap.add_argument('--out')
     a = ap.parse_args()
     seeds = [int(x) for x in a.seeds.split(',')]
@@ -78,10 +79,10 @@ def main():
         for lab, d, fmt in (('PH', a.ph, a.self[0] if a.self else None), ('P1', a.p1, a.self[1] if a.self else None)):
             p = fmt.format(s=s) if fmt else find(d, s)
             agg, gaps = ue_windows(p, a.nwin)
-            r[lab] = dict(metrics(agg, 30, a.nwin), key_gaps=gaps, file=p)
+            r[lab] = dict(metrics(agg, a.nue, a.nwin), key_gaps=gaps, file=p)
             pool[lab].update({(s,) + k: v for k, v in agg.items()})
         res['per_seed'][s] = r
-    P = {lab: metrics(v, 30 * len(seeds), a.nwin) for lab, v in pool.items()}
+    P = {lab: metrics(v, a.nue * len(seeds), a.nwin) for lab, v in pool.items()}
     res['pooled'] = P
     w_ph, w_p1 = P['PH']['W1_gt1s'], P['P1']['W1_gt1s']
     ratio = None if not w_p1 else w_ph / w_p1
