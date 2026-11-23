@@ -70,3 +70,4 @@
 驗收全過 → 另寫分析規格（成員變動、`ZT_DATASET` 登記、S_i 在換手資料上之定義），經使用者確認後才跑分析。驗收失敗 → 依 §4 回報，等待使用者決定。
 
 ## 8. 執行紀錄
+- 2026-11-23 02:33:17 UTC（台灣 10:33）：`scripts/r9/d30ph_chain.sh` 啟動（`setsid nohup`，log `data/results/phase2/D30PH_chain.log`）。啟動閘門通過（r11 md5 與凍結值相同）；8 個 seed 同時執行；以 `/proc/<pid>/environ` 與 `pgrep` 確認命令列為 `--RngRun=<s> --simTime=301 --totalUes=30 --e2nrEnabled=true --handoverMode=FixedTtt --configuration=1 --minSpeed=3 --maxSpeed=10 --indicationPeriodicity=1.0 --heuristicType=-1`，環境變數僅 `ZT_R7_S2=1`、`ZT_R10_RETX_TAG=1`。預估完成 20–30 h（約 11/24 下午至 11/25 上午，台灣時間），之後鏈自動做逐 seed 驗收與 P-6（再約 2 h）。
