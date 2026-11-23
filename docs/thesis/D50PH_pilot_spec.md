@@ -52,3 +52,4 @@
 - 判讀腳本乾跑：以 30 UE 小型驗證之既有資料（`r11c_ho`／`r11c_causal`，已看過）於 `/tmp/d50_dry` 以符號連結建構（只寫該目錄內之 `tail.json`／`decision.json`）。端到端可執行；W1 比值 0.01346、換手次數 517／386／469／483 與先前報告一致；預期之失敗全部出現（無 `meta.txt` → Q-0 失敗；30 UE 資料對 50 UE 分母 → 覆蓋率 0.599 < 0.70）。**判準未因乾跑調整。**
 
 ## 7. 執行紀錄
+- 2026-11-23 09:52:54 UTC（台灣 17:52）：`scripts/r9/run_d50_pilot.sh` 啟動（`setsid nohup`，log `data/pilot_d50_run.log`、`data/pilot_d50/summary.txt`）。閘門通過；9 個模擬同時執行；已核對命令列：`ho` 臂含 `--handoverMode=FixedTtt`，`na` 臂不含，其餘相同（`--totalUes=50`），環境變數僅 `ZT_R7_S2=1`、`ZT_R10_RETX_TAG=1`。預估約 4 h（估計）→ 台灣時間約 22:00 前後；完成後自動執行 `d50_pilot_report.py`。
