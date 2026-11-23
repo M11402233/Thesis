@@ -25,3 +25,4 @@
 收齊並通過後：分析用主檔（50 UE 版 `prepare`）與 `datasets.py` 之 50 UE 登錄、各檢查中硬編碼之 30（N_known 等）改為 50，另寫規格；第四章全部以 50 UE 重跑。**不得終止；加開實例須問使用者；分析腳本不得寫入 `data/ues50_ph_r11_seeds/`。**
 
 ## 6. 執行紀錄
+- 2026-11-23 15:34:55 UTC（台灣 23:34）：`scripts/r9/d50ph_chain.sh` 啟動（`setsid nohup`，log `data/results/d50ph_chain.log`、`data/results/phase2/D50PH_phase0/summary.txt`）。閘門通過；8 個模擬同時；已核對命令列（`--totalUes=50 --handoverMode=FixedTtt --simTime=301`）與環境變數（僅 `ZT_R7_S2=1`、`ZT_R10_RETX_TAG=1`）。預估 52–92 h → 台灣時間約 11/26 03:30 至 11/27 21:30（估計）。啟動指令之 `timeout` 短於 `sleep` 而被切斷，之後重新查證僅有一條鏈、8 個模擬，無重複啟動。
