@@ -26,3 +26,5 @@
 
 ## 6. 執行紀錄
 - 2026-11-23 15:34:55 UTC（台灣 23:34）：`scripts/r9/d50ph_chain.sh` 啟動（`setsid nohup`，log `data/results/d50ph_chain.log`、`data/results/phase2/D50PH_phase0/summary.txt`）。閘門通過；8 個模擬同時；已核對命令列（`--totalUes=50 --handoverMode=FixedTtt --simTime=301`）與環境變數（僅 `ZT_R7_S2=1`、`ZT_R10_RETX_TAG=1`）。預估 52–92 h → 台灣時間約 11/26 03:30 至 11/27 21:30（估計）。啟動指令之 `timeout` 短於 `sleep` 而被切斷，之後重新查證僅有一條鏈、8 個模擬，無重複啟動。
+- **2026-11-24 05:52 UTC（台灣 13:52）停止 seed 4206、4207（使用者決定「停掉 2 個 seed 換安全」）**：全長收集之每個模擬之 RSS 隨模擬時間線性增長（約 8.8 MB／模擬秒／行程；25 s 為 750 MB、79 s 為 1,240 MB；31 s 試跑看不到），8 個推至 301 s 約 26 GB／31 GB，預估結束時 MemAvailable 僅 1.7–2.8 GB（防護線 600 MB，8 個收集器各自檢查、可能同時觸發）。停止時模擬約 80 s；收集腳本將被終止之模擬當作結束並寫出主檔，但其 N 檢查標為「未通過」（80／79 窗，exit=143），**未混入**：輸出（含主檔、aux、log）改名封存為 `data/ues50_ph_r11_seeds_stopped_20261124/`（`README_STOPPED.txt`；僅診斷、不得併入、未刪除）。**所餘 6 個 seed（4200–4205）繼續**；鏈腳本於收集結束後對 4206／4207 記「NO MAIN OUTPUT」並以 STOPPED 結束，其餘 6 個 seed 之逐 seed 驗收照常執行與記錄（此 STOPPED 為預期，不代表 6 個 seed 失敗，須看 `summary.txt` 各 seed 行）。**P-6 可比之 4200–4203 皆保留**。
+- **影響與待決**：D-50PH 之 seed 數由 8 降為 6（4200–4205），窗數 6 × 300；4206／4207 是否之後補跑（約 2–4 天、須同時執行數量受限）待使用者決定。正文須如實寫 6 seed。
