@@ -56,7 +56,7 @@ def metrics(agg, nue, nwin):
 
 
 def find(d, s):
-    for v, n in (('D30PH', 30), ('D30P1', 30), ('D50PH', 50)):
+    for v, n in (('D30PH', 30), ('D30P1', 30), ('D50PH', 50), ('DS12', 12)):
         p = os.path.join(d, f'{v}_ues{n}_t300_seed{s}_aux', 'DlE2RlcStats_r11eff.txt')
         if os.path.exists(p):
             return p
