@@ -50,8 +50,8 @@
 3. pilot 通過後收 8 seed。
 
 **於第 2 台 i7-14700 執行之條件**（避免跨機器差異混入資料）：
-- 使用**同一 r11 二進位**（md5 相同）；不得在該機重新編譯後直接收集——前例：GCC 11 與 GCC 13 之建置使 `RxPacketTrace` 之 SINR 欄末位不同（D-30P phase-0，P-2）。
-- 收集前以短跑與本機同 seed、同命令列之輸出比對（`check_d30ph_phase0.py equal`），逐位相同才收。
+- **舊機器（Xeon Silver 4110，4 核，2026-11-26 唯讀檢查）無法使用同一二進位**：CPU 指令集不同（含 AVX-512），r11 須由原始碼重新建置，D-S12 之模擬器為「同原始碼、不同建置」；原始碼 md5 須與新機器 r11 相同，輸出差異以 X-1 量測（`DS12_pilot_spec.md` §3、§5）。
+- 若改用同型號之第 2 台 i7-14700：可使用同一 r11 二進位（md5 相同），收集前以短跑與本機同 seed、同命令列比對（`check_d30ph_phase0.py equal`），逐位相同才收。前例：GCC 11 與 GCC 13 之建置使 `RxPacketTrace` 之 SINR 欄末位不同（D-30P phase-0，P-2）。
 - 該機之 CPU 隔離、記憶體與 swap 設定【待填】（本機之 isolcpus 情形見記憶 `newmachine-isolcpus-2026-11-23`）。
 
 ### 2.3 運算資源分配（D2）
